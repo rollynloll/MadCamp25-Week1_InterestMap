@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">madClass01</string>
+    <!-- Replace with your Kakao Native App Key (without 'Kakao' prefix) -->
+    <string name="kakao_native_app_key">YOUR_KAKAO_NATIVE_APP_KEY</string>
+    <string name="login_title">OmO</string>
+    <string name="login_subtitle1">사진으로 만나는</string>
+    <string name="login_subtitle2">나와 꼭 맞는 사람들</string>
+    <string name="login_caption">AI가 분석한 취향으로\n새로운 인연을 시작하세요</string>
+    <string name="kakao_login_button">카카오로 시작하기</string>
+    <string name="login_terms">계속 진행하면 서비스 이용약관 및\n개인정보 처리방침에 동의하는 것으로 간주됩니다</string>
+</resources>
