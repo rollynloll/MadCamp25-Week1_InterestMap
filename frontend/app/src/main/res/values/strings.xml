@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">madClass01</string>
     <!-- Replace with your Kakao Native App Key (without 'Kakao' prefix) -->
-    <string name="kakao_native_app_key">YOUR_KAKAO_NATIVE_APP_KEY</string>
+    <string name="kakao_native_app_key">83c4af2ff2a941cfb1519f28a6f55bb6</string>
     <string name="login_title">OmO</string>
     <string name="login_subtitle1">사진으로 만나는</string>
     <string name="login_subtitle2">나와 꼭 맞는 사람들</string>

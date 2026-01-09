@@ -29,8 +29,10 @@ import com.example.madclass01.presentation.common.component.TagChip
 
 @Composable
 fun ProfileScreen(
+    userId: String? = null,  // userId 추가
     onEditClick: () -> Unit
 ) {
+    // TODO: userId로 프로필 정보 로드
     Box(
         modifier = Modifier
             .fillMaxSize()

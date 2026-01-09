@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.login.screen
 
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -19,14 +20,81 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.R
 import com.example.madclass01.presentation.login.viewmodel.LoginViewModel
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
+import com.kakao.sdk.user.UserApiClient
 
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: (token: String) -> Unit = {}
+    onLoginSuccess: (userId: String, nickname: String) -> Unit = { _, _ -> }
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
     val kakaoYellow = Color(0xFFFEE500)
     val omoOrange = Color(0xFFFF8A3D)
+    
+    // 로그인 성공 시 처리
+    LaunchedEffect(uiState.isLoginSuccess) {
+        if (uiState.isLoginSuccess && uiState.userId != null) {
+            onLoginSuccess(uiState.userId!!, uiState.nickname ?: "")
+            viewModel.resetLoginState()
+        }
+    }
+    
+    // 카카오 로그인 콜백
+    val kakaoCallback: (OAuthToken?, Throwable?) -> Unit = { token, error ->
+        if (error != null) {
+            Log.e("KakaoLogin", "로그인 실패", error)
+            viewModel.setLoginError("카카오 로그인 실패: ${error.message}")
+        } else if (token != null) {
+            Log.d("KakaoLogin", "로그인 성공, 토큰: ${token.accessToken}")
+            
+            // 사용자 정보 요청
+            UserApiClient.instance.me { user, error ->
+                if (error != null) {
+                    Log.e("KakaoLogin", "사용자 정보 요청 실패", error)
+                    viewModel.setLoginError("사용자 정보 요청 실패")
+                } else if (user != null) {
+                    Log.d("KakaoLogin", "사용자 정보: ${user.id}, ${user.kakaoAccount?.profile?.nickname}")
+                    
+                    // 백엔드에 사용자 등록
+                    viewModel.handleKakaoLoginSuccess(
+                        kakaoUserId = user.id.toString(),
+                        nickname = user.kakaoAccount?.profile?.nickname,
+                        profileImageUrl = user.kakaoAccount?.profile?.profileImageUrl
+                    )
+                }
+            }
+        }
+    }
+    
+    // 카카오 로그인 실행 함수
+    fun startKakaoLogin() {
+        // 카카오톡 설치 여부 확인
+        if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
+            // 카카오톡으로 로그인
+            UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
+                if (error != null) {
+                    Log.e("KakaoLogin", "카카오톡 로그인 실패", error)
+                    
+                    // 사용자가 카카오톡 로그인을 취소한 경우
+                    if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
+                        return@loginWithKakaoTalk
+                    }
+                    
+                    // 카카오톡 로그인 실패 시 카카오 계정으로 로그인 시도
+                    UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
+                } else if (token != null) {
+                    kakaoCallback(token, null)
+                }
+            }
+        } else {
+            // 카카오톡 미설치: 카카오 계정으로 로그인
+            UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -104,26 +172,43 @@ fun LoginScreen(
             ) {
                 Button(
                     onClick = {
-                        // 임시 동작: 카카오 로그인 없이 바로 프로필 생성 흐름으로 이동
-                        onLoginSuccess("dummy-token")
+                        // 실제 카카오톡 로그인 실행
+                        startKakaoLogin()
                     },
+                    enabled = !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(containerColor = kakaoYellow),
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                 ) {
-                    Icon(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
-                        contentDescription = null,
-                        tint = Color.Unspecified
-                    )
-                    Spacer(Modifier.width(8.dp))
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.Black
+                        )
+                    } else {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
+                            contentDescription = null,
+                            tint = Color.Unspecified
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = LocalContext.current.getString(R.string.kakao_login_button),
+                            color = Color.Black,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+                
+                // 에러 메시지 표시
+                if (uiState.loginErrorMessage.isNotEmpty()) {
                     Text(
-                        text = LocalContext.current.getString(R.string.kakao_login_button),
-                        color = Color.Black,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
+                        text = uiState.loginErrorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
                     )
                 }
 

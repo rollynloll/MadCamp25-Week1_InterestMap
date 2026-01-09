@@ -52,6 +52,7 @@ sealed class MainTab(
 
 @Composable
 fun MainScreen(
+    userId: String? = null,  // userId 추가
     onNavigateToGroupDetail: (String) -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {}
 ) {
@@ -113,6 +114,7 @@ fun MainScreen(
         ) {
             composable(MainTab.Groups.route) {
                 GroupListScreen(
+                    userId = userId,  // userId 전달
                     onGroupClick = onNavigateToGroupDetail
                 )
             }
@@ -125,6 +127,7 @@ fun MainScreen(
             
             composable(MainTab.Profile.route) {
                 ProfileScreen(
+                    userId = userId,  // userId 전달
                     onEditClick = onNavigateToEditProfile
                 )
             }

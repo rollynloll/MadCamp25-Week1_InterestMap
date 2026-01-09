@@ -69,7 +69,11 @@ fun ImageThumbnail(
             model = imageUri,
             contentDescription = "프로필 이미지",
             modifier = Modifier
-                .fillMaxSize(),
+                .fillMaxSize()
+                .background(
+                    color = Color(0xFFF5F5F5),
+                    shape = RoundedCornerShape(12.dp)
+                ),
             contentScale = ContentScale.Crop
         )
         
@@ -78,6 +82,7 @@ fun ImageThumbnail(
             onClick = onRemove,
             modifier = Modifier
                 .align(Alignment.TopEnd)
+                .padding(4.dp)
                 .size(28.dp)
                 .background(
                     color = Color.Black.copy(alpha = 0.6f),

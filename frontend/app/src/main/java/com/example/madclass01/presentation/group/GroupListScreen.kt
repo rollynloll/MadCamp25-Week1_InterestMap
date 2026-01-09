@@ -23,13 +23,16 @@ import com.example.madclass01.presentation.group.viewmodel.GroupListViewModel
 
 @Composable
 fun GroupListScreen(
+    userId: String? = null,  // userId 추가
     viewModel: GroupListViewModel = hiltViewModel(),
     onGroupClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    LaunchedEffect(Unit) {
-        viewModel.loadMyGroups()
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            viewModel.setUserId(userId)
+        }
     }
     
     Box(

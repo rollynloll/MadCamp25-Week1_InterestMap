@@ -50,6 +50,20 @@ class TagSelectionViewModel @Inject constructor(
         }
     }
     
+    fun setRecommendedTags(tags: List<String>) {
+        val tagModels = tags.mapIndexed { index, tagName ->
+            Tag(
+                id = "recommended_$index",
+                name = tagName,
+                category = "recommended",
+                isSelected = true  // 추천 태그는 기본 선택
+            )
+        }
+        _uiState.value = _uiState.value.copy(
+            extractedTags = tagModels
+        )
+    }
+    
     fun toggleExtractedTag(tagId: String) {
         viewModelScope.launch {
             val currentState = _uiState.value

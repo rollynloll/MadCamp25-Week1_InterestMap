@@ -32,6 +32,7 @@ import com.example.madclass01.presentation.profile.viewmodel.ProfileSetupViewMod
 
 @Composable
 fun ProfileSetupScreen(
+    userId: String? = null,  // userId 추가
     viewModel: ProfileSetupViewModel = hiltViewModel(),
     onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>) -> Unit = { _, _, _, _ -> },
     onProceedToTagSelection: () -> Unit = {}
@@ -39,12 +40,26 @@ fun ProfileSetupScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     
+    // userId 설정
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            viewModel.setUserId(userId)
+        }
+    }
+    
+    // 다중 이미지 선택
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val fileName = getFileName(context, it)
-            viewModel.addImage(it.toString(), fileName)
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        android.util.Log.d("ProfileSetup", "이미지 선택됨: ${uris.size}개")
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                android.util.Log.d("ProfileSetup", "이미지 추가: $uri")
+                val fileName = getFileName(context, uri)
+                viewModel.addImage(uri.toString(), fileName)
+            }
+        } else {
+            android.util.Log.w("ProfileSetup", "선택된 이미지 없음")
         }
     }
     

@@ -3,6 +3,8 @@ package com.example.madclass01.presentation.login.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.madclass01.data.repository.ApiResult
+import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.model.User
 import com.example.madclass01.domain.usecase.LoginUseCase
 import com.example.madclass01.domain.usecase.ValidateEmailUseCase
@@ -24,14 +26,17 @@ data class LoginUiState(
     val passwordErrorMessage: String = "",
     val loginErrorMessage: String = "",
     val isLoginSuccess: Boolean = false,
-    val loginToken: String? = null
+    val loginToken: String? = null,
+    val userId: String? = null,  // 백엔드 userId 추가
+    val nickname: String? = null
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val validateEmailUseCase: ValidateEmailUseCase,
-    private val validatePasswordUseCase: ValidatePasswordUseCase
+    private val validatePasswordUseCase: ValidatePasswordUseCase,
+    private val backendRepository: BackendRepository  // 백엔드 추가
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -103,10 +108,63 @@ class LoginViewModel @Inject constructor(
         }
     }
     
+    /**
+     * 카카오 로그인 성공 후 백엔드에 사용자 등록/조회
+     */
+    fun handleKakaoLoginSuccess(
+        kakaoUserId: String,
+        nickname: String?,
+        profileImageUrl: String?
+    ) {
+        viewModelScope.launch {
+            android.util.Log.d("LoginViewModel", "handleKakaoLoginSuccess 시작 - kakaoUserId: $kakaoUserId")
+            _uiState.value = _uiState.value.copy(isLoading = true, loginErrorMessage = "")
+            
+            when (val result = backendRepository.createUser(
+                provider = "kakao",
+                providerUserId = kakaoUserId,
+                nickname = nickname,
+                profileImageUrl = profileImageUrl
+            )) {
+                is ApiResult.Success -> {
+                    val user = result.data
+                    android.util.Log.d("LoginViewModel", "백엔드 유저 생성 성공 - userId: ${user.id}, nickname: ${user.nickname}")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoginSuccess = true,
+                        userId = user.id,
+                        nickname = user.nickname,
+                        loginToken = user.id  // userId를 token으로 사용
+                    )
+                }
+                is ApiResult.Error -> {
+                    android.util.Log.e("LoginViewModel", "백엔드 유저 생성 실패: ${result.message}")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        loginErrorMessage = "백엔드 연동 실패: ${result.message}"
+                    )
+                }
+                is ApiResult.Loading -> {}
+            }
+        }
+    }
+    
+    /**
+     * 로그인 에러 설정 (외부에서 호출)
+     */
+    fun setLoginError(message: String) {
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            loginErrorMessage = message
+        )
+    }
+    
     fun resetLoginState() {
         _uiState.value = _uiState.value.copy(
             isLoginSuccess = false,
             loginToken = null,
+            userId = null,
+            nickname = null,
             loginErrorMessage = ""
         )
     }
