@@ -1,11 +1,6 @@
 from fastapi import FastAPI
 
+from app.auth.router import router as auth_router
+
 app = FastAPI()
-
-@app.get("/")
-def read_root():
-    return {"message": "Hello FastAPI"}
-
-@app.get("/health")
-async def health():
-    return {"ok": True}
+app.include_router(auth_router)
