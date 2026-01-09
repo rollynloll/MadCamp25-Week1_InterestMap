@@ -1,0 +1,27 @@
+# --- Core ---
+fastapi>=0.110
+uvicorn[standard]>=0.27
+
+# --- Database ---
+sqlalchemy>=2.0
+asyncpg>=0.29
+alembic>=1.13
+pgvector>=0.2.5          # pgvector SQLAlchemy 지원 ⭐
+
+# --- Config ---
+python-dotenv>=1.0
+pydantic>=2.6
+pydantic-settings>=2.2   # env 설정 분리용 (FastAPI 권장)
+
+# --- Auth / Security ---
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+
+# --- File upload / background ---
+python-multipart>=0.0.9
+
+# --- HTTP / External API ---
+httpx>=0.27              # Kakao API + embedding API 호출
+
+# --- Utilities ---
+tenacity>=8.2            # embedding API 재시도용 (선택 but 추천)
