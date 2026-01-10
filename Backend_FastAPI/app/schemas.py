@@ -103,10 +103,25 @@ class UserUpdateRequest(BaseModel):
     nickname: Optional[str] = None
     profile_image_url: Optional[str] = None
     profile_data: Optional[Dict[str, Any]] = None
+
+
 class GroupMembersResponse(BaseSchema):
     items: list[GroupMemberItem]
 
+
 class UserResponse(BaseModel):
+    id: str
+    provider: str
+    provider_user_id: str
+    nickname: Optional[str]
+    profile_image_url: Optional[str]
+    profile_data: Dict[str, Any]
+    created_at: str
+    updated_at: str
+    
+    class Config:
+        from_attributes = True
+
 
 class InterestMapGroup(BaseSchema):
     id: str

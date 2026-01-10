@@ -146,8 +146,6 @@ class BackendRepository @Inject constructor(
             val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
 
             val response = apiService.uploadPhoto(userIdBody, multipartBody)
-
-            val response = apiService.uploadPhoto(userId, multipartBody)
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
