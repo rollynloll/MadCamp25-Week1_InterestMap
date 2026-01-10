@@ -107,6 +107,7 @@ fun LoginScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .background(omoOrange)
     ) {
         // 상단 로고/타이틀

@@ -103,6 +103,8 @@ fun ChatScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding()
             .background(Color.White)
     ) {
         // Chat Header (60dp height)

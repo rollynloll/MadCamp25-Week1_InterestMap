@@ -91,6 +91,8 @@ fun ProfileSetupScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding()
             .background(Color.White)
     ) {
         Column(

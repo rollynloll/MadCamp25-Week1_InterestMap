@@ -69,6 +69,7 @@ fun MainScreen(
     val tabs = listOf(MainTab.Groups, MainTab.Search, MainTab.Profile)
     
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         containerColor = Color.White,
         bottomBar = {
             NavigationBar(

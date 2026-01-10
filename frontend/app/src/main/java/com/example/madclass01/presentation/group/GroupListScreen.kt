@@ -46,7 +46,9 @@ fun GroupListScreen(
             .background(Color.White)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             // 헤더
             Text(

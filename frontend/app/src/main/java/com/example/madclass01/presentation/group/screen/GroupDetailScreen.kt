@@ -104,6 +104,7 @@ fun GroupDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
             .background(Color.White)
     ) {
         if (uiState.isLoading) {

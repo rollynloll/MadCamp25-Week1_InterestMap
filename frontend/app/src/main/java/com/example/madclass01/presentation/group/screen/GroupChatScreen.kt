@@ -46,7 +46,13 @@ fun GroupChatScreen(
         viewModel.initialize(groupId, groupName, memberCount, currentUserId)
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(Color.White)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding()
+            .background(Color.White)
+    ) {
         ChatHeader(groupName, memberCount, onBack, onSearch, onMore)
 
         // Messages Area

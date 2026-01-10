@@ -55,6 +55,7 @@ fun ProfileScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .background(Color.White)
     ) {
         // 상단 오렌지 배경 섹션

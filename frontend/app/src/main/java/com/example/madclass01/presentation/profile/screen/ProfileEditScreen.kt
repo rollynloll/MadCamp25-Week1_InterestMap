@@ -100,6 +100,9 @@ fun ProfileEditScreen(
     }
 
     Scaffold(
+        modifier = Modifier
+            .systemBarsPadding()
+            .imePadding(),
         containerColor = Color.White,
         topBar = {
             TopAppBar(

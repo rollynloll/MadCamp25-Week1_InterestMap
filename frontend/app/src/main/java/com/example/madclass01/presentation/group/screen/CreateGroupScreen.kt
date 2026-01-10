@@ -477,7 +477,7 @@ fun CreateGroupScreen(
                                 FlowRow(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     uiState.selectedTags.forEach { tag ->
                                         TagChip(

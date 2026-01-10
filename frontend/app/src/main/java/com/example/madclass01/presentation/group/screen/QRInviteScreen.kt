@@ -86,6 +86,7 @@ fun QRInviteScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .statusBarsPadding()
                 .verticalScroll(rememberScrollState())
         ) {
             // Header
