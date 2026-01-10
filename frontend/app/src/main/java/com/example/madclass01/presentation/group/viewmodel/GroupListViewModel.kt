@@ -28,6 +28,14 @@ class GroupListViewModel @Inject constructor(
     
     private val _uiState = MutableStateFlow(GroupListUiState())
     val uiState: StateFlow<GroupListUiState> = _uiState.asStateFlow()
+
+    init {
+        // 오프라인/로그인 전에도 "내가 참여한 그룹" 목업이 보이도록 기본 데이터 로드
+        viewModelScope.launch {
+            val groups = getMyGroupsUseCase()
+            _uiState.value = _uiState.value.copy(myGroups = groups)
+        }
+    }
     
     fun setUserId(userId: String) {
         _uiState.value = _uiState.value.copy(userId = userId)
@@ -35,7 +43,17 @@ class GroupListViewModel @Inject constructor(
     }
     
     fun loadMyGroups() {
-        val userId = _uiState.value.userId ?: return
+        val userId = _uiState.value.userId
+
+        // userId가 없으면(로그인 전/오프라인) 목업 데이터로 표시
+        if (userId.isNullOrBlank()) {
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+                val groups = getMyGroupsUseCase()
+                _uiState.value = _uiState.value.copy(myGroups = groups, isLoading = false)
+            }
+            return
+        }
         
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
@@ -60,9 +78,12 @@ class GroupListViewModel @Inject constructor(
                     )
                 }
                 is ApiResult.Error -> {
+                    // 백엔드 실패 시에도 UX가 막히지 않도록 목업으로 fallback
+                    val fallbackGroups = getMyGroupsUseCase()
                     _uiState.value = _uiState.value.copy(
+                        myGroups = fallbackGroups,
                         isLoading = false,
-                        errorMessage = "그룹을 불러오는데 실패했습니다: ${result.message}"
+                        errorMessage = ""
                     )
                 }
                 is ApiResult.Loading -> {}

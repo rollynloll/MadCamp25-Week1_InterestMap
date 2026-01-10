@@ -51,7 +51,8 @@ fun LoginScreen(
         } else if (token != null) {
             Log.d("KakaoLogin", "로그인 성공, 토큰: ${token.accessToken}")
             
-            // 사용자 정보 요청
+            // [주석처리] 사용자 정보 요청 - 곧바로 로그인되도록 수정
+            /*
             UserApiClient.instance.me { user, error ->
                 if (error != null) {
                     Log.e("KakaoLogin", "사용자 정보 요청 실패", error)
@@ -67,6 +68,13 @@ fun LoginScreen(
                     )
                 }
             }
+            */
+            
+            // 임시: 서버 연동 없이 프론트에서 바로 로그인 처리
+            viewModel.loginOffline(
+                userId = token.accessToken,
+                nickname = "카카오사용자"
+            )
         }
     }
     
@@ -201,6 +209,29 @@ fun LoginScreen(
                             fontWeight = FontWeight.Bold
                         )
                     }
+                }
+
+                // 테스트 로그인 버튼 (임시)
+                OutlinedButton(
+                    onClick = {
+                        // 임시: 서버 연동 없이 프론트에서 바로 로그인
+                        viewModel.loginOffline(
+                            userId = "local_test_${System.currentTimeMillis()}",
+                            nickname = "테스트유저"
+                        )
+                    },
+                    enabled = !uiState.isLoading,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                ) {
+                    Text(
+                        text = "테스트로 로그인",
+                        color = Color(0xFF111827),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 
                 // 에러 메시지 표시

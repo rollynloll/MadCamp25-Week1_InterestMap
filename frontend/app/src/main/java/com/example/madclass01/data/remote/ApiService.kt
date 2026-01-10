@@ -61,6 +61,60 @@ interface ApiService {
         @Path("groupId") groupId: String,
         @Body request: AddMemberRequest
     ): Response<GroupResponse>
+
+        @GET("/api/groups/{groupId}/detail")
+        suspend fun getGroupDetail(@Path("groupId") groupId: String): Response<GroupDetailResponse>
+
+        @GET("/api/groups/{groupId}/embeddings")
+        suspend fun getGroupUserEmbeddings(@Path("groupId") groupId: String): Response<GroupEmbeddingResponse>
+
+        @GET("/api/users/{userId}/embedding")
+        suspend fun getUserEmbedding(@Path("userId") userId: String): Response<UserEmbeddingResponse>
+
+    // ==================== Group Chat APIs ====================
+
+    @GET("/api/chats/group/{groupId}/messages")
+    suspend fun getGroupMessages(
+        @Path("groupId") groupId: String,
+        @Query("limit") limit: Int = 50
+    ): Response<List<ChatMessageResponse>>
+
+    @POST("/api/chats/group/{groupId}/messages")
+    suspend fun sendGroupTextMessage(
+        @Path("groupId") groupId: String,
+        @Body request: SendChatMessageRequest
+    ): Response<ChatMessageResponse>
+
+    @Multipart
+    @POST("/api/chats/group/{groupId}/photos")
+    suspend fun sendGroupImageMessage(
+        @Path("groupId") groupId: String,
+        @Part("user_id") userId: String,
+        @Part("file") file: okhttp3.MultipartBody.Part
+    ): Response<ChatMessageResponse>
+
+    @POST("/api/chats/group/{groupId}/join")
+    suspend fun joinGroupChat(
+        @Path("groupId") groupId: String,
+        @Body request: JoinLeaveRequest
+    ): Response<Unit>
+
+    @POST("/api/chats/group/{groupId}/leave")
+    suspend fun leaveGroupChat(
+        @Path("groupId") groupId: String,
+        @Body request: JoinLeaveRequest
+    ): Response<Unit>
+    
+    // ==================== Invite APIs ====================
+    
+    @POST("/api/invites/generate")
+    suspend fun generateInviteLink(@Body request: GenerateInviteLinkRequest): Response<InviteLinkResponse>
+    
+    @GET("/api/invites/group/{groupId}")
+    suspend fun getInviteLink(@Path("groupId") groupId: String): Response<InviteLinkResponse>
+    
+    @POST("/api/invites/join")
+    suspend fun joinByInviteLink(@Body request: JoinByInviteLinkRequest): Response<JoinByInviteLinkResponse>
     
     // ==================== Image Analysis APIs ====================
     

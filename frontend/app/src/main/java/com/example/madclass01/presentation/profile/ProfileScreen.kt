@@ -30,6 +30,12 @@ import com.example.madclass01.presentation.common.component.TagChip
 @Composable
 fun ProfileScreen(
     userId: String? = null,  // userId 추가
+    nickname: String? = null,
+    age: Int? = null,
+    region: String? = null,
+    bio: String? = null,
+    images: List<String> = emptyList(),
+    tags: List<String> = emptyList(),
     onEditClick: () -> Unit
 ) {
     // TODO: userId로 프로필 정보 로드
@@ -83,17 +89,35 @@ fun ProfileScreen(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AccountCircle,
-                        contentDescription = "프로필 사진",
-                        tint = Color(0xFFDDDDDD),
-                        modifier = Modifier.size(80.dp)
-                    )
+                    if (images.isNotEmpty()) {
+                        AsyncImage(
+                            model = images.first(),
+                            contentDescription = "프로필 사진",
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "프로필 사진",
+                            tint = Color(0xFFDDDDDD),
+                            modifier = Modifier.size(80.dp)
+                        )
+                    }
                 }
                 
                 // 이름 및 나이
                 Text(
-                    text = "김지원, 28세",
+                    text = buildString {
+                        append(nickname ?: "사용자")
+                        if (age != null) {
+                            append(", ")
+                            append(age)
+                            append("세")
+                        }
+                    },
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1A1A1A)
@@ -105,7 +129,7 @@ fun ProfileScreen(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = "📍 서울 강남구",
+                        text = "📍 ${region ?: "지역 미설정"}",
                         fontSize = 14.sp,
                         color = Color(0xFF666666),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
@@ -114,7 +138,8 @@ fun ProfileScreen(
                 
                 // 자기소개
                 Text(
-                    text = "새로운 사람들과 즐거운 취미 생활을 하고 싶어요! 함께 운동하고 맛집 탐방하실 분들 모여주세요 🌟",
+                    text = bio?.takeIf { it.isNotBlank() }
+                        ?: "자기소개를 입력해보세요.",
                     fontSize = 14.sp,
                     color = Color(0xFF666666),
                     lineHeight = 20.sp,
@@ -137,7 +162,7 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("러닝", "카페투어", "전시회", "베이킹", "요가").forEach { tag ->
+                        (if (tags.isEmpty()) listOf("태그 없음") else tags).forEach { tag ->
                             TagChip(
                                 label = tag,
                                 isSelected = false,
@@ -168,18 +193,35 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        items(6) { index ->
-                            Box(
-                                modifier = Modifier
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFFF5F5F5))
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color(0xFFE0E0E0),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                            )
+                        items(if (images.isEmpty()) listOf("") else images) { imageUri ->
+                            if (imageUri.isBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF5F5F5))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFFE0E0E0),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                )
+                            } else {
+                                AsyncImage(
+                                    model = imageUri,
+                                    contentDescription = "프로필 사진",
+                                    modifier = Modifier
+                                        .aspectRatio(1f)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(Color(0xFFF5F5F5))
+                                        .border(
+                                            width = 1.dp,
+                                            color = Color(0xFFE0E0E0),
+                                            shape = RoundedCornerShape(8.dp)
+                                        ),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         }
                     }
                 }

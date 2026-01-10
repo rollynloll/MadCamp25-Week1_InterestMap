@@ -53,7 +53,15 @@ sealed class MainTab(
 @Composable
 fun MainScreen(
     userId: String? = null,  // userId 추가
+    startTabRoute: String = MainTab.Groups.route,
+    profileNickname: String? = null,
+    profileAge: Int? = null,
+    profileRegion: String? = null,
+    profileBio: String? = null,
+    profileImages: List<String> = emptyList(),
+    profileTags: List<String> = emptyList(),
     onNavigateToGroupDetail: (String) -> Unit = {},
+    onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -109,13 +117,14 @@ fun MainScreen(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = MainTab.Groups.route,
+            startDestination = startTabRoute,
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(MainTab.Groups.route) {
                 GroupListScreen(
                     userId = userId,  // userId 전달
-                    onGroupClick = onNavigateToGroupDetail
+                    onGroupClick = onNavigateToGroupDetail,
+                    onCreateGroupClick = onNavigateToCreateGroup
                 )
             }
             
@@ -128,6 +137,12 @@ fun MainScreen(
             composable(MainTab.Profile.route) {
                 ProfileScreen(
                     userId = userId,  // userId 전달
+                    nickname = profileNickname,
+                    age = profileAge,
+                    region = profileRegion,
+                    bio = profileBio,
+                    images = profileImages,
+                    tags = profileTags,
                     onEditClick = onNavigateToEditProfile
                 )
             }

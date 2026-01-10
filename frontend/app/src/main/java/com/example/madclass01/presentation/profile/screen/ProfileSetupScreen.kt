@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +35,8 @@ import com.example.madclass01.presentation.profile.viewmodel.ProfileSetupViewMod
 fun ProfileSetupScreen(
     userId: String? = null,  // userId 추가
     viewModel: ProfileSetupViewModel = hiltViewModel(),
+    isEditMode: Boolean = false,
+    onBack: () -> Unit = {},
     onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>) -> Unit = { _, _, _, _ -> },
     onProceedToTagSelection: () -> Unit = {}
 ) {
@@ -46,6 +49,8 @@ fun ProfileSetupScreen(
             viewModel.setUserId(userId)
         }
     }
+
+    // 수정 플로우는 ProfileEditScreen을 사용합니다.
     
     // 다중 이미지 선택
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -65,6 +70,12 @@ fun ProfileSetupScreen(
     
     LaunchedEffect(uiState.isProfileComplete) {
         if (uiState.isProfileComplete) {
+            onProfileComplete(
+                uiState.nickname,
+                uiState.age,
+                uiState.region,
+                uiState.images.map { it.uri }
+            )
             onProceedToTagSelection()
             viewModel.resetCompleteState()
         }
@@ -90,15 +101,27 @@ fun ProfileSetupScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 헤더
-            Text(
-                text = "프로필 설정",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
+            Row(
                 modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 8.dp)
-            )
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "뒤로가기",
+                        tint = Color(0xFFFF9945)
+                    )
+                }
+
+                Text(
+                    text = "프로필 설정",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A)
+                )
+            }
             
             Text(
                 text = "기초 정보를 입력해주세요 (1/2)",

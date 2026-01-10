@@ -242,4 +242,9 @@ class ProfileSetupViewModel @Inject constructor(
     fun clearErrorMessage() {
         _uiState.value = _uiState.value.copy(errorMessage = "")
     }
+
+    fun resetInputsForEdit() {
+        val existingUserId = _uiState.value.userId
+        _uiState.value = ProfileSetupUiState(userId = existingUserId)
+    }
 }

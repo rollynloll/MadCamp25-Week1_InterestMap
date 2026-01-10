@@ -168,4 +168,63 @@ class LoginViewModel @Inject constructor(
             loginErrorMessage = ""
         )
     }
+
+    /**
+     * 프론트 전용 임시 로그인 (백엔드 연동 X)
+     * - 다음(프로필) 화면으로 바로 이동시키기 위한 mock 처리
+     */
+    fun loginOffline(
+        userId: String = "local_test_user",
+        nickname: String = "테스트유저"
+    ) {
+        _uiState.value = _uiState.value.copy(
+            isLoading = false,
+            isLoginSuccess = true,
+            userId = userId,
+            nickname = nickname,
+            loginToken = userId,
+            loginErrorMessage = ""
+        )
+    }
+
+    /**
+     * 개발/테스트용 임시 로그인
+     * - 카카오 SDK 없이도 바로 앱 진입 가능
+     * - 가능하면 백엔드 test endpoint로 유저를 생성해 실제 userId를 받는다.
+     */
+    fun loginAsTestUser() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, loginErrorMessage = "")
+
+            val provider = "test"
+            val providerUserId = "test_user_${System.currentTimeMillis()}"
+            val nickname = "테스트유저"
+
+            when (val result = backendRepository.createTestUser(
+                provider = provider,
+                providerUserId = providerUserId,
+                nickname = nickname
+            )) {
+                is ApiResult.Success -> {
+                    val user = result.data
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoginSuccess = true,
+                        userId = user.id,
+                        nickname = user.nickname ?: nickname,
+                        loginToken = user.id
+                    )
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        loginErrorMessage = "테스트 로그인 실패: ${result.message}"
+                    )
+                }
+                is ApiResult.Loading -> {
+                    // no-op
+                }
+            }
+        }
+    }
 }

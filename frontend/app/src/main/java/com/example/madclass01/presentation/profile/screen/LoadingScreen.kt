@@ -5,7 +5,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -24,6 +28,7 @@ fun LoadingScreen(
     userId: String?,
     imageUrls: List<String>,
     viewModel: LoadingViewModel = hiltViewModel(),
+    onBack: () -> Unit = {},
     onLoadingComplete: (List<String>) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -49,6 +54,23 @@ fun LoadingScreen(
             .background(Color.White),
         contentAlignment = Alignment.Center
     ) {
+        // 상단 뒤로가기
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, top = 8.dp)
+                .align(Alignment.TopStart),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "뒤로가기",
+                    tint = Color(0xFFFF9945)
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()

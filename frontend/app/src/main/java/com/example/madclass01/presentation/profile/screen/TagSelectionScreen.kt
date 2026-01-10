@@ -29,7 +29,7 @@ fun TagSelectionScreen(
     recommendedTags: List<String>,
     viewModel: TagSelectionViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onComplete: (selectedTags: Int) -> Unit = {}
+    onComplete: (selectedTags: List<String>) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
@@ -44,7 +44,7 @@ fun TagSelectionScreen(
     
     LaunchedEffect(uiState.isSelectionComplete) {
         if (uiState.isSelectionComplete) {
-            onComplete(viewModel.getSelectedTags().size)
+            onComplete(viewModel.getSelectedTags().map { it.name })
             viewModel.resetCompleteState()
         }
     }
