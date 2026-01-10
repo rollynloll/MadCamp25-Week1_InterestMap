@@ -77,3 +77,7 @@ frontend/.gradle/
 frontend/local.properties
 frontend/app/build/
 frontend/build/
+
+# Local build logs
+*.log
+frontend/build_log.txt
