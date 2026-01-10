@@ -22,19 +22,29 @@ import com.example.madclass01.presentation.profile.viewmodel.TagSelectionViewMod
 
 @Composable
 fun TagSelectionScreen(
+    userId: String?,
+    nickname: String,
+    age: Int?,
+    region: String?,
+    recommendedTags: List<String>,
     viewModel: TagSelectionViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onComplete: (selectedTags: Int) -> Unit = {}
+    onComplete: (selectedTags: List<String>) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    LaunchedEffect(Unit) {
-        viewModel.analyzeImages()
+    // 추천 태그 설정
+    LaunchedEffect(recommendedTags) {
+        if (recommendedTags.isNotEmpty()) {
+            viewModel.setRecommendedTags(recommendedTags)
+        } else {
+            viewModel.analyzeImages()
+        }
     }
     
     LaunchedEffect(uiState.isSelectionComplete) {
         if (uiState.isSelectionComplete) {
-            onComplete(viewModel.getSelectedTags().size)
+            onComplete(viewModel.getSelectedTags().map { it.name })
             viewModel.resetCompleteState()
         }
     }
@@ -120,7 +130,7 @@ fun TagSelectionScreen(
                     onToggleTag = { viewModel.toggleExtractedTag(it) }
                 )
                 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 // 직접 추가하기
                 Column {

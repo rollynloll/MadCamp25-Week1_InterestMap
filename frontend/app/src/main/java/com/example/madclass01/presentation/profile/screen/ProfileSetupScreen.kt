@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,24 +33,51 @@ import com.example.madclass01.presentation.profile.viewmodel.ProfileSetupViewMod
 
 @Composable
 fun ProfileSetupScreen(
+    userId: String? = null,  // userId 추가
     viewModel: ProfileSetupViewModel = hiltViewModel(),
+    isEditMode: Boolean = false,
+    onBack: () -> Unit = {},
     onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>) -> Unit = { _, _, _, _ -> },
     onProceedToTagSelection: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    remember(isEditMode) { Unit }
     
+    // userId 설정
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            viewModel.setUserId(userId)
+        }
+    }
+
+    // 수정 플로우는 ProfileEditScreen을 사용합니다.
+    
+    // 다중 이미지 선택
     val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            val fileName = getFileName(context, it)
-            viewModel.addImage(it.toString(), fileName)
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        android.util.Log.d("ProfileSetup", "이미지 선택됨: ${uris.size}개")
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                android.util.Log.d("ProfileSetup", "이미지 추가: $uri")
+                val fileName = getFileName(context, uri)
+                viewModel.addImage(uri.toString(), fileName)
+            }
+        } else {
+            android.util.Log.w("ProfileSetup", "선택된 이미지 없음")
         }
     }
     
     LaunchedEffect(uiState.isProfileComplete) {
         if (uiState.isProfileComplete) {
+            onProfileComplete(
+                uiState.nickname,
+                uiState.age,
+                uiState.region,
+                uiState.images.map { it.uri }
+            )
             onProceedToTagSelection()
             viewModel.resetCompleteState()
         }
@@ -65,6 +93,8 @@ fun ProfileSetupScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .systemBarsPadding()
+            .imePadding()
             .background(Color.White)
     ) {
         Column(
@@ -75,15 +105,27 @@ fun ProfileSetupScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // 헤더
-            Text(
-                text = "프로필 설정",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
+            Row(
                 modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 8.dp)
-            )
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "뒤로가기",
+                        tint = Color(0xFFFF9945)
+                    )
+                }
+
+                Text(
+                    text = "프로필 설정",
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A)
+                )
+            }
             
             Text(
                 text = "기초 정보를 입력해주세요 (1/2)",
@@ -289,7 +331,7 @@ fun ProfileSetupScreen(
             
             // 다음 버튼
             Button(
-                onClick = { viewModel.proceedToNextStep() },
+                onClick = { viewModel.proceedToNextStep(context) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),

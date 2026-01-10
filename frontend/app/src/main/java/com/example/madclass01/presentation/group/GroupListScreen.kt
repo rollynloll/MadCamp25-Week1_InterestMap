@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,18 +20,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import com.example.madclass01.presentation.group.component.GroupCard
 import com.example.madclass01.presentation.group.viewmodel.GroupListViewModel
 
 @Composable
 fun GroupListScreen(
+    userId: String? = null,  // userId 추가
     viewModel: GroupListViewModel = hiltViewModel(),
-    onGroupClick: (String) -> Unit
+    onGroupClick: (String) -> Unit,
+    onCreateGroupClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
-    LaunchedEffect(Unit) {
-        viewModel.loadMyGroups()
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            viewModel.setUserId(userId)
+        }
     }
     
     Box(
@@ -38,7 +46,9 @@ fun GroupListScreen(
             .background(Color.White)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             // 헤더
             Text(
@@ -59,13 +69,13 @@ fun GroupListScreen(
                     }
                 }
                 
-                uiState.errorMessage != null -> {
+                uiState.errorMessage.isNotEmpty() -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = uiState.errorMessage ?: "오류가 발생했습니다",
+                            text = uiState.errorMessage,
                             color = Color.Red
                         )
                     }
@@ -100,6 +110,20 @@ fun GroupListScreen(
                     }
                 }
             }
+        }
+
+        FloatingActionButton(
+            onClick = onCreateGroupClick,
+            containerColor = Color(0xFFFF9945),
+            contentColor = Color.White,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(20.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = "그룹 생성"
+            )
         }
     }
 }

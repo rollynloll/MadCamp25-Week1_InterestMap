@@ -8,6 +8,20 @@ class GetMyGroupsUseCase @Inject constructor() {
         // Mock data - 실제로는 Repository에서 가져옴
         return listOf(
             Group(
+                id = "molipcamp_4",
+                name = "몰입캠프 분반4",
+                description = "몰입캠프 4분반 모임방",
+                memberCount = 21,
+                activity = "활발함",
+                tags = listOf(
+                    com.example.madclass01.domain.model.Tag(id = "mc1", name = "몰입캠프", category = "interest"),
+                    com.example.madclass01.domain.model.Tag(id = "mc2", name = "개발", category = "interest")
+                ),
+                lastActivityDate = "오늘",
+                messageCount = 21,
+                isJoined = true
+            ),
+            Group(
                 id = "1",
                 name = "서울 러너스",
                 description = "매주 일요일 한강에서 모여요",

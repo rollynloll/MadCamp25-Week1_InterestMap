@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.main
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Group
@@ -52,13 +53,24 @@ sealed class MainTab(
 
 @Composable
 fun MainScreen(
+    userId: String? = null,  // userId 추가
+    startTabRoute: String = MainTab.Groups.route,
+    profileNickname: String? = null,
+    profileAge: Int? = null,
+    profileGender: String? = null,
+    profileRegion: String? = null,
+    profileBio: String? = null,
+    profileImages: List<String> = emptyList(),
+    profileTags: List<String> = emptyList(),
     onNavigateToGroupDetail: (String) -> Unit = {},
+    onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val tabs = listOf(MainTab.Groups, MainTab.Search, MainTab.Profile)
     
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
         containerColor = Color.White,
         bottomBar = {
             NavigationBar(
@@ -108,12 +120,14 @@ fun MainScreen(
     ) { paddingValues ->
         NavHost(
             navController = navController,
-            startDestination = MainTab.Groups.route,
+            startDestination = startTabRoute,
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(MainTab.Groups.route) {
                 GroupListScreen(
-                    onGroupClick = onNavigateToGroupDetail
+                    userId = userId,  // userId 전달
+                    onGroupClick = onNavigateToGroupDetail,
+                    onCreateGroupClick = onNavigateToCreateGroup
                 )
             }
             
@@ -125,6 +139,14 @@ fun MainScreen(
             
             composable(MainTab.Profile.route) {
                 ProfileScreen(
+                    userId = userId,  // userId 전달
+                    nickname = profileNickname,
+                    age = profileAge,
+                    gender = profileGender,
+                    region = profileRegion,
+                    bio = profileBio,
+                    images = profileImages,
+                    tags = profileTags,
                     onEditClick = onNavigateToEditProfile
                 )
             }
