@@ -84,3 +84,5 @@ frontend/build_log.txt
 
 # Docs (do not commit markdown)
 *.md
+!README.md
+!**/README.md
