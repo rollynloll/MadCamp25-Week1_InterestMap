@@ -1,6 +1,7 @@
 package com.example.madclass01.data.remote
 
 import com.example.madclass01.data.remote.dto.*
+import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -39,8 +40,8 @@ interface ApiService {
     @Multipart
     @POST("/api/photos")
     suspend fun uploadPhoto(
-        @Part("user_id") userId: String,
-        @Part("file") file: okhttp3.MultipartBody.Part
+        @Part("user_id") userId: RequestBody,
+        @Part file: okhttp3.MultipartBody.Part
     ): Response<PhotoResponse>
     
     @GET("/api/photos/user/{userId}")
@@ -61,6 +62,7 @@ interface ApiService {
         @Path("groupId") groupId: String,
         @Body request: AddMemberRequest
     ): Response<GroupResponse>
+
 
         @GET("/api/groups/{groupId}/detail")
         suspend fun getGroupDetail(@Path("groupId") groupId: String): Response<GroupDetailResponse>
@@ -104,18 +106,18 @@ interface ApiService {
         @Path("groupId") groupId: String,
         @Body request: JoinLeaveRequest
     ): Response<Unit>
-    
+
     // ==================== Invite APIs ====================
-    
+
     @POST("/api/invites/generate")
     suspend fun generateInviteLink(@Body request: GenerateInviteLinkRequest): Response<InviteLinkResponse>
-    
+
     @GET("/api/invites/group/{groupId}")
     suspend fun getInviteLink(@Path("groupId") groupId: String): Response<InviteLinkResponse>
-    
+
     @POST("/api/invites/join")
     suspend fun joinByInviteLink(@Body request: JoinByInviteLinkRequest): Response<JoinByInviteLinkResponse>
-    
+
     // ==================== Image Analysis APIs ====================
     
     @POST("/api/analyze/images")

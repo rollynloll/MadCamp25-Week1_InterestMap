@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import java.io.File
 import javax.inject.Inject
@@ -142,7 +143,10 @@ class BackendRepository @Inject constructor(
         try {
             val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
             val multipartBody = MultipartBody.Part.createFormData("file", file.name, requestBody)
-            
+            val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
+
+            val response = apiService.uploadPhoto(userIdBody, multipartBody)
+
             val response = apiService.uploadPhoto(userId, multipartBody)
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)

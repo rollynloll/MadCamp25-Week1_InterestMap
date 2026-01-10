@@ -1,0 +1,27 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: asap_db
+      POSTGRES_USER: week1_user
+      POSTGRES_PASSWORD: 1234
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://week1_user:your_password@db:5432/asap_db
+      JWT_SECRET: a05552ea88c755cf5226e932a1182f4e57b16f75ac79b3c92c487638ae4dc988
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+volumes:
+  pgdata:

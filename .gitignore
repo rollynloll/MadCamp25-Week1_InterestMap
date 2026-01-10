@@ -47,13 +47,33 @@ share/python-wheels/
 *.db
 *.sqlite
 uploads/
+# Virtual environments
+Backend_FastAPI/venv/
+.venv/
 
 # OS
 .DS_Store
 Thumbs.db
 
 # Environment
+# Env files
 .env
 .env.local
 *.pem
 *.key
+Backend_FastAPI/.env
+
+# App uploads and local debug
+Backend_FastAPI/uploads/
+Backend_FastAPI/embedding_debug_user_*.json
+
+# IDE/editor
+.vscode/
+frontend/.idea/
+*.iml
+
+# Android/Gradle
+frontend/.gradle/
+frontend/local.properties
+frontend/app/build/
+frontend/build/
