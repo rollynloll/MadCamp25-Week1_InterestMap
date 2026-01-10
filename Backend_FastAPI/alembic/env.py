@@ -1,9 +1,13 @@
+import asyncio # New import
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
 from sqlalchemy import pool
-
+from sqlalchemy.ext.asyncio import create_async_engine # Changed import
 from alembic import context
+
+from app.core.config import settings # New import
+from app.db.base import Base # New import
+import app.models  # ensure model metadata is registered
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,7 +22,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+target_metadata = Base.metadata # Changed
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -38,7 +42,8 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    # use the DATABASE_URL from settings for offline migrations as well
+    url = settings.DATABASE_URL
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -50,29 +55,32 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def run_migrations_online() -> None:
+async def run_migrations_online() -> None: # Changed to async
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+    # Use the DATABASE_URL from our settings for online migrations
+    connectable = create_async_engine(
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
+    async with connectable.connect() as connection: # Changed to async with
         context.configure(
             connection=connection, target_metadata=target_metadata
         )
 
-        with context.begin_transaction():
+        async with context.begin_transaction(): # Changed to async with
             context.run_migrations()
+    
+    await connectable.dispose() # Dispose of the engine resources
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    run_migrations_online()
+    # Changed: Run the async function in an event loop
+    asyncio.run(run_migrations_online())

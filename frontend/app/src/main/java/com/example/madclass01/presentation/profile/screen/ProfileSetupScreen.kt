@@ -289,7 +289,7 @@ fun ProfileSetupScreen(
             
             // 다음 버튼
             Button(
-                onClick = { viewModel.proceedToNextStep() },
+                onClick = { viewModel.proceedToNextStep(context) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),

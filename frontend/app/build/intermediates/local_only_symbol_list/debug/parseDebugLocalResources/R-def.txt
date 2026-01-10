@@ -1,0 +1,25 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color purple_200
+color purple_500
+color purple_700
+color teal_200
+color teal_700
+color white
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+drawable omo
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string kakao_login_button
+string kakao_native_app_key
+string login_caption
+string login_subtitle1
+string login_subtitle2
+string login_terms
+string login_title
+style Theme.MadClass01
+xml backup_rules
+xml data_extraction_rules

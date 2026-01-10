@@ -1,7 +1,11 @@
 package com.example.madclass01.presentation.profile.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.madclass01.data.repository.ApiResult
+import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.model.ImageItem
 import com.example.madclass01.domain.model.Tag
 import com.example.madclass01.domain.usecase.AddImageUseCase
@@ -13,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 data class ProfileSetupUiState(
@@ -27,7 +32,8 @@ data class ProfileSetupUiState(
     val errorMessage: String = "",
     val isProfileComplete: Boolean = false,
     val nicknameError: String = "",
-    val imageCountText: String = "0/20"
+    val imageCountText: String = "0/20",
+    val userId: String? = null  // 백엔드 userId 저장
 )
 
 @HiltViewModel
@@ -35,11 +41,20 @@ class ProfileSetupViewModel @Inject constructor(
     private val addImageUseCase: AddImageUseCase,
     private val removeImageUseCase: RemoveImageUseCase,
     private val addTagUseCase: AddTagUseCase,
-    private val removeTagUseCase: RemoveTagUseCase
+    private val removeTagUseCase: RemoveTagUseCase,
+    private val backendRepository: BackendRepository  // 백엔드 추가
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(ProfileSetupUiState())
     val uiState: StateFlow<ProfileSetupUiState> = _uiState.asStateFlow()
+    
+    /**
+     * 로그인 후 userId 설정
+     */
+    fun setUserId(userId: String) {
+        android.util.Log.d("ProfileSetupViewModel", "setUserId 호출됨: $userId")
+        _uiState.value = _uiState.value.copy(userId = userId)
+    }
     
     fun updateNickname(newNickname: String) {
         _uiState.value = _uiState.value.copy(
@@ -63,22 +78,29 @@ class ProfileSetupViewModel @Inject constructor(
     }
     
     fun addImage(imageUri: String, imageName: String = "", imageSize: Long = 0L) {
+        android.util.Log.d("ProfileSetupViewModel", "addImage 호출 - URI: $imageUri, 현재 이미지 수: ${_uiState.value.images.size}")
         viewModelScope.launch {
             val currentState = _uiState.value
             val imageItem = ImageItem(uri = imageUri, name = imageName, size = imageSize)
             
             val (isSuccess, updatedImages) = addImageUseCase(imageItem, currentState.images)
             
+            android.util.Log.d("ProfileSetupViewModel", "addImageUseCase 결과 - isSuccess: $isSuccess, 업데이트된 이미지 수: ${updatedImages.size}")
+            
             if (isSuccess) {
                 _uiState.value = currentState.copy(
                     images = updatedImages,
                     imageCountText = "${updatedImages.size}/20"
                 )
+                android.util.Log.d("ProfileSetupViewModel", "이미지 추가 성공! 총 ${updatedImages.size}개")
             } else {
                 if (currentState.images.size >= 20) {
+                    android.util.Log.w("ProfileSetupViewModel", "이미지 최대 개수 도달")
                     _uiState.value = currentState.copy(
                         errorMessage = "최대 20개의 이미지만 선택할 수 있습니다"
                     )
+                } else {
+                    android.util.Log.e("ProfileSetupViewModel", "이미지 추가 실패 - 이유 불명")
                 }
             }
         }
@@ -143,7 +165,7 @@ class ProfileSetupViewModel @Inject constructor(
         }
     }
     
-    fun proceedToNextStep() {
+    fun proceedToNextStep(context: Context) {
         val currentState = _uiState.value
         
         // 닉네임 검증
@@ -169,10 +191,85 @@ class ProfileSetupViewModel @Inject constructor(
             return
         }
         
-        _uiState.value = currentState.copy(
-            isProfileComplete = true,
-            errorMessage = ""
-        )
+        // 백엔드에 프로필 업데이트
+        if (currentState.userId != null) {
+            android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 시작 - userId: ${currentState.userId}")
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isLoading = true)
+
+                val uploadedUrls = mutableListOf<String>()
+                for (image in currentState.images) {
+                    val tempFile = copyToTempFile(context, image)
+                    if (tempFile == null) {
+                        _uiState.value = currentState.copy(
+                            isLoading = false,
+                            errorMessage = "프로필 사진 처리 실패"
+                        )
+                        return@launch
+                    }
+
+                    when (val uploadResult = backendRepository.uploadPhoto(
+                        userId = currentState.userId!!,
+                        file = tempFile
+                    )) {
+                        is ApiResult.Success -> uploadedUrls.add(uploadResult.data.fileUrl)
+                        is ApiResult.Error -> {
+                            android.util.Log.e(
+                                "ProfileSetupViewModel",
+                                "사진 업로드 실패: ${uploadResult.message}"
+                            )
+                            tempFile.delete()
+                            _uiState.value = currentState.copy(
+                                isLoading = false,
+                                errorMessage = "사진 업로드 실패: ${uploadResult.message}"
+                            )
+                            return@launch
+                        }
+                        is ApiResult.Loading -> {}
+                    }
+                    tempFile.delete()
+                }
+
+                val profileData = mapOf(
+                    "age" to currentState.age,
+                    "region" to currentState.region,
+                    "bio" to currentState.bio,
+                    "image_count" to currentState.images.size
+                )
+
+                android.util.Log.d("ProfileSetupViewModel", "백엔드 updateUser 호출 - userId: ${currentState.userId}, nickname: ${currentState.nickname}")
+                when (val result = backendRepository.updateUser(
+                    userId = currentState.userId!!,
+                    nickname = currentState.nickname,
+                    profileImageUrl = uploadedUrls.firstOrNull(),
+                    profileData = profileData
+                )) {
+                    is ApiResult.Success -> {
+                        android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 성공")
+                        _uiState.value = currentState.copy(
+                            isLoading = false,
+                            isProfileComplete = true,
+                            errorMessage = ""
+                        )
+                    }
+                    is ApiResult.Error -> {
+                        android.util.Log.e("ProfileSetupViewModel", "프로필 업데이트 실패: ${result.message}")
+                        _uiState.value = currentState.copy(
+                            isLoading = false,
+                            errorMessage = "프로필 저장 실패: ${result.message}"
+                        )
+                    }
+                    is ApiResult.Loading -> {}
+                }
+            }
+        } else {
+            android.util.Log.w("ProfileSetupViewModel", "userId가 null입니다! 백엔드 업데이트 스킵")
+            // userId가 없으면 로컬만 업데이트
+            _uiState.value = currentState.copy(
+                isProfileComplete = true,
+                errorMessage = ""
+            )
+        }
     }
     
     fun resetCompleteState() {
@@ -181,5 +278,30 @@ class ProfileSetupViewModel @Inject constructor(
     
     fun clearErrorMessage() {
         _uiState.value = _uiState.value.copy(errorMessage = "")
+    }
+
+    private fun copyToTempFile(context: Context, image: ImageItem): File? {
+        val uri = Uri.parse(image.uri)
+        val inputStream = try {
+            context.contentResolver.openInputStream(uri)
+        } catch (exception: Exception) {
+            android.util.Log.e("ProfileSetupViewModel", "이미지 열기 실패: $uri", exception)
+            null
+        }
+        inputStream ?: return null
+
+        val fileName = image.name.ifBlank { "image_${System.currentTimeMillis()}.jpg" }
+        val tempFile = File(context.cacheDir, "upload_${System.currentTimeMillis()}_$fileName")
+        return try {
+            inputStream.use { input ->
+                tempFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            tempFile
+        } catch (exception: Exception) {
+            android.util.Log.e("ProfileSetupViewModel", "임시 파일 저장 실패", exception)
+            null
+        }
     }
 }
