@@ -28,12 +28,12 @@ fun IconSelectButton(
         modifier = modifier
             .size(56.dp)
             .background(
-                color = if (isSelected) Color(0xFFEEF2FF) else Color(0xFFF9FAFB),
+                color = if (isSelected) Color(0xFFFFF4E6) else Color(0xFFF9FAFB),
                 shape = RoundedCornerShape(12.dp)
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) Color(0xFF667EEA) else Color(0xFFE5E7EB),
+                color = if (isSelected) Color(0xFFFF9945) else Color(0xFFE5E7EB),
                 shape = RoundedCornerShape(12.dp)
             )
             .clickable { onClick(iconType) },
@@ -45,6 +45,10 @@ fun IconSelectButton(
                 "coffee" -> "☕"
                 "camera" -> "📷"
                 "mountain" -> "⛰️"
+                "music" -> "🎵"
+                "book" -> "📚"
+                "sports" -> "⚽"
+                "food" -> "🍔"
                 else -> "👥"
             },
             fontSize = 24.sp
@@ -61,7 +65,7 @@ fun IconPreview(
         modifier = modifier
             .size(96.dp)
             .background(
-                color = Color(0xFF667EEA),
+                color = Color(0xFFFF9945),
                 shape = RoundedCornerShape(24.dp)
             ),
         contentAlignment = Alignment.Center
@@ -72,6 +76,10 @@ fun IconPreview(
                 "coffee" -> "☕"
                 "camera" -> "📷"
                 "mountain" -> "⛰️"
+                "music" -> "🎵"
+                "book" -> "📚"
+                "sports" -> "⚽"
+                "food" -> "🍔"
                 else -> "👥"
             },
             fontSize = 48.sp

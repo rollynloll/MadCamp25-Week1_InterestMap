@@ -56,6 +56,7 @@ fun MainScreen(
     startTabRoute: String = MainTab.Groups.route,
     profileNickname: String? = null,
     profileAge: Int? = null,
+    profileGender: String? = null,
     profileRegion: String? = null,
     profileBio: String? = null,
     profileImages: List<String> = emptyList(),
@@ -139,6 +140,7 @@ fun MainScreen(
                     userId = userId,  // userId 전달
                     nickname = profileNickname,
                     age = profileAge,
+                    gender = profileGender,
                     region = profileRegion,
                     bio = profileBio,
                     images = profileImages,

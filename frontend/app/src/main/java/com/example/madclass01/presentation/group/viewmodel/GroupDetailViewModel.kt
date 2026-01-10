@@ -44,6 +44,12 @@ class GroupDetailViewModel @Inject constructor(
      * 그룹 상세 정보와 관계 그래프 조회
      */
     fun initializeWithGroup(groupId: String, currentUserId: String) {
+        // 테스트/목업 사용자인 경우 API 호출 없이 바로 목업 데이터 사용
+        if (isTestUser(currentUserId)) {
+            loadMockData(groupId)
+            return
+        }
+
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
 
@@ -84,6 +90,43 @@ class GroupDetailViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    /**
+     * 테스트 사용자 여부 확인
+     */
+    private fun isTestUser(userId: String): Boolean {
+        return userId in listOf("test_user", "mock_user", "test", "mock")
+    }
+
+    /**
+     * 목업 데이터 로드 (테스트용)
+     */
+    private fun loadMockData(groupId: String) {
+        // 목업 그룹 정보
+        val mockGroup = Group(
+            id = groupId,
+            name = if (groupId.contains("molip", ignoreCase = true)) "몰입캠프 분반4" else "테스트 그룹",
+            description = "테스트용 목업 그룹입니다",
+            memberCount = 21,
+            activity = "활발함",
+            tags = emptyList(),
+            imageUrl = "",
+            lastActivityDate = "2024-01-10",
+            messageCount = 156,
+            matchPercentage = 85,
+            region = "서울",
+            memberAge = "20대",
+            isJoined = true
+        )
+
+        // API 호출 없이 바로 목업 상태로 설정 (에러 메시지로 목업 모드 표시)
+        _uiState.value = _uiState.value.copy(
+            group = mockGroup,
+            relationshipGraph = null,
+            isLoading = false,
+            errorMessage = "mock_mode" // 목업 모드 표시용
+        )
     }
 
     /**

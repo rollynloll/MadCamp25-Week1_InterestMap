@@ -1,24 +1,33 @@
 package com.example.madclass01.presentation.group.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.madclass01.domain.model.GraphNodePosition
 import com.example.madclass01.domain.model.RelationshipGraph
 import com.example.madclass01.utils.GraphLayoutCalculator
+import kotlin.math.abs
 
 /**
  * 관계 그래프 캔버스
@@ -41,7 +50,11 @@ fun RelationshipGraphComponent(
         contentAlignment = Alignment.Center
     ) {
         // 현재 사용자 노드 (중앙)
+        val currentUserEmbedding = relationshipGraph.embeddings[relationshipGraph.currentUserId]
         CenterNodeComponent(
+            userName = currentUserEmbedding?.userName ?: "나",
+            profileImageUrl = currentUserEmbedding?.profileImageUrl
+                ?: fallbackAvatarUrl(relationshipGraph.currentUserId),
             selectedUserId = selectedUserId,
             onNodeClick = { onNodeClick(relationshipGraph.currentUserId) }
         )
@@ -53,7 +66,8 @@ fun RelationshipGraphComponent(
                 OtherUserNodeComponent(
                     nodePosition = nodePosition,
                     userName = embedding.userName,
-                    profileImageUrl = embedding.profileImageUrl,
+                    profileImageUrl = embedding.profileImageUrl
+                        ?: fallbackAvatarUrl(nodePosition.userId),
                     isSelected = selectedUserId == nodePosition.userId,
                     similarity = nodePosition.similarityScore,
                     onNodeClick = { onNodeClick(nodePosition.userId) },
@@ -64,6 +78,11 @@ fun RelationshipGraphComponent(
     }
 }
 
+private fun fallbackAvatarUrl(seed: String): String {
+    val stableSeed = abs(seed.hashCode())
+    return "https://picsum.photos/seed/$stableSeed/200/200"
+}
+
 /**
  * 중앙 노드 (현재 사용자)
  * - 72x72px
@@ -72,27 +91,67 @@ fun RelationshipGraphComponent(
  */
 @Composable
 fun CenterNodeComponent(
+    userName: String,
+    profileImageUrl: String? = null,
     selectedUserId: String? = null,
     onNodeClick: () -> Unit = {}
 ) {
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .background(
-                brush = androidx.compose.ui.graphics.Brush.linearGradient(
-                    colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
-                ),
-                shape = CircleShape
-            )
-            .clickable { onNodeClick() },
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "나",
-            color = Color.White,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
+    // "나"는 다른 노드와 확실히 구분되도록 Halo + 배지로 강조
+    Box(contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .size(88.dp)
+                .background(Color(0xFF667EEA).copy(alpha = 0.14f), CircleShape)
         )
+
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .shadow(elevation = 20.dp, shape = CircleShape, clip = false)
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
+                    ),
+                    shape = CircleShape
+                )
+                .border(4.dp, Color.White, CircleShape)
+                .clickable { onNodeClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = profileImageUrl,
+                contentDescription = "프로필",
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            Text(
+                text = userName.take(2),
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .offset(y = 16.dp)
+                    .background(Color.White, RoundedCornerShape(999.dp))
+                    .border(1.dp, Color(0xFFFF9945), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "ME",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF9945)
+                )
+            }
+        }
     }
 }
 
@@ -118,6 +177,18 @@ fun OtherUserNodeComponent(
 ) {
     val nodeSize = GraphLayoutCalculator.calculateNodeSize(similarity)
     val nodeColor = GraphLayoutCalculator.selectNodeColor(similarity)
+
+    val borderWidth = when {
+        nodeSize >= 56f -> 3.dp
+        nodeSize >= 48f -> 2.dp
+        else -> 2.dp
+    }
+    val elevation = when {
+        nodeSize >= 56f -> 12.dp
+        nodeSize >= 48f -> 10.dp
+        else -> 8.dp
+    }
+    val labelColor = if (nodeColor == "#E5E7EB") Color(0xFF6B7280) else Color.White
     
     val xOffset = (nodePosition.x - 195).dp  // 390/2 = 195
     val yOffset = (nodePosition.y - 260).dp  // 520/2 = 260
@@ -131,16 +202,26 @@ fun OtherUserNodeComponent(
         Box(
             modifier = Modifier
                 .size(nodeSize.dp)
+                .shadow(elevation = elevation, shape = CircleShape, clip = false)
                 .background(
                     color = Color(android.graphics.Color.parseColor(nodeColor)),
                     shape = CircleShape
                 )
+                .border(borderWidth, Color.White, CircleShape)
                 .clickable { onNodeClick() },
             contentAlignment = Alignment.Center
         ) {
+            AsyncImage(
+                model = profileImageUrl,
+                contentDescription = "프로필",
+                modifier = Modifier
+                    .size(nodeSize.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
             Text(
-                text = userName.take(2),  // 이름 첫 2글자
-                color = Color.White,
+                text = userName.take(2),
+                color = labelColor,
                 fontSize = if (nodeSize >= 48) 13.sp else 12.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,

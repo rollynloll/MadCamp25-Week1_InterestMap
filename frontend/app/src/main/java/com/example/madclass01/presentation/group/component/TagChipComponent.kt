@@ -23,10 +23,10 @@ fun TagChip(
         modifier = modifier
             .height(32.dp)
             .background(
-                color = Color(0xFFEEF2FF),
+                color = Color(0xFFFFF4E6),
                 shape = RoundedCornerShape(16.dp)
             )
-            .padding(horizontal = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -34,19 +34,19 @@ fun TagChip(
             text = tag,
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
-            color = Color(0xFF4338CA)
+            color = Color(0xFFFF9945)
         )
         
         Box(
             modifier = Modifier
-                .size(14.dp)
+                .size(16.dp)
                 .clickable { onRemove(tag) },
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "✕",
                 fontSize = 12.sp,
-                color = Color(0xFF6366F1),
+                color = Color(0xFFFF9945),
                 fontWeight = FontWeight.Bold
             )
         }

@@ -26,18 +26,18 @@ fun PrivacyOption(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(66.dp)
+            .height(72.dp)
             .background(
                 color = if (isSelected) Color(0xFFF9FAFB) else Color.White,
                 shape = RoundedCornerShape(12.dp)
             )
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) Color(0xFF667EEA) else Color(0xFFE5E7EB),
+                color = if (isSelected) Color(0xFFFF9945) else Color(0xFFE5E7EB),
                 shape = RoundedCornerShape(12.dp)
             )
             .clickable(enabled = true, onClick = onClick)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -51,12 +51,12 @@ fun PrivacyOption(
                 modifier = Modifier
                     .size(20.dp)
                     .background(
-                        color = if (isSelected) Color(0xFF667EEA) else Color.White,
+                        color = if (isSelected) Color(0xFFFF9945) else Color.White,
                         shape = RoundedCornerShape(10.dp)
                     )
                     .border(
                         width = 2.dp,
-                        color = if (isSelected) Color(0xFF667EEA) else Color(0xFFD1D5DB),
+                        color = if (isSelected) Color(0xFFFF9945) else Color(0xFFD1D5DB),
                         shape = RoundedCornerShape(10.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -66,7 +66,7 @@ fun PrivacyOption(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                color = Color(0xFF667EEA),
+                                color = Color.White,
                                 shape = RoundedCornerShape(4.dp)
                             )
                     )
@@ -78,19 +78,21 @@ fun PrivacyOption(
             // Text Info
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = title,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF111827)
+                    color = Color(0xFF111827),
+                    maxLines = 1
                 )
                 Text(
                     text = description,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color(0xFF6B7280)
+                    color = Color(0xFF6B7280),
+                    maxLines = 1
                 )
             }
         }

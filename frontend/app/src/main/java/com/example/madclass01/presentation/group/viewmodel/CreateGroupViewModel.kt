@@ -14,7 +14,9 @@ import javax.inject.Inject
 data class CreateGroupUiState(
     val groupName: String = "",
     val groupDescription: String = "",
-    val selectedIconType: String = "users", // users, coffee, camera, mountain
+    val useCustomImage: Boolean = false,  // true: 사진 사용, false: 아이콘 사용
+    val selectedIconType: String = "users",
+    val profileImageUri: String? = null,
     val selectedTags: List<String> = emptyList(),
     val isPublic: Boolean = true,
     val isLoading: Boolean = false,
@@ -47,7 +49,16 @@ class CreateGroupViewModel @Inject constructor(
     
     fun selectIconType(iconType: String) {
         _uiState.value = _uiState.value.copy(
-            selectedIconType = iconType
+            selectedIconType = iconType,
+            useCustomImage = false,
+            profileImageUri = null
+        )
+    }
+    
+    fun updateProfileImageUri(uri: String?) {
+        _uiState.value = _uiState.value.copy(
+            profileImageUri = uri,
+            useCustomImage = uri != null
         )
     }
     

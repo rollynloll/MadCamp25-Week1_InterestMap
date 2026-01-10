@@ -2,7 +2,18 @@ package com.example.madclass01.presentation.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -11,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Female
+import androidx.compose.material.icons.filled.Male
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -25,13 +38,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.madclass01.presentation.common.component.TagChip
 
 @Composable
 fun ProfileScreen(
     userId: String? = null,  // userId 추가
     nickname: String? = null,
     age: Int? = null,
+    gender: String? = null,  // "male" 또는 "female"
     region: String? = null,
     bio: String? = null,
     images: List<String> = emptyList(),
@@ -39,54 +52,48 @@ fun ProfileScreen(
     onEditClick: () -> Unit
 ) {
     // TODO: userId로 프로필 정보 로드
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
     ) {
+        // 상단 오렌지 배경 섹션
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFFF9945))
+                .padding(20.dp)
         ) {
-            // 헤더
+            // 편집 버튼 (오른쪽 상단)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(
-                    text = "프로필",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
-                )
-                
-                IconButton(onClick = onEditClick) {
+                IconButton(
+                    onClick = onEditClick,
+                    modifier = Modifier.size(32.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "프로필 수정",
-                        tint = Color(0xFFFF9945)
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
-            
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // 프로필 정보
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // 프로필 이미지
                 Box(
                     modifier = Modifier
                         .size(100.dp)
-                        .background(
-                            color = Color(0xFFF5F5F5),
-                            shape = CircleShape
-                        ),
+                        .background(Color.White, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (images.isNotEmpty()) {
@@ -99,129 +106,170 @@ fun ProfileScreen(
                             contentScale = ContentScale.Crop
                         )
                     } else {
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = "프로필 사진",
-                            tint = Color(0xFFDDDDDD),
-                            modifier = Modifier.size(80.dp)
+                        Text(
+                            text = nickname?.take(3) ?: "김OO",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF10B981)
                         )
                     }
                 }
-                
-                // 이름 및 나이
-                Text(
-                    text = buildString {
-                        append(nickname ?: "사용자")
-                        if (age != null) {
-                            append(", ")
-                            append(age)
-                            append("세")
-                        }
-                    },
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
-                )
-                
-                // 지역
-                Surface(
-                    color = Color(0xFFF8F8F8),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = "📍 ${region ?: "지역 미설정"}",
-                        fontSize = 14.sp,
-                        color = Color(0xFF666666),
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                }
-                
-                // 자기소개
-                Text(
-                    text = bio?.takeIf { it.isNotBlank() }
-                        ?: "자기소개를 입력해보세요.",
-                    fontSize = 14.sp,
-                    color = Color(0xFF666666),
-                    lineHeight = 20.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-                
-                // 관심사 태그
+
+                // 프로필 정보 텍스트
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(top = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "관심사",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A1A)
-                    )
-                    
+                    // 이름과 성별 아이콘
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        (if (tags.isEmpty()) listOf("태그 없음") else tags).forEach { tag ->
-                            TagChip(
-                                label = tag,
-                                isSelected = false,
-                                onToggle = {},
-                                modifier = Modifier
+                        // 성별 아이콘
+                        when (gender?.lowercase()) {
+                            "male", "남성" -> Icon(
+                                imageVector = Icons.Default.Male,
+                                contentDescription = "남성",
+                                tint = Color(0xFF60A5FA),  // 파란색
+                                modifier = Modifier.size(20.dp)
+                            )
+                            "female", "여성" -> Icon(
+                                imageVector = Icons.Default.Female,
+                                contentDescription = "여성",
+                                tint = Color(0xFFF472B6),  // 핑크색
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        
+                        Text(
+                            text = nickname ?: "김OO",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+
+                    // 나이, 지역
+                    Text(
+                        text = buildString {
+                            if (age != null) append("${age}세")
+                            if (region != null) {
+                                if (age != null) append(" · ")
+                                append(region)
+                            }
+                        },
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
+
+                    // 한줄 소개
+                    Text(
+                        text = bio?.takeIf { it.isNotBlank() } ?: "한줄 소개 ~",
+                        fontSize = 14.sp,
+                        color = Color.White.copy(alpha = 0.9f),
+                        maxLines = 2
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // 관심사 태그
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "관심사",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White.copy(alpha = 0.8f)
+                )
+
+                @OptIn(ExperimentalLayoutApi::class)
+                androidx.compose.foundation.layout.FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    (if (tags.isEmpty()) listOf("요가", "독서", "서핑") else tags).forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = Color.White,
+                            modifier = Modifier
+                        ) {
+                            Text(
+                                text = tag,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF666666),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                             )
                         }
                     }
                 }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // 사진 갤러리
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            }
+        }
+
+        // 사진 갤러리 섹션
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = null,
+                        tint = Color(0xFF667EEA),
+                        modifier = Modifier.size(24.dp)
+                    )
                     Text(
-                        text = "사진",
+                        text = "자신을 표현하는 사진",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1A1A1A)
                     )
-                    
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(3),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth()
+                }
+
+                Text(
+                    text = "${images.size}장",
+                    fontSize = 14.sp,
+                    color = Color(0xFF999999)
+                )
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(if (images.isEmpty()) List(9) { "" } else images) { imageUri ->
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFFE8E8E8))
                     ) {
-                        items(if (images.isEmpty()) listOf("") else images) { imageUri ->
-                            if (imageUri.isBlank()) {
-                                Box(
-                                    modifier = Modifier
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFF5F5F5))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color(0xFFE0E0E0),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                )
-                            } else {
-                                AsyncImage(
-                                    model = imageUri,
-                                    contentDescription = "프로필 사진",
-                                    modifier = Modifier
-                                        .aspectRatio(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(Color(0xFFF5F5F5))
-                                        .border(
-                                            width = 1.dp,
-                                            color = Color(0xFFE0E0E0),
-                                            shape = RoundedCornerShape(8.dp)
-                                        ),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
+                        if (imageUri.isNotBlank()) {
+                            AsyncImage(
+                                model = imageUri,
+                                contentDescription = "프로필 사진",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
                     }
                 }

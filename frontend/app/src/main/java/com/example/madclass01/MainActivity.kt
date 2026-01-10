@@ -14,6 +14,7 @@ import com.example.madclass01.presentation.profile.screen.LoadingScreen
 import com.example.madclass01.presentation.profile.screen.ProfileEditScreen
 import com.example.madclass01.presentation.profile.screen.TagSelectionScreen
 import com.example.madclass01.presentation.test.ApiTestScreen
+import com.example.madclass01.presentation.chat.ChatScreen
 import com.example.madclass01.presentation.group.screen.CreateGroupScreen
 import com.example.madclass01.presentation.group.screen.GroupDetailScreen
 import dagger.hilt.android.AndroidEntryPoint
@@ -55,6 +56,7 @@ fun AppNavigation() {
     var userId by remember { mutableStateOf<String?>(null) }
     var userNickname by remember { mutableStateOf<String?>(null) }
     var userAge by remember { mutableStateOf<Int?>(null) }
+    var userGender by remember { mutableStateOf<String?>("female") }  // "male" 또는 "female"
     var userRegion by remember { mutableStateOf<String?>(null) }
     var userBio by remember { mutableStateOf<String>("") }
     var userImages by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -147,21 +149,28 @@ fun AppNavigation() {
         }
         AppScreen.ProfileEdit -> {
             ProfileEditScreen(
+                initialProfileImage = userImages.firstOrNull(),
                 initialNickname = userNickname ?: "",
                 initialAge = userAge,
                 initialRegion = userRegion,
                 initialBio = userBio,
                 initialImages = userImages,
+                initialTags = userTags,
                 onBack = {
                     homeStartTabRoute = "profile"
                     currentScreen = AppScreen.Home
                 },
-                onSave = { nickname, age, region, bio, images ->
+                onSave = { profileImage, nickname, age, region, bio, images, tags ->
                     userNickname = nickname
                     userAge = age
                     userRegion = region
                     userBio = bio
-                    userImages = images
+                    userImages = if (profileImage != null) {
+                        listOf(profileImage) + images.filter { it != profileImage }
+                    } else {
+                        images
+                    }
+                    userTags = tags
                     homeStartTabRoute = "profile"
                     currentScreen = AppScreen.Home
                 }
@@ -175,6 +184,9 @@ fun AppNavigation() {
                 onBackPress = {
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
+                },
+                onChatRoomCreated = { chatRoomId, groupName ->
+                    currentScreen = AppScreen.Chat(chatRoomId, groupName)
                 }
             )
         }
@@ -191,12 +203,23 @@ fun AppNavigation() {
                 }
             )
         }
+        is AppScreen.Chat -> {
+            val chat = currentScreen as AppScreen.Chat
+            ChatScreen(
+                chatRoomId = chat.chatRoomId,
+                chatRoomName = chat.chatRoomName,
+                onBackPress = {
+                    currentScreen = AppScreen.Home
+                }
+            )
+        }
         AppScreen.Home -> {
             com.example.madclass01.presentation.main.MainScreen(
                 userId = userId,  // userId 전달
                 startTabRoute = homeStartTabRoute,
                 profileNickname = userNickname,
                 profileAge = userAge,
+                profileGender = userGender,
                 profileRegion = userRegion,
                 profileBio = userBio,
                 profileImages = userImages,
@@ -225,6 +248,7 @@ sealed class AppScreen {
     object TagSelection : AppScreen()
     data class GroupDetail(val groupId: String) : AppScreen()
     object CreateGroup : AppScreen()
+    data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅") : AppScreen()
     object Home : AppScreen()
 }
 
