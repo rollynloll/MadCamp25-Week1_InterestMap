@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.login.screen
 
+import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,6 +33,7 @@ fun LoginScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val activity = context as? Activity
     val kakaoYellow = Color(0xFFFEE500)
     val omoOrange = Color(0xFFFF8A3D)
     
@@ -50,13 +52,12 @@ fun LoginScreen(
             viewModel.setLoginError("카카오 로그인 실패: ${error.message}")
         } else if (token != null) {
             Log.d("KakaoLogin", "로그인 성공, 토큰: ${token.accessToken}")
-            
-            // [주석처리] 사용자 정보 요청 - 곧바로 로그인되도록 수정
-            /*
+
+            // 사용자 정보 요청 (카카오 userId/nickname 확보)
             UserApiClient.instance.me { user, error ->
                 if (error != null) {
                     Log.e("KakaoLogin", "사용자 정보 요청 실패", error)
-                    viewModel.setLoginError("사용자 정보 요청 실패")
+                    viewModel.setLoginError("사용자 정보 요청 실패: ${error.message}")
                 } else if (user != null) {
                     Log.d("KakaoLogin", "사용자 정보: ${user.id}, ${user.kakaoAccount?.profile?.nickname}")
                     
@@ -66,24 +67,32 @@ fun LoginScreen(
                         nickname = user.kakaoAccount?.profile?.nickname,
                         profileImageUrl = user.kakaoAccount?.profile?.profileImageUrl
                     )
+                } else {
+                    viewModel.setLoginError("사용자 정보가 비어있습니다")
                 }
             }
-            */
-            
-            // 임시: 서버 연동 없이 프론트에서 바로 로그인 처리
-            viewModel.loginOffline(
-                userId = token.accessToken,
-                nickname = "카카오사용자"
-            )
         }
     }
     
     // 카카오 로그인 실행 함수
     fun startKakaoLogin() {
-        // 카카오톡 설치 여부 확인
-        if (UserApiClient.instance.isKakaoTalkLoginAvailable(context)) {
-            // 카카오톡으로 로그인
-            UserApiClient.instance.loginWithKakaoTalk(context) { token, error ->
+        // 카카오톡 설치/로그인 가능 여부 확인
+        val talkAvailable = UserApiClient.instance.isKakaoTalkLoginAvailable(context)
+        Log.d(
+            "KakaoLogin",
+            "startKakaoLogin: isKakaoTalkLoginAvailable=$talkAvailable, activity=${activity != null}"
+        )
+
+        if (talkAvailable) {
+            // 카카오톡으로 로그인 (Activity context 필요)
+            val host = activity
+            if (host == null) {
+                Log.w("KakaoLogin", "카카오톡 로그인을 위한 Activity 컨텍스트를 가져올 수 없어 웹 로그인으로 대체합니다")
+                UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
+                return
+            }
+
+            UserApiClient.instance.loginWithKakaoTalk(host) { token, error ->
                 if (error != null) {
                     Log.e("KakaoLogin", "카카오톡 로그인 실패", error)
                     

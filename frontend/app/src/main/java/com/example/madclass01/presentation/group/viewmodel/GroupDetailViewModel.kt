@@ -96,7 +96,21 @@ class GroupDetailViewModel @Inject constructor(
      * 테스트 사용자 여부 확인
      */
     private fun isTestUser(userId: String): Boolean {
-        return userId in listOf("test_user", "mock_user", "test", "mock")
+        val normalized = userId.trim().lowercase()
+        if (normalized.isEmpty()) return true
+
+        return normalized in setOf(
+            "test_user",
+            "mock_user",
+            "test",
+            "mock",
+            "local_test_user"
+        ) ||
+            normalized.startsWith("local_test_") ||
+            normalized.startsWith("test_user_") ||
+            normalized.startsWith("mock_user_") ||
+            normalized.startsWith("test-") ||
+            normalized.startsWith("mock-")
     }
 
     /**

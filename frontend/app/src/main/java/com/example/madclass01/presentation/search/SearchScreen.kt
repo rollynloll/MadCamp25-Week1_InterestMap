@@ -2,6 +2,7 @@ package com.example.madclass01.presentation.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -143,7 +144,7 @@ fun SearchScreen(
                         group = group,
                         onClick = { onGroupClick(group.id) }
                     )
-                    Divider(
+                    HorizontalDivider(
                         color = Color(0xFFF5F5F5),
                         thickness = 1.dp
                     )
@@ -447,9 +448,7 @@ fun FilterBottomSheet(
                         containerColor = Color.White,
                         contentColor = inactiveText
                     ),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(
-                        brush = androidx.compose.ui.graphics.SolidColor(border)
-                    )
+                    border = BorderStroke(1.dp, border)
                 ) {
                     Text(text = "초기화", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 }

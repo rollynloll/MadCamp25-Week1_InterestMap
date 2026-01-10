@@ -42,6 +42,8 @@ fun QRInviteScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    remember(userId) { Unit }
     var showCopyToast by remember { mutableStateOf(false) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     
@@ -120,7 +122,7 @@ fun QRInviteScreen(
                 }
             }
             
-            Divider(
+            HorizontalDivider(
                 color = Color(0xFFE5E7EB),
                 thickness = 1.dp
             )

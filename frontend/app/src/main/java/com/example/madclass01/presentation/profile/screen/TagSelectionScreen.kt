@@ -130,7 +130,7 @@ fun TagSelectionScreen(
                     onToggleTag = { viewModel.toggleExtractedTag(it) }
                 )
                 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 // 직접 추가하기
                 Column {

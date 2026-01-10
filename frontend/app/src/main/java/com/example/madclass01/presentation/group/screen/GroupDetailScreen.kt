@@ -15,8 +15,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Chat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +48,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.example.madclass01.presentation.group.component.ChatButtonComponent
@@ -57,21 +58,6 @@ import com.example.madclass01.presentation.group.component.RelationshipGraphComp
 import com.example.madclass01.presentation.group.viewmodel.GroupDetailViewModel
 import com.example.madclass01.R
 
-/**
- * 그룹 상세 화면 (Group Detail Screen)
- * - 헤더: 그룹 정보, 뒤로가기, QR 코드, 더보기
- * - 콘텐츠: 관계 그래프 (중앙 사용자 중심, 유사도 기반 거리)
- * - 하단: 채팅 버튼
- *
- * 그래프 특징:
- * - 중앙: 접속한 사용자 (자신)
- * - 주변: 그룹 내 다른 사용자들
- * - 거리: 코사인 유사도 기반 (가까울수록 취향이 비슷)
- * - 색상: 유사도에 따라 다름
- *   - 초록색: 유사도 높음 (0.5~1.0)
- *   - 주황색: 유사도 보통 (0.3~0.5)
- *   - 회색: 유사도 낮음 (0~0.3)
- */
 @Composable
 fun GroupDetailScreen(
     groupId: String,
@@ -88,7 +74,7 @@ fun GroupDetailScreen(
         viewModel.initializeWithGroup(groupId, currentUserId)
     }
 
-    // 채팅 룸 생성 감시
+    // 채팅방 생성 감시
     LaunchedEffect(uiState.chatRoomId) {
         if (uiState.chatRoomId != null) {
             val groupName = uiState.group?.name ?: if (groupId.contains("molip", ignoreCase = true)) {
@@ -108,7 +94,6 @@ fun GroupDetailScreen(
             .background(Color.White)
     ) {
         if (uiState.isLoading) {
-            // 로딩 상태
             Column(
                 modifier = Modifier
                     .fillMaxSize(),
@@ -124,9 +109,6 @@ fun GroupDetailScreen(
                 )
             }
         } else if (uiState.errorMessage.isNotEmpty()) {
-            // 에러 상태: 404 등으로 상세 조회 실패해도 임시 목업(그래프 캔버스)로 화면을 보여준다.
-            // mock_mode인 경우 테스트 사용자이므로 다이얼로그 없이 바로 목업 표시
-            // 그리고 시스템 Back(뒤로가기)로 원래 화면으로 복귀한다.
             BackHandler(enabled = true) {
                 onBackPress()
             }
@@ -169,7 +151,7 @@ fun GroupDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Chat,
+                                    imageVector = Icons.AutoMirrored.Outlined.Chat,
                                     contentDescription = "채팅",
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
@@ -195,7 +177,7 @@ fun GroupDetailScreen(
                     GroupDetailHeaderComponent(
                         groupName = fallbackGroupName,
                         memberCount = fallbackMemberCount,
-                        activityStatus = if (isMockMode) "테스트 모드 (목업 데이터)" else "임시 목업",
+                        activityStatus = if (isMockMode) "테스트 모드 (목업 데이터)" else "목업 데이터",
                         groupIcon = "👥",
                         onBackClick = onBackPress,
                         onQRCodeClick = onQRCodeClick,
@@ -272,7 +254,7 @@ fun GroupDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Chat,
+                                    imageVector = Icons.AutoMirrored.Outlined.Chat,
                                     contentDescription = "채팅",
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
@@ -348,7 +330,7 @@ private fun MockRelationshipGraphCanvas(
     currentUserName: String,
     currentUserImageModel: Any? = null
 ) {
-    // CSS 스펙에 맞춘 임시 목업 배치 (390x520 캔버스 내 absolute 배치)
+    // CSS 스펙에 맞춘 예시 목업 배치 (390x520 캔버스, absolute 배치)
     val avatar1 = "https://picsum.photos/seed/node1/200/200"
     val avatar2 = "https://picsum.photos/seed/node2/200/200"
     val avatar3 = "https://picsum.photos/seed/node3/200/200"
@@ -451,7 +433,7 @@ private fun StarNode(
     ) {
         AsyncImage(
             model = imageModel ?: R.drawable.omo,
-            contentDescription = "프로필",
+            contentDescription = null,
             modifier = Modifier
                 .size(64.dp)
                 .clip(CircleShape),
@@ -489,7 +471,7 @@ private fun PlanetNode(
     ) {
         AsyncImage(
             model = imageModel ?: R.drawable.omo,
-            contentDescription = "프로필",
+            contentDescription = null,
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape),
@@ -512,7 +494,7 @@ private fun PlanetNode(
 }
 
 /**
- * 선택된 사용자 프로필 시트 (모달)
+ * 선택된 사용자 프로필 시트(모달)
  * - 사용자 정보 표시
  * - 채팅 버튼
  * - 유사도 표시
@@ -622,7 +604,7 @@ fun SelectedUserProfileBottomSheet(
                     Text(
                         text = when {
                             similarity >= 0.7 -> "매우 유사"
-                            similarity >= 0.5 -> "유사함"
+                            similarity >= 0.5 -> "유사"
                             similarity >= 0.3 -> "보통"
                             else -> "다름"
                         },
@@ -649,7 +631,7 @@ fun SelectedUserProfileBottomSheet(
                 )
             ) {
                 Text(
-                    text = "$userName 님과 채팅하기",
+                    text = "$userName 와 채팅하기",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -661,3 +643,4 @@ fun SelectedUserProfileBottomSheet(
         }
     }
 }
+

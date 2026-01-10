@@ -42,6 +42,8 @@ fun ProfileSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+
+    remember(isEditMode) { Unit }
     
     // userId 설정
     LaunchedEffect(userId) {
