@@ -157,3 +157,107 @@ class MessageCreateRequest(BaseSchema):
 class EmbeddingResponse(BaseSchema):
     ok: bool
     embedding: MeEmbedding
+
+
+# Legacy /api schemas used by Android client
+class UserCreateRequest(BaseSchema):
+    provider: str
+    provider_user_id: str
+    nickname: str | None = None
+    profile_image_url: str | None = None
+    profile_data: dict[str, Any] | None = None
+
+
+class UserUpdateRequest(BaseSchema):
+    nickname: str | None = None
+    profile_image_url: str | None = None
+    profile_data: dict[str, Any] | None = None
+
+
+class UserResponse(BaseSchema):
+    id: str
+    provider: str
+    provider_user_id: str
+    nickname: str | None
+    profile_image_url: str | None
+    profile_data: dict[str, Any]
+    created_at: str
+    updated_at: str
+
+
+class PhotoUploadResponse(BaseSchema):
+    id: str
+    user_id: str
+    file_path: str
+    file_url: str
+    uploaded_at: str
+
+
+class GroupCreateRequest(BaseSchema):
+    name: str
+    creator_id: str
+    description: str | None = None
+
+
+class GroupResponse(BaseSchema):
+    id: str
+    name: str
+    creator_id: str
+    description: str | None
+    member_ids: list[str]
+    created_at: str
+
+
+class AddMemberRequest(BaseSchema):
+    user_id: str
+
+
+class TagAnalysisRequest(BaseSchema):
+    user_id: str
+    image_urls: list[str]
+
+
+class TagAnalysisResponse(BaseSchema):
+    tags: list[str]
+    categories: list[str]
+    interests: list[str]
+
+
+class ImageAnalysisRequest(BaseSchema):
+    user_id: str
+    image_urls: list[str]
+
+
+class ImageKeyword(BaseSchema):
+    keyword: str
+    confidence: float
+    category: str | None = None
+
+
+class ImageAnalysisResult(BaseSchema):
+    image_url: str
+    caption: str
+    keywords: list[ImageKeyword]
+
+
+class ImageAnalysisResponse(BaseSchema):
+    user_id: str
+    results: list[ImageAnalysisResult]
+    recommended_tags: list[str]
+    all_keywords: list[ImageKeyword]
+
+
+class GenerateEmbeddingRequest(BaseSchema):
+    user_id: str
+    nickname: str
+    age: int | None = None
+    region: str | None = None
+    bio: str | None = None
+    tags: list[str]
+    image_keywords: list[str]
+
+
+class GenerateEmbeddingResponse(BaseSchema):
+    user_id: str
+    embedding: list[float]
+    map_position: dict[str, float]

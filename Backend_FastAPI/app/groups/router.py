@@ -162,7 +162,10 @@ async def group_interest_map(
     user_ids = [user.id for user in users]
 
     embedding_result = await db.execute(
-        select(UserEmbedding.user_id).where(UserEmbedding.user_id.in_(user_ids))
+        select(UserEmbedding.user_id).where(
+            UserEmbedding.user_id.in_(user_ids),
+            UserEmbedding.is_active == True,  # noqa: E712
+        )
     )
     embedding_user_ids = {row[0] for row in embedding_result.all()}
 

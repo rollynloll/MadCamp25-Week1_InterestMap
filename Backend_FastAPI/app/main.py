@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Req
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from typing import List, Optional, Dict, Any
+import asyncio
 import uuid
 from datetime import datetime
 import logging
@@ -15,7 +16,7 @@ from app.schemas import (
     GroupCreateRequest, GroupResponse, AddMemberRequest,
     PhotoUploadResponse, TagAnalysisRequest, TagAnalysisResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
-    GenerateEmbeddingRequest, EmbeddingResponse
+    GenerateEmbeddingRequest, GenerateEmbeddingResponse
 )
 from app.router import router as spec_router
 from app.db.session import engine, get_db
@@ -23,6 +24,17 @@ from app.db.base import Base
 import app.models  # ensure models are registered for metadata
 from app.models.user import User
 from app.models.photo import UserPhoto
+from app.services.embedding.captioning import caption_image
+from app.services.embedding.composer import build_final_text, compute_source_hash
+from app.services.embedding.openai_embed import embed_text
+from app.services.embedding.repo import (
+    create_embedding,
+    deactivate_embeddings,
+    get_active_embedding,
+    get_recent_captions,
+    upsert_image_caption,
+)
+from app.services.embedding.translation import translate_to_korean
 
 LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -270,6 +282,37 @@ async def upload_photo(
     )
     db.add(photo)
     user.profile_image_url = file_url
+
+    caption_raw_en = f"an uploaded image ({disk_path.name})"
+    model_name = "fallback"
+    model_version = "fallback"
+    try:
+        caption_task = asyncio.to_thread(caption_image, str(disk_path))
+        caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=15)
+    except asyncio.TimeoutError:
+        logger.warning("Captioning timed out for %s", disk_path.name)
+    except Exception as exc:
+        logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
+
+    try:
+        translate_task = translate_to_korean(caption_raw_en)
+        caption_ko = await asyncio.wait_for(translate_task, timeout=15)
+    except asyncio.TimeoutError:
+        logger.warning("Translation timed out for %s", disk_path.name)
+        caption_ko = caption_raw_en
+    except Exception as exc:
+        logger.warning("Translation failed for %s: %s", disk_path.name, exc)
+        caption_ko = caption_raw_en
+
+    await upsert_image_caption(
+        db,
+        image_id=photo_id,
+        caption_raw_en=caption_raw_en,
+        caption_ko=caption_ko,
+        model_name=model_name,
+        model_version=model_version,
+    )
+
     await db.commit()
     await db.refresh(photo)
     await db.refresh(user)
@@ -463,41 +506,57 @@ async def analyze_images(
         all_keywords=all_keywords
     )
 
-@app.post("/api/generate-embedding", response_model=EmbeddingResponse)
+@app.post("/api/generate-embedding", response_model=GenerateEmbeddingResponse)
 async def generate_embedding(
     request: GenerateEmbeddingRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """
     사용자 프로필 전체를 임베딩 벡터로 변환
-    실제로는 Sentence-BERT, OpenAI Embeddings 등 사용
+    PDF 명세 기반 임베딩 파이프라인
     """
-    await _ensure_user_cached(db, request.user_id)
-    
-    import numpy as np
-    
-    # Mock 임베딩 생성 (128차원)
-    # 실제로는 텍스트 + 이미지 특징을 결합한 임베딩
-    np.random.seed(hash(request.user_id) % (2**32))  # 같은 user_id는 같은 임베딩
-    embedding = np.random.randn(128).tolist()
-    
-    # 2D 맵 위치 계산 (t-SNE, UMAP 등으로 차원 축소)
-    # Mock으로 -1.0 ~ 1.0 범위로 정규화
-    map_x = np.tanh(embedding[0] + embedding[1])
-    map_y = np.tanh(embedding[2] + embedding[3])
-    
-    # 사용자 프로필에 임베딩 저장
-    user = users_db[request.user_id]
-    user["profile_data"]["embedding"] = embedding
-    user["profile_data"]["map_position"] = {"x": float(map_x), "y": float(map_y)}
-    user["profile_data"]["tags"] = request.tags
-    user["profile_data"]["image_keywords"] = request.image_keywords
-    user["updated_at"] = datetime.now().isoformat()
-    
-    return EmbeddingResponse(
+    user = await _get_user_by_id(db, request.user_id)
+
+    selected_tags = (request.tags or []) + (request.image_keywords or [])
+    selected_tags = selected_tags[:10]
+    user_description = request.bio or user.profile_data.get("bio") if user.profile_data else None
+    image_captions = await get_recent_captions(db, user.id, limit=5)
+
+    final_text = build_final_text(
+        selected_tags=selected_tags,
+        user_description=user_description,
+        image_captions=image_captions,
+    )
+    source_hash = compute_source_hash(final_text)
+
+    try:
+        active = await get_active_embedding(db, user.id)
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Embedding storage unavailable") from exc
+    if active and active.source_hash == source_hash:
+        embedding = active.embedding
+    else:
+        embedding, model_name, model_version = await embed_text(final_text)
+        await deactivate_embeddings(db, user.id)
+        new_embedding = await create_embedding(
+            db,
+            user_id=user.id,
+            embedding_type="profile_v1",
+            model_name=model_name,
+            model_version=model_version,
+            embedding=embedding,
+            source_hash=source_hash,
+        )
+        await db.commit()
+        await db.refresh(new_embedding)
+
+    map_x = float(embedding[0]) if embedding else 0.0
+    map_y = float(embedding[1]) if embedding else 0.0
+
+    return GenerateEmbeddingResponse(
         user_id=request.user_id,
         embedding=embedding,
-        map_position={"x": float(map_x), "y": float(map_y)}
+        map_position={"x": map_x, "y": map_y},
     )
 
 # ==================== Test APIs (개발용) ====================

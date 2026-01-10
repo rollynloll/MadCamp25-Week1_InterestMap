@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+Backend_FastAPI/venv/
+.venv/
+
+# Env files
+.env
+Backend_FastAPI/.env
+
+# App uploads and local debug
+Backend_FastAPI/uploads/
+Backend_FastAPI/embedding_debug_user_*.json
+
+# IDE/editor
+.vscode/
+frontend/.idea/
+*.iml
+
+# Android/Gradle
+frontend/.gradle/
+frontend/local.properties
+frontend/app/build/
+frontend/build/
