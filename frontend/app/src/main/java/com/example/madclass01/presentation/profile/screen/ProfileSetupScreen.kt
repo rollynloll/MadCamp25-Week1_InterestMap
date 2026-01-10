@@ -193,6 +193,55 @@ fun ProfileSetupScreen(
                 )
             )
             
+            // 성별 선택
+            Text(
+                text = "성별",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1A1A1A),
+                modifier = Modifier
+                    .align(Alignment.Start)
+                    .padding(bottom = 12.dp)
+            )
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = uiState.gender == "male",
+                    onClick = { viewModel.updateGender("male") },
+                    label = { Text("남") },
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFFF9945),
+                        selectedLabelColor = Color.White
+                    )
+                )
+                FilterChip(
+                    selected = uiState.gender == "female",
+                    onClick = { viewModel.updateGender("female") },
+                    label = { Text("여") },
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFFF9945),
+                        selectedLabelColor = Color.White
+                    )
+                )
+                FilterChip(
+                    selected = uiState.gender == "undecided",
+                    onClick = { viewModel.updateGender("undecided") },
+                    label = { Text("미정") },
+                    modifier = Modifier.weight(1f),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = Color(0xFFFF9945),
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+            
             // 지역 입력
             OutlinedTextField(
                 value = uiState.region,

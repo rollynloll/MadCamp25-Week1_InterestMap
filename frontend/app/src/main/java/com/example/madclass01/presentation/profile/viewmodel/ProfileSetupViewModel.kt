@@ -24,6 +24,7 @@ data class ProfileSetupUiState(
     val nickname: String = "",
     val age: Int = 0,
     val region: String = "",
+    val gender: String = "",  // 성별: "male", "female", "undecided"
     val bio: String = "",
     val images: List<ImageItem> = emptyList(),
     val hobbies: List<Tag> = emptyList(),
@@ -69,6 +70,10 @@ class ProfileSetupViewModel @Inject constructor(
     
     fun updateRegion(newRegion: String) {
         _uiState.value = _uiState.value.copy(region = newRegion)
+    }
+    
+    fun updateGender(newGender: String) {
+        _uiState.value = _uiState.value.copy(gender = newGender)
     }
     
     fun updateBio(newBio: String) {
