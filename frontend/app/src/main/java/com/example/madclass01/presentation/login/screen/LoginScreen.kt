@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.R
+import com.example.madclass01.presentation.login.model.LoginSource
 import com.example.madclass01.presentation.login.viewmodel.LoginViewModel
 import com.kakao.sdk.auth.model.OAuthToken
 import com.kakao.sdk.common.model.ClientError
@@ -29,7 +30,7 @@ import com.kakao.sdk.user.UserApiClient
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: (userId: String, nickname: String) -> Unit = { _, _ -> }
+    onLoginSuccess: (userId: String, nickname: String, source: LoginSource, isProfileComplete: Boolean, age: Int?, region: String?, bio: String?) -> Unit = { _, _, _, _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -40,7 +41,15 @@ fun LoginScreen(
     // 로그인 성공 시 처리
     LaunchedEffect(uiState.isLoginSuccess) {
         if (uiState.isLoginSuccess && uiState.userId != null) {
-            onLoginSuccess(uiState.userId!!, uiState.nickname ?: "")
+            onLoginSuccess(
+                uiState.userId!!,
+                uiState.nickname ?: "",
+                uiState.loginSource,
+                uiState.isProfileComplete,
+                uiState.profileAge,
+                uiState.profileRegion,
+                uiState.profileBio
+            )
             viewModel.resetLoginState()
         }
     }

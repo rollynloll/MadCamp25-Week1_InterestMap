@@ -9,6 +9,7 @@ import com.example.madclass01.domain.model.User
 import com.example.madclass01.domain.usecase.LoginUseCase
 import com.example.madclass01.domain.usecase.ValidateEmailUseCase
 import com.example.madclass01.domain.usecase.ValidatePasswordUseCase
+import com.example.madclass01.presentation.login.model.LoginSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,7 +29,12 @@ data class LoginUiState(
     val isLoginSuccess: Boolean = false,
     val loginToken: String? = null,
     val userId: String? = null,  // 백엔드 userId 추가
-    val nickname: String? = null
+    val nickname: String? = null,
+    val profileAge: Int? = null,
+    val profileRegion: String? = null,
+    val profileBio: String? = null,
+    val isProfileComplete: Boolean = false,
+    val loginSource: LoginSource = LoginSource.None
 )
 
 @HiltViewModel
@@ -91,6 +97,7 @@ class LoginViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isLoginSuccess = true,
+                        loginSource = LoginSource.Email,
                         loginToken = result.token
                     )
                 } else {
@@ -129,11 +136,23 @@ class LoginViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val user = result.data
                     android.util.Log.d("LoginViewModel", "백엔드 유저 생성 성공 - userId: ${user.id}, nickname: ${user.nickname}")
+
+                    val profileAge = user.profileData["age"].toIntOrNull()
+                    val profileRegion = user.profileData["region"] as? String
+                    val profileBio = user.profileData["bio"] as? String
+                    val imageCount = user.profileData["image_count"].toIntOrNull() ?: 0
+                    val isProfileComplete = profileAge != null && !profileRegion.isNullOrBlank() && imageCount >= 1
+
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isLoginSuccess = true,
+                        loginSource = LoginSource.Kakao,
                         userId = user.id,
-                        nickname = user.nickname,
+                        nickname = user.nickname ?: nickname,
+                        profileAge = profileAge,
+                        profileRegion = profileRegion,
+                        profileBio = profileBio,
+                        isProfileComplete = isProfileComplete,
                         loginToken = user.id  // userId를 token으로 사용
                     )
                 }
@@ -165,6 +184,11 @@ class LoginViewModel @Inject constructor(
             loginToken = null,
             userId = null,
             nickname = null,
+            profileAge = null,
+            profileRegion = null,
+            profileBio = null,
+            isProfileComplete = false,
+            loginSource = LoginSource.None,
             loginErrorMessage = ""
         )
     }
@@ -180,8 +204,10 @@ class LoginViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(
             isLoading = false,
             isLoginSuccess = true,
+            loginSource = LoginSource.Test,
             userId = userId,
             nickname = nickname,
+            isProfileComplete = true,
             loginToken = userId,
             loginErrorMessage = ""
         )
@@ -210,8 +236,10 @@ class LoginViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isLoginSuccess = true,
+                        loginSource = LoginSource.Test,
                         userId = user.id,
                         nickname = user.nickname ?: nickname,
+                        isProfileComplete = true,
                         loginToken = user.id
                     )
                 }
@@ -225,6 +253,17 @@ class LoginViewModel @Inject constructor(
                     // no-op
                 }
             }
+        }
+    }
+
+    private fun Any?.toIntOrNull(): Int? {
+        return when (this) {
+            is Int -> this
+            is Long -> this.toInt()
+            is Double -> this.toInt()
+            is Float -> this.toInt()
+            is String -> this.toIntOrNull()
+            else -> null
         }
     }
 }

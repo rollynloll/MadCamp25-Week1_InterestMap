@@ -9,6 +9,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.madclass01.presentation.login.screen.LoginScreen
+import com.example.madclass01.presentation.login.model.LoginSource
 import com.example.madclass01.presentation.profile.screen.ProfileSetupScreen
 import com.example.madclass01.presentation.profile.screen.LoadingScreen
 import com.example.madclass01.presentation.profile.screen.ProfileEditScreen
@@ -46,10 +47,6 @@ fun AppNavigation() {
     // 🧪 테스트 모드: true로 설정하면 API 테스트 화면으로 시작
     val isTestMode = false  // 테스트 완료!
 
-    // 임시: 프로필 입력/업로드 단계 스킵
-    val skipProfileSetupForNow = true
-
-
     var currentScreen by remember { mutableStateOf<AppScreen>(
         if (isTestMode) AppScreen.ApiTest else AppScreen.Login
     ) }
@@ -71,10 +68,10 @@ fun AppNavigation() {
         }
         AppScreen.Login -> {
             LoginScreen(
-                onLoginSuccess = { id, nickname ->
+                onLoginSuccess = { id, nickname, source, isProfileComplete, age, region, bio ->
                     userId = id
                     userNickname = nickname
-                    if (skipProfileSetupForNow) {
+                    if (source == LoginSource.Test) {
                         // 프로필 목업 값
                         userAge = 20
                         userRegion = "서울"
@@ -82,6 +79,13 @@ fun AppNavigation() {
                         userImages = emptyList()
                         recommendedTags = emptyList()
                         userTags = emptyList()
+                        homeStartTabRoute = "groups"
+                        currentScreen = AppScreen.Home
+                    } else if (isProfileComplete) {
+                        // 이미 프로필이 등록된 유저는 스킵
+                        userAge = age
+                        userRegion = region
+                        userBio = bio ?: ""
                         homeStartTabRoute = "groups"
                         currentScreen = AppScreen.Home
                     } else {
