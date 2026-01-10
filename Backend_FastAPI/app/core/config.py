@@ -2,6 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # Database
+    DATABASE_URL: str
+
     # Kakao
     KAKAO_REST_API_KEY: str
     KAKAO_REDIRECT_URI: str
