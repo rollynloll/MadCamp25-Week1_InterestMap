@@ -114,7 +114,10 @@ fun GroupDetailScreen(
             }
 
             val isMockMode = uiState.errorMessage == "mock_mode"
-            var showErrorDialog by remember(uiState.errorMessage) { mutableStateOf(!isMockMode) }
+            // 테스트 사용자는 에러 다이얼로그 안 띄움, 실제 사용자는 무조건 띄움
+            var showErrorDialog by remember(uiState.errorMessage, uiState.isTestUser) { 
+                mutableStateOf(!uiState.isTestUser && !isMockMode) 
+            }
 
             val fallbackGroupName = if (groupId.contains("molip", ignoreCase = true)) {
                 "몰입캠프 분반4"
@@ -208,14 +211,7 @@ fun GroupDetailScreen(
                     },
                     confirmButton = {
                         Button(onClick = onBackPress) {
-                            Text(text = "뒤로가기")
-                        }
-                    },
-                    dismissButton = {
-                        Button(onClick = {
-                            showErrorDialog = false
-                        }) {
-                            Text(text = "목업 보기")
+                            Text(text = "확인")
                         }
                     }
                 )

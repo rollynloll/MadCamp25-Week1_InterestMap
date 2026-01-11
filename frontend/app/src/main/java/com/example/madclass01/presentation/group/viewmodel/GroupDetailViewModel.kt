@@ -22,7 +22,8 @@ data class GroupDetailUiState(
     val isLoading: Boolean = false,
     val errorMessage: String = "",
     val selectedUserId: String? = null,  // 선택된 사용자 (채팅 등)
-    val chatRoomId: String? = null  // 생성된 채팅 룸
+    val chatRoomId: String? = null,  // 생성된 채팅 룸
+    val isTestUser: Boolean = false  // 테스트 사용자 여부
 )
 
 /**
@@ -44,14 +45,16 @@ class GroupDetailViewModel @Inject constructor(
      * 그룹 상세 정보와 관계 그래프 조회
      */
     fun initializeWithGroup(groupId: String, currentUserId: String) {
+        val isTest = isTestUser(currentUserId)
+        
         // 테스트/목업 사용자인 경우 API 호출 없이 바로 목업 데이터 사용
-        if (isTestUser(currentUserId)) {
-            loadMockData(groupId)
+        if (isTest) {
+            loadMockData(groupId, isTest)
             return
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "", isTestUser = false)
 
             try {
                 // 1. 그룹 상세 정보 조회
@@ -116,7 +119,7 @@ class GroupDetailViewModel @Inject constructor(
     /**
      * 목업 데이터 로드 (테스트용)
      */
-    private fun loadMockData(groupId: String) {
+    private fun loadMockData(groupId: String, isTestUser: Boolean) {
         // 목업 그룹 정보
         val mockGroup = Group(
             id = groupId,
@@ -134,12 +137,13 @@ class GroupDetailViewModel @Inject constructor(
             isJoined = true
         )
 
-        // API 호출 없이 바로 목업 상태로 설정 (에러 메시지로 목업 모드 표시)
+        // API 호출 없이 바로 목업 상태로 설정
         _uiState.value = _uiState.value.copy(
             group = mockGroup,
             relationshipGraph = null,
             isLoading = false,
-            errorMessage = "mock_mode" // 목업 모드 표시용
+            errorMessage = "mock_mode", // 목업 모드 표시용
+            isTestUser = isTestUser
         )
     }
 
