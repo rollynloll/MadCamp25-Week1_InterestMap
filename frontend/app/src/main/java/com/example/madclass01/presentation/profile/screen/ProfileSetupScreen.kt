@@ -308,7 +308,7 @@ fun ProfileSetupScreen(
                 // 직접 입력
                 TagInputField(
                     onAddTag = { viewModel.addHobby(it) },
-                    placeholder = "직접 입력",
+                    placeholderText = "직접 입력"
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 

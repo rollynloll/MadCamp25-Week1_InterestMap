@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.sp
 fun TagInputField(
     onAddTag: (String) -> Unit,
     modifier: Modifier = Modifier,
-    placeholder: String = "관심사를 입력하세요"
+    placeholderText: String = "관심사를 입력하세요"
 ) {
     var inputValue by remember { mutableStateOf(TextFieldValue("")) }
     
@@ -58,7 +58,7 @@ fun TagInputField(
                 ) {
                     if (inputValue.text.isEmpty()) {
                         Text(
-                            text = placeholder,
+                            text = placeholderText,
                             fontSize = 14.sp,
                             color = Color(0xFFCCCCCC)
                         )
