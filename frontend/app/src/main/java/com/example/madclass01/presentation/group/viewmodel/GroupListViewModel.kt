@@ -67,8 +67,9 @@ class GroupListViewModel @Inject constructor(
                             name = groupResponse.name,
                             description = groupResponse.description ?: "",
                             memberCount = groupResponse.memberIds.size,
-                            tags = emptyList(),  // TODO: 태그 정보 추가
-                            imageUrl = ""
+                            tags = groupResponse.tags.map { Tag(id = it, name = it) },
+                            imageUrl = groupResponse.imageUrl,
+                            region = groupResponse.region
                         )
                     }
                     _uiState.value = _uiState.value.copy(

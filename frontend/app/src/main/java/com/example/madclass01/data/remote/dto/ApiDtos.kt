@@ -121,7 +121,11 @@ data class GroupResponse(
     @SerializedName("member_ids")
     val memberIds: List<String>,
     @SerializedName("created_at")
-    val createdAt: String
+    val createdAt: String,
+    val tags: List<String> = emptyList(),
+    val region: String = "",
+    @SerializedName("image_url")
+    val imageUrl: String = ""
 )
 
 data class CreateGroupRequest(
