@@ -88,7 +88,11 @@ fun TagSelectionScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = onBack,
+                            onClick = { 
+                                if (!uiState.errorMessage.contains("로딩")) {
+                                    onBack()
+                                }
+                            },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(

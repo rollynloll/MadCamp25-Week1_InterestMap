@@ -109,7 +109,9 @@ fun QRInviteScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Back Button
-                IconButton(onClick = onBackPress) {
+                IconButton(
+                    onClick = onBackPress
+                ) {
                     Text(text = "←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
                 }
                 

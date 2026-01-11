@@ -122,11 +122,18 @@ fun ProfileSetupScreen(
                     .padding(bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
+                IconButton(
+                    onClick = { 
+                        if (!uiState.isLoading) {
+                            onBack()
+                        }
+                    },
+                    enabled = !uiState.isLoading
+                ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "뒤로가기",
-                        tint = Color(0xFFFF9945)
+                        tint = if (uiState.isLoading) Color(0xFFCCCCCC) else Color(0xFFFF9945)
                     )
                 }
 

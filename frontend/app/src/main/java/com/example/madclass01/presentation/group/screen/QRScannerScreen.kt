@@ -141,7 +141,9 @@ fun QRScannerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBackPress) {
+                IconButton(
+                    onClick = onBackPress
+                ) {
                     Text(
                         text = "←",
                         fontSize = 24.sp,
