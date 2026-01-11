@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.model.Group
+import com.example.madclass01.domain.model.Tag
 import com.example.madclass01.domain.usecase.GetMyGroupsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,8 +68,9 @@ class GroupListViewModel @Inject constructor(
                             name = groupResponse.name,
                             description = groupResponse.description ?: "",
                             memberCount = groupResponse.memberIds.size,
-                            tags = emptyList(),  // TODO: 태그 정보 추가
-                            imageUrl = ""
+                            tags = groupResponse.tags.map { Tag(id = it, name = it) },
+                            imageUrl = groupResponse.imageUrl,
+                            region = groupResponse.region
                         )
                     }
                     _uiState.value = _uiState.value.copy(

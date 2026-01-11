@@ -230,43 +230,35 @@ interface ApiService {
     suspend fun getUserEmbedding(@Path("userId") userId: String): Response<UserEmbeddingResponse>
 
     // Group Chat APIs
-    @GET("/api/chats/group/{groupId}/messages")
+    @GET("/groups/{groupId}/messages")
     suspend fun getGroupMessages(
         @Path("groupId") groupId: String,
         @Query("limit") limit: Int = 50
-    ): Response<List<ChatMessageResponse>>
+    ): Response<GroupMessagesResponse>
 
-    @GET("/api/chats/group/{groupId}/messages")
-    suspend fun getGroupMessagesLegacy(
-        @Path("groupId") groupId: String,
-        @Query("limit") limit: Int = 50
-    ): Response<List<ChatMessageResponse>>
-
-    @POST("/api/chats/group/{groupId}/messages")
+    @POST("/groups/{groupId}/messages")
     suspend fun sendGroupTextMessage(
         @Path("groupId") groupId: String,
-        @Body request: SendChatMessageRequest
-    ): Response<ChatMessageResponse>
+        @Body request: MessageCreateRequest
+    ): Response<GroupMessageItem>
 
     @Multipart
-    @POST("/api/chats/group/{groupId}/photos")
+    @POST("/groups/{groupId}/photos")
     suspend fun sendGroupImageMessage(
         @Path("groupId") groupId: String,
         @Part("user_id") userId: String,
         @Part("file") file: okhttp3.MultipartBody.Part
-    ): Response<ChatMessageResponse>
+    ): Response<GroupMessageItem>
 
-    @POST("/api/chats/group/{groupId}/join")
+    @POST("/groups/{groupId}/join")
     suspend fun joinGroupChat(
-        @Path("groupId") groupId: String,
-        @Body request: JoinLeaveRequest
-    ): Response<Unit>
+        @Path("groupId") groupId: String
+    ): Response<OkResponse>
 
-    @POST("/api/chats/group/{groupId}/leave")
+    @POST("/groups/{groupId}/leave")
     suspend fun leaveGroupChat(
-        @Path("groupId") groupId: String,
-        @Body request: JoinLeaveRequest
-    ): Response<Unit>
+        @Path("groupId") groupId: String
+    ): Response<OkResponse>
 
     // Invite APIs
     @POST("/api/invites/generate")

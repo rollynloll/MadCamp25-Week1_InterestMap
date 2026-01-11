@@ -146,6 +146,11 @@ fun ProfileScreen(
                                 tint = Color(0xFFF472B6),  // 핑크색
                                 modifier = Modifier.size(20.dp)
                             )
+                            "undecided", "미정" -> Text(
+                                text = "❓",
+                                fontSize = 20.sp,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                         
                         Text(

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,17 +77,18 @@ fun GroupDetailHeaderComponent(
                 .padding(end = 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // QR 코드 아이콘
+            // 사람 초대 아이콘
             Box(
                 modifier = Modifier
                     .size(24.dp)
                     .clickable { onQRCodeClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "⌨",
-                    color = Color.White,
-                    fontSize = 18.sp
+                Icon(
+                    imageVector = Icons.Default.PersonAdd,
+                    contentDescription = "초대하기",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
@@ -185,12 +188,13 @@ fun GroupDetailMiniHeaderComponent(
                 .padding(start = 16.dp)
         )
 
-        // QR 코드
-        Text(
-            text = "⌨",
-            color = Color.White,
-            fontSize = 18.sp,
+        // 사람 초대
+        Icon(
+            imageVector = Icons.Default.PersonAdd,
+            contentDescription = "초대하기",
+            tint = Color.White,
             modifier = Modifier
+                .size(24.dp)
                 .clickable { onQRCodeClick() }
                 .padding(end = 12.dp)
         )

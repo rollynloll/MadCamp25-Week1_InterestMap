@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -86,7 +88,11 @@ fun TagSelectionScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         IconButton(
-                            onClick = onBack,
+                            onClick = { 
+                                if (!uiState.errorMessage.contains("로딩")) {
+                                    onBack()
+                                }
+                            },
                             modifier = Modifier.size(40.dp)
                         ) {
                             Icon(
@@ -146,6 +152,59 @@ fun TagSelectionScreen(
                         onAddTag = { viewModel.addCustomTag(it) },
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
+                }
+                
+                // 사진으로 본 관심사 섹션 (AI 추천)
+                if (uiState.photoInterests.isNotEmpty()) {
+                    Column {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "📸 사진으로 본 관심사",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1A1A1A)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "AI 추천",
+                                    fontSize = 11.sp,
+                                    color = Color.White,
+                                    modifier = Modifier
+                                        .background(
+                                            color = Color(0xFF4CAF50),
+                                            shape = RoundedCornerShape(4.dp)
+                                        )
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            
+                            Text(
+                                text = "${uiState.photoInterests.filter { it.isSelected }.size} / ${uiState.photoInterests.size}",
+                                fontSize = 12.sp,
+                                color = Color(0xFF4CAF50),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        
+                        Text(
+                            text = "사진에서 발견된 관심사입니다. 원하지 않으면 X를 눌러 제거하세요",
+                            fontSize = 12.sp,
+                            color = Color(0xFF999999),
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        PhotoInterestSection(
+                            tags = uiState.photoInterests,
+                            onRemoveTag = { viewModel.removePhotoInterest(it) }
+                        )
+                    }
                 }
                 
                 // 추천 태그
@@ -241,6 +300,65 @@ fun TagSelectionScreen(
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun PhotoInterestSection(
+    tags: List<com.example.madclass01.domain.model.Tag>,
+    onRemoveTag: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        tags.forEach { tag ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0xFFF1F8F4),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4CAF50))
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = tag.name,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1A1A1A)
+                        )
+                    }
+                    
+                    IconButton(
+                        onClick = { onRemoveTag(tag.id) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "제거",
+                            tint = Color(0xFF999999),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
     }

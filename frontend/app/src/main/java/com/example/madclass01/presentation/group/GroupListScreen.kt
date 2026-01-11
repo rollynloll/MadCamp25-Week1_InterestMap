@@ -8,6 +8,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.QrCodeScanner
 import com.example.madclass01.presentation.group.component.GroupCard
 import com.example.madclass01.presentation.group.viewmodel.GroupListViewModel
 
@@ -30,7 +32,8 @@ fun GroupListScreen(
     userId: String? = null,  // userId 추가
     viewModel: GroupListViewModel = hiltViewModel(),
     onGroupClick: (String) -> Unit,
-    onCreateGroupClick: () -> Unit = {}
+    onCreateGroupClick: () -> Unit = {},
+    onQRScanClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     
@@ -51,13 +54,28 @@ fun GroupListScreen(
                 .statusBarsPadding()
         ) {
             // 헤더
-            Text(
-                text = "내 그룹",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "내 그룹",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A)
+                )
+                
+                IconButton(onClick = onQRScanClick) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "QR 스캔",
+                        tint = Color(0xFFFF9945)
+                    )
+                }
+            }
             
             when {
                 uiState.isLoading -> {

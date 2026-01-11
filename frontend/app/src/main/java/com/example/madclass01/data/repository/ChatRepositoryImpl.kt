@@ -1,9 +1,7 @@
 package com.example.madclass01.data.repository
 
 import com.example.madclass01.data.remote.ApiService
-import com.example.madclass01.data.remote.dto.ChatMessageResponse
-import com.example.madclass01.data.remote.dto.JoinLeaveRequest
-import com.example.madclass01.data.remote.dto.SendChatMessageRequest
+import com.example.madclass01.data.remote.dto.MessageCreateRequest
 import com.example.madclass01.domain.model.ChatMessage
 import com.example.madclass01.domain.repository.ChatRepository
 import javax.inject.Inject
@@ -22,8 +20,12 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun joinGroup(groupId: String, userId: String): Result<Unit> {
         return try {
-            val res = apiService.joinGroupChat(groupId, JoinLeaveRequest(userId))
-            if (res.isSuccessful) Result.success(Unit) else Result.failure(Exception("join failed ${res.code()}"))
+            val res = apiService.joinGroupChat(groupId)
+            if (res.isSuccessful && res.body()?.ok == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("join failed ${res.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -31,8 +33,12 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun leaveGroup(groupId: String, userId: String): Result<Unit> {
         return try {
-            val res = apiService.leaveGroupChat(groupId, JoinLeaveRequest(userId))
-            if (res.isSuccessful) Result.success(Unit) else Result.failure(Exception("leave failed ${res.code()}"))
+            val res = apiService.leaveGroupChat(groupId)
+            if (res.isSuccessful && res.body()?.ok == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("leave failed ${res.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -42,9 +48,10 @@ class ChatRepositoryImpl @Inject constructor(
         while (true) {
             val res = apiService.getGroupMessages(groupId, limit = 100)
             if (res.isSuccessful && res.body() != null) {
-                emit(res.body()!!.map(ChatMessageResponse::toDomain))
+                val messages = res.body()!!.items.map { it.toDomain() }
+                emit(messages.reversed()) // 최신 메시지가 아래로 가도록 역순 정렬
             }
-            delay(5000) // 5초 폴링
+            delay(3000) // 3초 폴링
         }
     }
 
@@ -52,7 +59,8 @@ class ChatRepositoryImpl @Inject constructor(
         return try {
             val res = apiService.getGroupMessages(groupId, limit)
             if (res.isSuccessful && res.body() != null) {
-                Result.success(res.body()!!.map(ChatMessageResponse::toDomain))
+                val messages = res.body()!!.items.map { it.toDomain() }
+                Result.success(messages.reversed())
             } else {
                 Result.failure(Exception("get messages failed ${res.code()}"))
             }
@@ -63,7 +71,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendTextMessage(groupId: String, userId: String, content: String): Result<ChatMessage> {
         return try {
-            val res = apiService.sendGroupTextMessage(groupId, SendChatMessageRequest(groupId, userId, content))
+            val res = apiService.sendGroupTextMessage(groupId, MessageCreateRequest(text = content))
             if (res.isSuccessful && res.body() != null) {
                 Result.success(res.body()!!.toDomain())
             } else {
@@ -76,7 +84,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendImageMessage(groupId: String, userId: String, imageBytes: ByteArray, fileName: String): Result<ChatMessage> {
         return try {
-            // 임시 파일 생성 후 업로드 (Compose에서 Uri를 바이트로 변환해 전달)
+            // 임시 파일 생성 후 업로드
             val tmpFile = File.createTempFile("upload_", fileName)
             tmpFile.writeBytes(imageBytes)
             val reqFile: RequestBody = tmpFile.asRequestBody("image/*".toMediaTypeOrNull())
