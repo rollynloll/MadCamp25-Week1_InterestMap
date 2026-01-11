@@ -4,6 +4,7 @@ import android.app.Activity
 import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -136,21 +139,32 @@ fun LoginScreen(
                 .padding(top = 120.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Surface(
+            Box(
                 modifier = Modifier.size(170.dp),
-                shape = CircleShape,
-                color = Color(0xFFFFB777)
+                contentAlignment = Alignment.Center
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(150.dp)
-                            .background(Color.Transparent, CircleShape)
-                    )
-                }
+                // Background shadow layer
+                Box(
+                    modifier = Modifier
+                        .size(150.dp)
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = CircleShape,
+                            spotColor = Color.Black,
+                            ambientColor = Color.Black
+                        )
+                )
+
+                Image(
+                    painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(150.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                        .background(Color.Transparent, CircleShape)
+                )
             }
             Spacer(Modifier.height(24.dp))
             Text(

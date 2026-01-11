@@ -193,6 +193,19 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 }
             )
         }
+        AppScreen.Loading -> {
+            LoadingScreen(
+                userId = userId,
+                imageUrls = userImages,
+                onBack = {
+                    currentScreen = AppScreen.ProfileSetup
+                },
+                onLoadingComplete = { tags ->
+                    recommendedTags = tags
+                    currentScreen = AppScreen.TagSelection
+                }
+            )
+        }
         AppScreen.TagSelection -> {
             TagSelectionScreen(
                 userId = userId,
