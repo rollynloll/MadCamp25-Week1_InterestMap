@@ -50,8 +50,7 @@ fun ProfileSetupScreen(
     viewModel: ProfileSetupViewModel = hiltViewModel(),
     isEditMode: Boolean = false,
     onBack: () -> Unit = {},
-    onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>) -> Unit = { _, _, _, _ -> },
-    onProceedToTagSelection: () -> Unit = {}
+    onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>, recommendedTags: List<String>) -> Unit = { _, _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -82,15 +81,15 @@ fun ProfileSetupScreen(
         }
     }
     
-    LaunchedEffect(uiState.isProfileComplete) {
-        if (uiState.isProfileComplete) {
+    LaunchedEffect(uiState.isProfileComplete, uiState.isAnalyzingImages, uiState.isLoading) {
+        if (uiState.isProfileComplete && !uiState.isAnalyzingImages && !uiState.isLoading) {
             onProfileComplete(
                 uiState.nickname,
                 uiState.age,
                 uiState.region,
-                uiState.images.map { it.uri }
+                uiState.images.map { it.uri },
+                uiState.recommendedTags
             )
-            onProceedToTagSelection()
             viewModel.resetCompleteState()
         }
     }

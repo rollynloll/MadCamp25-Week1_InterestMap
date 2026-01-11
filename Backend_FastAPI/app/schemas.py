@@ -210,6 +210,7 @@ class TextEmbeddingRequest(BaseSchema):
 class BatchPhotoUploadResponse(BaseSchema):
     photos: list[PhotoUploadResponse]
     suggested_tags: list[str]
+    image_tags: list[str] = Field(default_factory=list)
     embedding: list[float] | None = None
     map_position: dict[str, float] | None = None
 

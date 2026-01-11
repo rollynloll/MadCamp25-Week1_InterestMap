@@ -87,3 +87,4 @@ frontend/build_log.txt
 *.md
 !README.md
 !**/README.md
+user_embeddings/

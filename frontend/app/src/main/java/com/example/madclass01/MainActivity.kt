@@ -182,28 +182,13 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                         currentScreen = AppScreen.Login
                     }
                 },
-                onProfileComplete = { nickname, age, region, images ->
+                onProfileComplete = { nickname, age, region, images, tags ->
                     userNickname = nickname
                     userAge = age
                     userRegion = region
                     userImages = images
-                    println("Step 1 완료: $nickname, $age, $region, ${images.size}개 이미지")
-                    currentScreen = AppScreen.Loading
-                },
-                onProceedToTagSelection = {
-                    currentScreen = AppScreen.Loading
-                }
-            )
-        }
-        AppScreen.Loading -> {
-            LoadingScreen(
-                userId = userId,
-                imageUrls = userImages,
-                onBack = {
-                    currentScreen = AppScreen.ProfileSetup
-                },
-                onLoadingComplete = { tags ->
                     recommendedTags = tags
+                    println("Step 1 완료: $nickname, $age, $region, ${images.size}개 이미지")
                     currentScreen = AppScreen.TagSelection
                 }
             )

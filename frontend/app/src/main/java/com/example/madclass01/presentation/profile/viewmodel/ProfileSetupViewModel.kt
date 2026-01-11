@@ -254,6 +254,7 @@ class ProfileSetupViewModel @Inject constructor(
                 )
 
                 // 2. 한 번에 모든 사진 업로드
+                var recommendedTags: List<String> = emptyList()
                 val uploadedUrls = when (val uploadResult = backendRepository.uploadPhotos(
                     userId = currentState.userId!!,
                     files = optimizedFiles,
@@ -264,6 +265,7 @@ class ProfileSetupViewModel @Inject constructor(
                             "ProfileSetupViewModel",
                             "사진 업로드 성공: ${uploadResult.data.photos.size}개"
                         )
+                        recommendedTags = uploadResult.data.suggestedTags.take(5)
                         
                         // 임시 파일 삭제
                         optimizedFiles.forEach { it.delete() }
@@ -300,41 +302,12 @@ class ProfileSetupViewModel @Inject constructor(
                 // 업로드된 URL 저장
                 _uiState.value = _uiState.value.copy(uploadedImageUrls = uploadedUrls)
 
-                // 3. 이미지 분석 API 호출 (태그 추천 받기)
-                android.util.Log.d("ProfileSetupViewModel", "이미지 분석 API 호출 - ${uploadedUrls.size}개 이미지")
-                when (val analysisResult = backendRepository.analyzeImages(
-                    userId = currentState.userId!!,
-                    imageUrls = uploadedUrls
-                )) {
-                    is ApiResult.Success -> {
-                        android.util.Log.d(
-                            "ProfileSetupViewModel",
-                            "이미지 분석 성공 - tags: ${analysisResult.data.recommendedTags}"
-                        )
-                        
-                        // 추천 태그를 최대 5개까지 저장
-                        val recommendedTags = analysisResult.data.recommendedTags.take(5)
-                        
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            isAnalyzingImages = false,
-                            recommendedTags = recommendedTags,
-                            isProfileComplete = true  // 태그 선택 화면으로 이동
-                        )
-                    }
-                    is ApiResult.Error -> {
-                        android.util.Log.e(
-                            "ProfileSetupViewModel",
-                            "이미지 분석 실패: ${analysisResult.message}"
-                        )
-                        _uiState.value = currentState.copy(
-                            isLoading = false,
-                            isAnalyzingImages = false,
-                            errorMessage = "이미지 분석 실패: ${analysisResult.message}"
-                        )
-                    }
-                    is ApiResult.Loading -> {}
-                }
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isAnalyzingImages = false,
+                    recommendedTags = recommendedTags,
+                    isProfileComplete = true  // 태그 선택 화면으로 이동
+                )
             }
         } else {
             android.util.Log.w("ProfileSetupViewModel", "userId가 null입니다!")

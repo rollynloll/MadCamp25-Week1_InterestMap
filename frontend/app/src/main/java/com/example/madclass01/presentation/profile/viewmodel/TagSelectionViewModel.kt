@@ -39,9 +39,15 @@ class TagSelectionViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val result = analyzeImagesUseCase(emptyList())
+                val recommendedSource = if (result.recommendedTags.isNotEmpty()) {
+                    result.recommendedTags
+                } else {
+                    result.extractedTags
+                }
+                val recommended = recommendedSource.map { it.copy(isSelected = true) }
                 _uiState.value = _uiState.value.copy(
-                    extractedTags = result.extractedTags.map { it.copy(isSelected = true) },
-                    recommendedTags = result.recommendedTags
+                    extractedTags = emptyList(),
+                    recommendedTags = recommended
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
@@ -61,7 +67,8 @@ class TagSelectionViewModel @Inject constructor(
             )
         }
         _uiState.value = _uiState.value.copy(
-            extractedTags = tagModels
+            extractedTags = emptyList(),
+            recommendedTags = tagModels
         )
     }
     

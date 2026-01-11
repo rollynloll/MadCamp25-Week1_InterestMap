@@ -39,15 +39,17 @@ async def upsert_image_caption(
 async def get_recent_captions(
     db: AsyncSession,
     user_id: uuid.UUID,
-    limit: int = 5,
+    limit: int | None = None,
 ) -> list[str]:
-    result = await db.execute(
+    query = (
         select(ImageCaption.caption_ko)
         .join(UserPhoto, ImageCaption.image_id == UserPhoto.id)
         .where(UserPhoto.user_id == user_id)
         .order_by(ImageCaption.created_at.desc())
-        .limit(limit)
     )
+    if limit is not None:
+        query = query.limit(limit)
+    result = await db.execute(query)
     return [row[0] for row in result.all()]
 
 
