@@ -16,6 +16,7 @@ from app.models.message import GroupMessage
 from app.models.photo import UserPhoto
 from app.models.user import User
 from app.schemas import (
+    GroupCreateRequest,
     GroupListItem,
     GroupListResponse,
     GroupMemberItem,
@@ -34,6 +35,42 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/groups", tags=["groups"])
+
+
+@router.post("", status_code=201)
+async def create_group(
+    payload: GroupCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    그룹 생성 및 creator를 자동으로 멤버로 추가
+    """
+    # 그룹 생성
+    group = Group(
+        name=payload.name,
+        description=payload.description or "",
+    )
+    db.add(group)
+    await db.flush()
+    
+    # Creator를 자동으로 멤버로 추가 (role: creator)
+    member = GroupMember(
+        group_id=group.id,
+        user_id=current_user.id,
+        role="creator"
+    )
+    db.add(member)
+    await db.commit()
+    await db.refresh(group)
+    
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "description": group.description,
+        "creator_id": str(current_user.id),
+        "member_ids": [str(current_user.id)]
+    }
 
 
 def _coords_from_uuid(user_id: uuid.UUID) -> tuple[float, float]:
