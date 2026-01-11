@@ -192,14 +192,26 @@ class GenerateEmbeddingRequest(BaseSchema):
     age: int | None = None
     region: str | None = None
     bio: str | None = None
-    tags: list[str]
-    image_keywords: list[str]
+    tags: list[str] = Field(default_factory=list)
+    image_keywords: list[str] = Field(default_factory=list)
 
 
 class GenerateEmbeddingResponse(BaseSchema):
     user_id: str
     embedding: list[float]
     map_position: dict[str, float]
+
+
+class TextEmbeddingRequest(BaseSchema):
+    user_id: str
+    text: str
+
+
+class BatchPhotoUploadResponse(BaseSchema):
+    photos: list[PhotoUploadResponse]
+    suggested_tags: list[str]
+    embedding: list[float] | None = None
+    map_position: dict[str, float] | None = None
 
 
 class EmbeddingResponse(BaseSchema):

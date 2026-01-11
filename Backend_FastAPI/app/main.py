@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from collections import Counter
+import json
 from typing import List, Optional, Dict, Any
 import asyncio
 import hashlib
@@ -16,7 +18,8 @@ from app.schemas import (
     GroupCreateRequest, GroupResponse, AddMemberRequest,
     PhotoUploadResponse, TagAnalysisRequest, TagAnalysisResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
-    GenerateEmbeddingRequest, GenerateEmbeddingResponse
+    GenerateEmbeddingRequest, GenerateEmbeddingResponse,
+    TextEmbeddingRequest, BatchPhotoUploadResponse
 )
 from app.router import router as spec_router
 from app.db.session import engine, get_db
@@ -26,6 +29,7 @@ from app.models.user import User
 from app.models.photo import UserPhoto
 from app.services.embedding.captioning import caption_image
 from app.services.embedding.composer import build_final_text, compute_source_hash
+from app.services.embedding.embedding_log import log_embedding_io
 from app.services.embedding.interest import infer_interest_tags
 from app.services.embedding.openai_embed import embed_text
 from app.services.embedding.repo import (
@@ -105,6 +109,12 @@ app = FastAPI(
         }
     ]
 )
+
+@app.middleware("http")
+async def log_request_path(request: Request, call_next):
+    logger = logging.getLogger("uvicorn.error")
+    logger.info("Request %s %s", request.method, request.url.path)
+    return await call_next(request)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_ROOT = BASE_DIR / "uploads"
@@ -438,11 +448,13 @@ async def upload_photo(
     logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
     return _photo_response(photo, request)
 
-@app.post("/api/photos/batch", response_model=List[PhotoUploadResponse])
+@app.post("/api/photos/batch", response_model=BatchPhotoUploadResponse, tags=["photos"])
 async def upload_photos_batch(
     request: Request,
     user_id: str = Form(...),
     files: List[UploadFile] = File(...),
+    selected_tags: List[str] = Form([]),
+    selected_tags_json: str | None = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
     """다중 사진 업로드 (배치)"""
@@ -450,6 +462,16 @@ async def upload_photos_batch(
     user = await _get_user_by_id(db, user_id)
     
     uploaded_photos = []
+    batch_captions: list[str] = []
+    suggested_tag_counts: Counter[str] = Counter()
+    incoming_tags: list[str] = list(selected_tags)
+    if selected_tags_json:
+        try:
+            parsed = json.loads(selected_tags_json)
+            if isinstance(parsed, list):
+                incoming_tags.extend(str(item) for item in parsed)
+        except json.JSONDecodeError as exc:
+            logger.warning("Invalid selected_tags_json: %s", exc)
     
     # 현재 최대 sort_order 조회
     result = await db.execute(
@@ -512,37 +534,50 @@ async def upload_photos_batch(
         if is_primary:
             user.profile_image_url = file_url
         
-        # 비동기 캡셔닝 (백그라운드에서 처리)
+        # 캡셔닝을 완료한 뒤 응답 (DB에 저장까지 완료)
+        caption_raw_en = f"an uploaded image ({disk_path.name})"
+        model_name = "fallback"
+        model_version = "fallback"
         try:
             caption_task = asyncio.to_thread(caption_image, str(disk_path))
-            caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=10)
-            
-            caption_ko = caption_raw_en
-            try:
-                translate_task = translate_to_korean(caption_raw_en)
-                caption_ko = await asyncio.wait_for(translate_task, timeout=10)
-            except:
-                pass
-            
-            interest_tags = []
-            try:
-                interest_task = infer_interest_tags(caption_ko)
-                interest_tags = await asyncio.wait_for(interest_task, timeout=8)
-                if interest_tags:
-                    caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
-            except:
-                pass
-            
-            await upsert_image_caption(
-                db,
-                image_id=photo_id,
-                caption_raw_en=caption_raw_en,
-                caption_ko=caption_ko,
-                model_name=model_name,
-                model_version=model_version,
-            )
+            caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=30)
+        except asyncio.TimeoutError:
+            logger.warning("Captioning timed out for %s", disk_path.name)
         except Exception as exc:
             logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
+
+        try:
+            translate_task = translate_to_korean(caption_raw_en)
+            caption_ko = await asyncio.wait_for(translate_task, timeout=15)
+        except asyncio.TimeoutError:
+            logger.warning("Translation timed out for %s", disk_path.name)
+            caption_ko = caption_raw_en
+        except Exception as exc:
+            logger.warning("Translation failed for %s: %s", disk_path.name, exc)
+            caption_ko = caption_raw_en
+
+        interest_tags: list[str] = []
+        try:
+            interest_task = infer_interest_tags(caption_ko)
+            interest_tags = await asyncio.wait_for(interest_task, timeout=10)
+        except asyncio.TimeoutError:
+            logger.warning("Interest inference timed out for %s", disk_path.name)
+        except Exception as exc:
+            logger.warning("Interest inference failed for %s: %s", disk_path.name, exc)
+
+        if interest_tags:
+            suggested_tag_counts.update(interest_tags)
+            caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
+
+        batch_captions.append(caption_ko)
+        await upsert_image_caption(
+            db,
+            image_id=photo_id,
+            caption_raw_en=caption_raw_en,
+            caption_ko=caption_ko,
+            model_name=model_name,
+            model_version=model_version,
+        )
         
         uploaded_photos.append(_photo_response(photo, request))
         logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
@@ -560,8 +595,71 @@ async def upload_photos_batch(
     await db.refresh(user)
     _cache_user(user)
     
+    selected_tags: set[str] = set(str(item) for item in incoming_tags if item)
+    if user.profile_data:
+        for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
+            value = user.profile_data.get(key)
+            if isinstance(value, list):
+                selected_tags.update(str(item) for item in value)
+
+    suggested_tags = [
+        tag for tag, _count in suggested_tag_counts.most_common()
+        if tag not in selected_tags
+    ][:5]
+
+    embedding: list[float] | None = None
+    map_position: dict[str, float] | None = None
+    if batch_captions or selected_tags:
+        user_description = None
+        if user.profile_data:
+            user_description = user.profile_data.get("bio") or user.profile_data.get("description")
+        unique_captions: list[str] = []
+        seen: set[str] = set()
+        for caption in batch_captions:
+            if caption and caption not in seen:
+                seen.add(caption)
+                unique_captions.append(caption)
+        image_captions_for_embedding = unique_captions[:5]
+        final_text = build_final_text(
+            selected_tags=list(selected_tags)[:10],
+            user_description=user_description,
+            image_captions=image_captions_for_embedding,
+        )
+        source_hash = compute_source_hash(final_text)
+        embedding, model_name, model_version = await embed_text(final_text)
+        await deactivate_embeddings(db, user.id)
+        new_embedding = await create_embedding(
+            db,
+            user_id=user.id,
+            embedding_type="profile_v1",
+            model_name=model_name,
+            model_version=model_version,
+            embedding=embedding,
+            source_hash=source_hash,
+        )
+        await db.commit()
+        await db.refresh(new_embedding)
+        log_embedding_io(
+            user_name=user.nickname,
+            user_id=str(user.id),
+            input_text=final_text,
+            image_captions=image_captions_for_embedding,
+            embedding=embedding,
+            model_name=model_name,
+            model_version=model_version,
+        )
+        map_position = {
+            "x": float(embedding[0]) if embedding else 0.0,
+            "y": float(embedding[1]) if embedding else 0.0,
+        }
+
     logger.info("Batch upload completed user_id=%s count=%d", user_id, len(uploaded_photos))
-    return uploaded_photos
+    return BatchPhotoUploadResponse(
+        photos=uploaded_photos,
+        suggested_tags=suggested_tags,
+        embedding=embedding,
+        map_position=map_position,
+    )
 
 @app.get("/api/photos/user/{user_id}", response_model=List[PhotoUploadResponse])
 async def get_user_photos(
@@ -749,7 +847,7 @@ async def analyze_images(
         all_keywords=all_keywords
     )
 
-@app.post("/api/generate-embedding", response_model=GenerateEmbeddingResponse)
+@app.post("/api/generate-embedding", response_model=GenerateEmbeddingResponse, tags=["embedding"])
 async def generate_embedding(
     request: GenerateEmbeddingRequest,
     db: AsyncSession = Depends(get_db),
@@ -761,9 +859,19 @@ async def generate_embedding(
     user = await _get_user_by_id(db, request.user_id)
 
     selected_tags = (request.tags or []) + (request.image_keywords or [])
+    if not selected_tags and user.profile_data:
+        for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
+            value = user.profile_data.get(key)
+            if isinstance(value, list):
+                selected_tags.extend([str(item) for item in value])
     selected_tags = selected_tags[:10]
-    user_description = request.bio or user.profile_data.get("bio") if user.profile_data else None
+    user_description = request.bio or (user.profile_data.get("bio") if user.profile_data else None)
     image_captions = await get_recent_captions(db, user.id, limit=5)
+    if not image_captions:
+        logging.getLogger("uvicorn.error").warning(
+            "Embedding input has no image captions user_id=%s",
+            request.user_id,
+        )
 
     final_text = build_final_text(
         selected_tags=selected_tags,
@@ -778,6 +886,8 @@ async def generate_embedding(
         raise HTTPException(status_code=503, detail="Embedding storage unavailable") from exc
     if active and active.source_hash == source_hash:
         embedding = active.embedding
+        model_name = active.model_name
+        model_version = active.model_version
     else:
         embedding, model_name, model_version = await embed_text(final_text)
         await deactivate_embeddings(db, user.id)
@@ -792,6 +902,61 @@ async def generate_embedding(
         )
         await db.commit()
         await db.refresh(new_embedding)
+
+    user_name = user.nickname or request.nickname
+    log_embedding_io(
+        user_name=user_name,
+        user_id=str(user.id),
+        input_text=final_text,
+        image_captions=image_captions,
+        embedding=embedding,
+        model_name=model_name,
+        model_version=model_version,
+    )
+
+    map_x = float(embedding[0]) if embedding else 0.0
+    map_y = float(embedding[1]) if embedding else 0.0
+
+    return GenerateEmbeddingResponse(
+        user_id=request.user_id,
+        embedding=embedding,
+        map_position={"x": map_x, "y": map_y},
+    )
+
+
+@app.post("/api/embedding/text", response_model=GenerateEmbeddingResponse, tags=["embedding"])
+async def generate_embedding_from_text(
+    request: TextEmbeddingRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """텍스트만으로 임베딩 생성"""
+    user = await _get_user_by_id(db, request.user_id)
+    final_text = request.text
+    source_hash = compute_source_hash(final_text)
+
+    embedding, model_name, model_version = await embed_text(final_text)
+    await deactivate_embeddings(db, user.id)
+    new_embedding = await create_embedding(
+        db,
+        user_id=user.id,
+        embedding_type="profile_v1",
+        model_name=model_name,
+        model_version=model_version,
+        embedding=embedding,
+        source_hash=source_hash,
+    )
+    await db.commit()
+    await db.refresh(new_embedding)
+
+    log_embedding_io(
+        user_name=user.nickname,
+        user_id=str(user.id),
+        input_text=final_text,
+        image_captions=[],
+        embedding=embedding,
+        model_name=model_name,
+        model_version=model_version,
+    )
 
     map_x = float(embedding[0]) if embedding else 0.0
     map_y = float(embedding[1]) if embedding else 0.0

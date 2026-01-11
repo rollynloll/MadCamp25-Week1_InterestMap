@@ -251,7 +251,7 @@ async def rebuild_embedding(
 ):
     profile_data = current_user.profile_data or {}
     selected_tags = []
-    for key in ("tags", "interests", "hobbies", "selected_tags"):
+    for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
         value = profile_data.get(key)
         if isinstance(value, list):
             selected_tags.extend([str(item) for item in value])
