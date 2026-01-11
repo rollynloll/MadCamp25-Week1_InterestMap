@@ -21,7 +21,7 @@ object NetworkModule {
     // 실제 기기 (핫스팟): "http://10.26.91.102:8000/"
     // 실제 서버: "https://your-server.com"
     // 실제 서버2 : /10.249.99.27
-    private const val BASE_URL = "http://10.249.99.27:8000/"
+    private const val BASE_URL = "http://117.111.6.30:8000/"
     
     @Provides
     @Singleton

@@ -5,11 +5,13 @@ DB: user_photos
 - url (TEXT, NOT NULL)
 - sort_order (INT, NOT NULL)                   # 표시 순서 (작을수록 먼저)
 - is_primary (BOOL, NOT NULL, default=false)   # 대표 사진 여부
+- content_hash (VARCHAR(64), NULLABLE)         # 파일 내용 해시(중복 방지)
 - created_at (timestamptz, NOT NULL, default=now())
 - updated_at (timestamptz, NOT NULL, default=now(), onupdate=now())
 
 Constraints / Indexes
 - UNIQUE(user_id, url)                         # 같은 유저가 같은 URL 중복 저장 불가
+- UNIQUE(user_id, content_hash)                # 같은 유저의 동일 이미지 중복 저장 불가
 - INDEX(user_id, sort_order)                   # 갤러리 정렬 조회용
 - PARTIAL UNIQUE INDEX (user_id WHERE is_primary = true)
   → 유저당 대표사진 1장만 허용
@@ -23,6 +25,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    String,
     Text,
     UniqueConstraint,
     func,
@@ -39,6 +42,7 @@ class UserPhoto(Base):
     __table_args__ = (
         # 같은 유저가 같은 URL을 중복 저장하지 못하게
         UniqueConstraint("user_id", "url", name="uq_user_photos_user_url"),
+        UniqueConstraint("user_id", "content_hash", name="uq_user_photos_user_hash"),
 
         # 유저 갤러리 정렬 조회용
         Index("ix_user_photos_user_sort", "user_id", "sort_order"),
@@ -67,6 +71,11 @@ class UserPhoto(Base):
     url: Mapped[str] = mapped_column(
         Text,
         nullable=False,
+    )
+
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
     )
 
     sort_order: Mapped[int] = mapped_column(
