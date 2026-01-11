@@ -208,8 +208,9 @@ interface ApiService {
     @POST("/api/photos/batch")
     suspend fun uploadPhotos(
         @Part("user_id") userId: RequestBody,
-        @Part files: List<okhttp3.MultipartBody.Part>
-    ): Response<List<PhotoResponse>>
+        @Part files: List<okhttp3.MultipartBody.Part>,
+        @Part("selected_tags_json") selectedTagsJson: RequestBody
+    ): Response<BatchPhotoUploadResponse>
 
     @GET("/api/photos/user/{userId}")
     suspend fun getUserPhotos(@Path("userId") userId: String): Response<List<PhotoResponse>>

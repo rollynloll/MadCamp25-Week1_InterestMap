@@ -3,6 +3,7 @@ package com.example.madclass01.data.repository
 import android.content.Context
 import com.example.madclass01.data.remote.ApiService
 import com.example.madclass01.data.remote.dto.*
+import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -23,6 +24,7 @@ sealed class ApiResult<out T> {
 class BackendRepository @Inject constructor(
     private val apiService: ApiService
 ) {
+    private val gson = Gson()
     
     suspend fun healthCheck(): ApiResult<HealthCheckResponse> = withContext(Dispatchers.IO) {
         try {
@@ -140,9 +142,9 @@ class BackendRepository @Inject constructor(
             if (uploadResult !is ApiResult.Success) {
                 return@withContext ApiResult.Error("User created but photo upload failed: ${(uploadResult as? ApiResult.Error)?.message}")
             }
-            
+
             // 5. 첫 번째 사진을 프로필 이미지로 설정
-            val firstPhotoUrl = uploadResult.data.firstOrNull()?.fileUrl
+            val firstPhotoUrl = uploadResult.data.photos.firstOrNull()?.fileUrl
             if (firstPhotoUrl != null) {
                 updateUser(userId, profileImageUrl = firstPhotoUrl)
             } else {
@@ -216,7 +218,7 @@ class BackendRepository @Inject constructor(
                 
                 if (uploadResult is ApiResult.Success) {
                     // 첫 번째 사진을 프로필 이미지로 사용
-                    profileImageUrl = uploadResult.data.firstOrNull()?.fileUrl
+                    profileImageUrl = uploadResult.data.photos.firstOrNull()?.fileUrl
                 }
             }
             
@@ -252,16 +254,19 @@ class BackendRepository @Inject constructor(
      */
     suspend fun uploadPhotos(
         userId: String,
-        files: List<File>
-    ): ApiResult<List<PhotoResponse>> = withContext(Dispatchers.IO) {
+        files: List<File>,
+        selectedTags: List<String> = emptyList()
+    ): ApiResult<BatchPhotoUploadResponse> = withContext(Dispatchers.IO) {
         try {
             val multipartParts = files.mapIndexed { index, file ->
                 val requestBody = file.asRequestBody("image/webp".toMediaTypeOrNull())
                 MultipartBody.Part.createFormData("files", "photo_${index}.webp", requestBody)
             }
             val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
+            val tagsJson = gson.toJson(selectedTags)
+            val tagsBody = tagsJson.toRequestBody("application/json".toMediaTypeOrNull())
 
-            val response = apiService.uploadPhotos(userIdBody, multipartParts)
+            val response = apiService.uploadPhotos(userIdBody, multipartParts, tagsBody)
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {

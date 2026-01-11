@@ -256,19 +256,20 @@ class ProfileSetupViewModel @Inject constructor(
                 // 2. 한 번에 모든 사진 업로드
                 val uploadedUrls = when (val uploadResult = backendRepository.uploadPhotos(
                     userId = currentState.userId!!,
-                    files = optimizedFiles
+                    files = optimizedFiles,
+                    selectedTags = currentState.interests.map { it.name } + currentState.photoInterests.map { it.name }
                 )) {
                     is ApiResult.Success -> {
                         android.util.Log.d(
                             "ProfileSetupViewModel",
-                            "사진 업로드 성공: ${uploadResult.data.size}개"
+                            "사진 업로드 성공: ${uploadResult.data.photos.size}개"
                         )
                         
                         // 임시 파일 삭제
                         optimizedFiles.forEach { it.delete() }
                         
                         // URL 리스트 반환
-                        uploadResult.data.map { it.fileUrl }
+                        uploadResult.data.photos.map { it.fileUrl }
                     }
                     is ApiResult.Error -> {
                         android.util.Log.e(

@@ -250,6 +250,15 @@ data class PhotoResponse(
     val uploadedAt: String
 )
 
+data class BatchPhotoUploadResponse(
+    val photos: List<PhotoResponse>,
+    @SerializedName("suggested_tags")
+    val suggestedTags: List<String>,
+    val embedding: List<Float>? = null,
+    @SerializedName("map_position")
+    val mapPosition: MapPosition? = null
+)
+
 // ==================== Image Analysis ====================
 
 data class ImageAnalysisRequest(
