@@ -113,6 +113,9 @@ dependencies {
     // Coil for image loading
     implementation("io.coil-kt:coil-compose:2.4.0")
     
+    // FlowRow for layout
+    implementation("com.google.accompanist:accompanist-flowlayout:0.36.0")
+    
     // Navigation Compose
     implementation("androidx.navigation:navigation-compose:2.7.6")
     

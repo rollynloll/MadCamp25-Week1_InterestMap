@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import com.google.accompanist.flowlayout.FlowRow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
@@ -31,6 +32,17 @@ import com.example.madclass01.presentation.common.component.TagInputField
 import com.example.madclass01.presentation.profile.component.ImageGalleryGrid
 import com.example.madclass01.presentation.profile.viewmodel.ProfileSetupViewModel
 
+// 미리 정의된 관심사 태그 목록
+private val PREDEFINED_INTEREST_TAGS = listOf(
+    "여행", "운동", "음악", "영화", "독서", "요리",
+    "게임", "사진", "그림", "춤", "노래", "쇼핑",
+    "패션", "뷰티", "카페", "맛집", "등산", "캠핑",
+    "자전거", "수영", "러닝", "헬스", "요가", "필라테스",
+    "악기연주", "영화감상", "드라마", "애니메이션", "만화",
+    "반려동물", "식물키우기", "DIY", "베이킹", "낚시",
+    "보드게임", "카드게임", "볼링", "당구", "클라이밍"
+)
+
 @Composable
 fun ProfileSetupScreen(
     userId: String? = null,  // userId 추가
@@ -42,8 +54,7 @@ fun ProfileSetupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-
-    remember(isEditMode) { Unit }
+    var showAllTags by remember { mutableStateOf(false) }
     
     // userId 설정
     LaunchedEffect(userId) {
@@ -260,74 +271,142 @@ fun ProfileSetupScreen(
                 )
             )
             
-            // 취미 섹션
-            Text(
-                text = "취미",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 12.dp)
-            )
-            
-            TagInputField(
-                onAddTag = { viewModel.addHobby(it) },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            
-            if (uiState.hobbies.isNotEmpty()) {
-                LazyRow(
+            // 관심사 섹션
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(uiState.hobbies) { hobby ->
-                        TagChip(
-                            label = hobby.name,
-                            isSelected = true,
-                            onRemove = { viewModel.removeHobby(hobby.id) }
+                    Text(
+                        text = "관심사",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1A1A1A)
+                    )
+                    
+                    val totalSelected = uiState.hobbies.size + uiState.interests.size
+                    Text(
+                        text = "$totalSelected 개 선택 (최소 3개)",
+                        fontSize = 12.sp,
+                        color = if (totalSelected >= 3) Color(0xFFFF9945) else Color(0xFF999999),
+                        fontWeight = if (totalSelected >= 3) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+                
+                Text(
+                    text = "관심사를 선택하거나 직접 입력해주세요",
+                    fontSize = 12.sp,
+                    color = Color(0xFF999999),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                // 직접 입력
+                TagInputField(
+                    onAddTag = { viewModel.addHobby(it) },
+                    placeholder = "직접 입력",
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                // 선택된 태그 표시
+                val allSelectedTags = uiState.hobbies + uiState.interests
+                if (allSelectedTags.isNotEmpty()) {
+                    Text(
+                        text = "선택된 관심사",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF666666),
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        mainAxisSpacing = 8.dp,
+                        crossAxisSpacing = 8.dp
+                    ) {
+                        allSelectedTags.forEach { tag ->
+                            TagChip(
+                                label = tag.name,
+                                isSelected = true,
+                                onRemove = { 
+                                    if (uiState.hobbies.contains(tag)) {
+                                        viewModel.removeHobby(tag.id)
+                                    } else {
+                                        viewModel.removeInterest(tag.id)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+                
+                // 추천 태그
+                Text(
+                    text = "추천 관심사",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF666666),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                val displayTags = if (showAllTags) PREDEFINED_INTEREST_TAGS else PREDEFINED_INTEREST_TAGS.take(12)
+                val selectedTagNames = allSelectedTags.map { it.name }
+                
+                FlowRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    mainAxisSpacing = 8.dp,
+                    crossAxisSpacing = 8.dp
+                ) {
+                    displayTags.forEach { tagName ->
+                        val isSelected = selectedTagNames.contains(tagName)
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                if (isSelected) {
+                                    val tag = allSelectedTags.find { it.name == tagName }
+                                    tag?.let {
+                                        if (uiState.hobbies.contains(it)) {
+                                            viewModel.removeHobby(it.id)
+                                        } else {
+                                            viewModel.removeInterest(it.id)
+                                        }
+                                    }
+                                } else {
+                                    viewModel.addHobby(tagName)
+                                }
+                            },
+                            label = { Text(tagName) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFFF9945),
+                                selectedLabelColor = Color.White,
+                                containerColor = Color(0xFFF5F5F5),
+                                labelColor = Color(0xFF666666)
+                            )
                         )
                     }
                 }
-            } else {
-                Spacer(modifier = Modifier.height(24.dp))
-            }
-            
-            // 흥미 섹션
-            Text(
-                text = "흥미",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .padding(bottom = 12.dp)
-            )
-            
-            TagInputField(
-                onAddTag = { viewModel.addInterest(it) },
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            
-            if (uiState.interests.isNotEmpty()) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 32.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                
+                // 더보기/접기 버튼
+                TextButton(
+                    onClick = { showAllTags = !showAllTags },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
-                    items(uiState.interests) { interest ->
-                        TagChip(
-                            label = interest.name,
-                            isSelected = true,
-                            onRemove = { viewModel.removeInterest(interest.id) }
-                        )
-                    }
+                    Text(
+                        text = if (showAllTags) "접기 ▲" else "더보기 ▼",
+                        color = Color(0xFFFF9945),
+                        fontSize = 13.sp
+                    )
                 }
-            } else {
-                Spacer(modifier = Modifier.height(24.dp))
+                
+                Spacer(modifier = Modifier.height(8.dp))
             }
             
             // 프로필 사진 섹션
