@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,6 +42,7 @@ fun ProfileEditScreen(
     initialBio: String,
     initialImages: List<String>,
     initialTags: List<String> = emptyList(),
+    initialPhotoInterests: List<String> = emptyList(),
     allAvailableTags: List<String> = listOf(
         "운동", "여행", "음악", "영화", "독서", "게임",
         "요리", "사진", "그림", "춤", "노래", "악기",
@@ -65,7 +67,8 @@ fun ProfileEditScreen(
     var region by remember { mutableStateOf(initialRegion ?: "") }
     var bio by remember { mutableStateOf(initialBio) }
     var nicknameError by remember { mutableStateOf("") }
-    var selectedTags by remember { mutableStateOf(initialTags.toSet()) }
+    var selectedTags by remember { mutableStateOf(initialTags.toSet()) }  // 사용자가 선택한 관심사
+    var photoInterestTags by remember { mutableStateOf(initialPhotoInterests.toSet()) }  // 사진에서 추출한 관심사
     var showTagSelector by remember { mutableStateOf(false) }
 
     val images = remember {
@@ -292,14 +295,14 @@ fun ProfileEditScreen(
 
                     TextButton(onClick = { showTagSelector = true }) {
                         Text(
-                            text = if (selectedTags.isEmpty()) "태그 추가" else "태그 수정",
+                            text = if (selectedTags.isEmpty() && photoInterestTags.isEmpty()) "태그 추가" else "태그 수정",
                             fontSize = 14.sp,
                             color = Color(0xFFFF9945)
                         )
                     }
                 }
 
-                if (selectedTags.isEmpty()) {
+                if (selectedTags.isEmpty() && photoInterestTags.isEmpty()) {
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         color = Color(0xFFF5F5F5),
@@ -319,6 +322,7 @@ fun ProfileEditScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
+                        // 사용자가 선택한 관심사 태그
                         selectedTags.forEach { tag ->
                             TagChip(
                                 label = tag,
@@ -329,6 +333,35 @@ fun ProfileEditScreen(
                                 },
                                 modifier = Modifier
                             )
+                        }
+                        
+                        // 사진에서 추출한 관심사 태그 (파란색 배경으로 구분)
+                        photoInterestTags.forEach { tag ->
+                            Surface(
+                                shape = RoundedCornerShape(20.dp),
+                                color = Color(0xFFE3F2FD),  // 파란색 배경으로 구분
+                                modifier = Modifier.clickable {
+                                    // 클릭하면 태그 제거
+                                    photoInterestTags = photoInterestTags - tag
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "📸",
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = tag,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = Color(0xFF1976D2)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -437,7 +470,7 @@ fun ProfileEditScreen(
                         Button(
                             onClick = {
                                 val trimmed = customTagInput.trim()
-                                if (trimmed.isNotEmpty() && trimmed !in selectedTags) {
+                                if (trimmed.isNotEmpty() && trimmed !in selectedTags && trimmed !in photoInterestTags) {
                                     selectedTags = selectedTags + trimmed
                                     customTagInput = ""
                                 }
@@ -454,6 +487,66 @@ fun ProfileEditScreen(
                     }
                     
                     HorizontalDivider(color = Color(0xFFEEEEEE))
+                    
+                    // 사진에서 추출한 관심사 섹션
+                    if (photoInterestTags.isNotEmpty()) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "📸 사진에서 추출한 관심사",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF1976D2)
+                            )
+                            
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                photoInterestTags.forEach { tag ->
+                                    Surface(
+                                        shape = RoundedCornerShape(20.dp),
+                                        color = Color(0xFFE3F2FD),
+                                        modifier = Modifier.clickable {
+                                            photoInterestTags = photoInterestTags - tag
+                                        }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = tag,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color(0xFF1976D2)
+                                            )
+                                            Icon(
+                                                imageVector = Icons.Default.Close,
+                                                contentDescription = "제거",
+                                                tint = Color(0xFF1976D2),
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        HorizontalDivider(color = Color(0xFFEEEEEE))
+                    }
+                    
+                    // 사용자 선택 관심사 섹션
+                    Text(
+                        text = "✨ 선택한 관심사",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFFF9945)
+                    )
                     
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(

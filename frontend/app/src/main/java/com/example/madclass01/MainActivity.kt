@@ -105,12 +105,13 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
     var userId by remember { mutableStateOf<String?>(null) }
     var userNickname by remember { mutableStateOf<String?>(null) }
     var userAge by remember { mutableStateOf<Int?>(null) }
-    var userGender by remember { mutableStateOf<String?>("female") }  // "male" 또는 "female"
+    var userGender by remember { mutableStateOf<String?>(null) }  // 백엔드에서 받아옴
     var userRegion by remember { mutableStateOf<String?>(null) }
     var userBio by remember { mutableStateOf<String>("") }
     var userImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var recommendedTags by remember { mutableStateOf<List<String>>(emptyList()) }
-    var userTags by remember { mutableStateOf<List<String>>(emptyList()) }
+    var userTags by remember { mutableStateOf<List<String>>(emptyList()) }  // 사용자가 선택한 관심사
+    var userPhotoInterests by remember { mutableStateOf<List<String>>(emptyList()) }  // 사진에서 추출한 관심사
     var profileFlowEntry by remember { mutableStateOf(ProfileFlowEntry.Login) }
     var homeStartTabRoute by remember { mutableStateOf("groups") }
     
@@ -140,12 +141,13 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
         }
         AppScreen.Login -> {
             LoginScreen(
-                onLoginSuccess = { id, nickname, source, isProfileComplete, age, region, bio ->
+                onLoginSuccess = { id, nickname, source, isProfileComplete, age, gender, region, bio ->
                     userId = id
                     userNickname = nickname
                     if (source == LoginSource.Test) {
                         // 프로필 목업 값
                         userAge = 20
+                        userGender = "male"
                         userRegion = "서울"
                         userBio = ""
                         userImages = emptyList()
@@ -156,6 +158,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                     } else if (isProfileComplete) {
                         // 이미 프로필이 등록된 유저는 스킵
                         userAge = age
+                        userGender = gender
                         userRegion = region
                         userBio = bio ?: ""
                         homeStartTabRoute = "groups"
@@ -232,6 +235,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 initialBio = userBio,
                 initialImages = userImages,
                 initialTags = userTags,
+                initialPhotoInterests = userPhotoInterests,
                 onBack = {
                     homeStartTabRoute = "profile"
                     currentScreen = AppScreen.Home

@@ -129,129 +129,52 @@ fun TagSelectionScreen(
                     .padding(horizontal = 20.dp, vertical = 24.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // 자동 추출된 태그
+                // AI 추천 태그 안내
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFFFF4E6)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "✨ AI가 사진을 분석하여 추천한 관심사입니다",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFF9945)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "원하는 관심사를 선택하거나 선택 해제할 수 있어요",
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    }
+                }
+                
+                // 자동 추출된 태그 (AI 추천)
                 TagSection(
-                    title = "자동 추출된 태그",
+                    title = "AI 추천 관심사",
                     tags = uiState.extractedTags,
                     onToggleTag = { viewModel.toggleExtractedTag(it) }
                 )
                 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                // 직접 추가하기
-                Column {
-                    Text(
-                        text = "직접 추가하기",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A1A),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                    
-                    TagInputField(
-                        onAddTag = { viewModel.addCustomTag(it) },
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                }
-                
-                // 사진으로 본 관심사 섹션 (AI 추천)
-                if (uiState.photoInterests.isNotEmpty()) {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "📸 사진으로 본 관심사",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1A1A1A)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "AI 추천",
-                                    fontSize = 11.sp,
-                                    color = Color.White,
-                                    modifier = Modifier
-                                        .background(
-                                            color = Color(0xFF4CAF50),
-                                            shape = RoundedCornerShape(4.dp)
-                                        )
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                            
-                            Text(
-                                text = "${uiState.photoInterests.filter { it.isSelected }.size} / ${uiState.photoInterests.size}",
-                                fontSize = 12.sp,
-                                color = Color(0xFF4CAF50),
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
+                // 선택된 태그 개수 표시
+                if (uiState.extractedTags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Text(
-                            text = "사진에서 발견된 관심사입니다. 원하지 않으면 X를 눌러 제거하세요",
-                            fontSize = 12.sp,
-                            color = Color(0xFF999999),
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                        
-                        PhotoInterestSection(
-                            tags = uiState.photoInterests,
-                            onRemoveTag = { viewModel.removePhotoInterest(it) }
-                        )
-                    }
-                }
-                
-                // 추천 태그
-                if (uiState.recommendedTags.isNotEmpty()) {
-                    Column {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "추천 태그",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1A1A1A)
-                            )
-                            
-                            Text(
-                                text = "사진 기반 추천",
-                                fontSize = 12.sp,
-                                color = Color(0xFF999999)
-                            )
-                        }
-                        
-                        TagSection(
-                            tags = uiState.recommendedTags,
-                            onToggleTag = { viewModel.toggleRecommendedTag(it) }
-                        )
-                    }
-                }
-                
-                // 커스텀 태그
-                if (uiState.customTags.isNotEmpty()) {
-                    Column {
-                        Text(
-                            text = "내가 추가한 태그",
+                            text = "선택된 관심사: ${uiState.extractedTags.count { it.isSelected }}개",
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF666666),
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        )
-                        
-                        CustomTagSection(
-                            tags = uiState.customTags,
-                            onRemoveTag = { viewModel.removeCustomTag(it) }
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFFF9945)
                         )
                     }
                 }

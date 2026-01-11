@@ -29,12 +29,15 @@ data class ProfileSetupUiState(
     val images: List<ImageItem> = emptyList(),
     val interests: List<Tag> = emptyList(),  // 사용자가 직접 선택/입력한 관심사
     val photoInterests: List<Tag> = emptyList(),  // 사진 임베딩으로 AI가 추천한 관심사
+    val recommendedTags: List<String> = emptyList(),  // AI가 추천한 태그 (자동 추출)
     val isLoading: Boolean = false,
+    val isAnalyzingImages: Boolean = false,  // 이미지 분석 중
     val errorMessage: String = "",
     val isProfileComplete: Boolean = false,
     val nicknameError: String = "",
     val imageCountText: String = "0/20",
-    val userId: String? = null  // 백엔드 userId 저장
+    val userId: String? = null,  // 백엔드 userId 저장
+    val uploadedImageUrls: List<String> = emptyList()  // 업로드된 이미지 URL
 )
 
 @HiltViewModel
@@ -197,7 +200,7 @@ class ProfileSetupViewModel @Inject constructor(
         val currentState = _uiState.value
         
         // 이미 로딩 중이면 중복 요청 방지
-        if (currentState.isLoading) {
+        if (currentState.isLoading || currentState.isAnalyzingImages) {
             android.util.Log.d("ProfileSetupViewModel", "이미 처리 중입니다. 중복 요청 무시")
             return
         }
@@ -225,13 +228,13 @@ class ProfileSetupViewModel @Inject constructor(
             return
         }
         
-        // 백엔드에 프로필 업데이트
+        // 백엔드에 사진 업로드 및 이미지 분석
         if (currentState.userId != null) {
-            android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 시작 - userId: ${currentState.userId}")
+            android.util.Log.d("ProfileSetupViewModel", "사진 업로드 및 이미지 분석 시작 - userId: ${currentState.userId}")
             viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(isLoading = true)
+                _uiState.value = _uiState.value.copy(isAnalyzingImages = true, isLoading = true)
 
-                // 모든 이미지를 최적화 (리사이징 + WebP 압축)
+                // 1. 모든 이미지를 최적화 (리사이징 + WebP 압축)
                 val optimizedFiles = currentState.images.mapNotNull { imageItem ->
                     backendRepository.optimizeImage(context, android.net.Uri.parse(imageItem.uri))
                 }
@@ -239,6 +242,7 @@ class ProfileSetupViewModel @Inject constructor(
                 if (optimizedFiles.isEmpty()) {
                     _uiState.value = currentState.copy(
                         isLoading = false,
+                        isAnalyzingImages = false,
                         errorMessage = "프로필 사진 처리 실패"
                     )
                     return@launch
@@ -249,7 +253,7 @@ class ProfileSetupViewModel @Inject constructor(
                     "이미지 최적화 완료: ${optimizedFiles.size}개 파일"
                 )
 
-                // 한 번에 모든 사진 업로드
+                // 2. 한 번에 모든 사진 업로드
                 val uploadedUrls = when (val uploadResult = backendRepository.uploadPhotos(
                     userId = currentState.userId!!,
                     files = optimizedFiles
@@ -275,6 +279,7 @@ class ProfileSetupViewModel @Inject constructor(
                         optimizedFiles.forEach { it.delete() }
                         _uiState.value = currentState.copy(
                             isLoading = false,
+                            isAnalyzingImages = false,
                             errorMessage = "사진 업로드 실패: ${uploadResult.message}"
                         )
                         return@launch
@@ -282,104 +287,135 @@ class ProfileSetupViewModel @Inject constructor(
                     is ApiResult.Loading -> emptyList()
                 }
 
-                // 관심사와 사진 임베딩 관심사 배열로 전송
-                val userInterests = currentState.interests.map { it.name }
-                val photoBasedInterests = currentState.photoInterests.map { it.name }
+                if (uploadedUrls.isEmpty()) {
+                    _uiState.value = currentState.copy(
+                        isLoading = false,
+                        isAnalyzingImages = false,
+                        errorMessage = "사진 업로드 실패"
+                    )
+                    return@launch
+                }
 
-                val profileData = mapOf(
-                    "age" to currentState.age,
-                    "gender" to currentState.gender,
-                    "region" to currentState.region,
-                    "bio" to currentState.bio,
-                    "interests" to userInterests,
-                    "photo_interests" to photoBasedInterests,
-                    "image_count" to currentState.images.size
-                )
+                // 업로드된 URL 저장
+                _uiState.value = _uiState.value.copy(uploadedImageUrls = uploadedUrls)
 
-                android.util.Log.d("ProfileSetupViewModel", "백엔드 updateUser 호출 - userId: ${currentState.userId}, nickname: ${currentState.nickname}")
-                when (val result = backendRepository.updateUser(
+                // 3. 이미지 분석 API 호출 (태그 추천 받기)
+                android.util.Log.d("ProfileSetupViewModel", "이미지 분석 API 호출 - ${uploadedUrls.size}개 이미지")
+                when (val analysisResult = backendRepository.analyzeImages(
                     userId = currentState.userId!!,
-                    nickname = currentState.nickname,
-                    profileImageUrl = uploadedUrls.firstOrNull(),
-                    profileData = profileData
+                    imageUrls = uploadedUrls
                 )) {
                     is ApiResult.Success -> {
-                        android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 성공")
-                        _uiState.value = currentState.copy(
+                        android.util.Log.d(
+                            "ProfileSetupViewModel",
+                            "이미지 분석 성공 - tags: ${analysisResult.data.recommendedTags}"
+                        )
+                        
+                        // 추천 태그를 최대 5개까지 저장
+                        val recommendedTags = analysisResult.data.recommendedTags.take(5)
+                        
+                        _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            isProfileComplete = true,
-                            errorMessage = ""
+                            isAnalyzingImages = false,
+                            recommendedTags = recommendedTags,
+                            isProfileComplete = true  // 태그 선택 화면으로 이동
                         )
                     }
                     is ApiResult.Error -> {
-                        android.util.Log.e("ProfileSetupViewModel", "프로필 업데이트 실패: ${result.message}")
+                        android.util.Log.e(
+                            "ProfileSetupViewModel",
+                            "이미지 분석 실패: ${analysisResult.message}"
+                        )
                         _uiState.value = currentState.copy(
                             isLoading = false,
-                            errorMessage = "프로필 저장 실패: ${result.message}"
+                            isAnalyzingImages = false,
+                            errorMessage = "이미지 분석 실패: ${analysisResult.message}"
                         )
                     }
                     is ApiResult.Loading -> {}
                 }
             }
         } else {
-            android.util.Log.w("ProfileSetupViewModel", "userId가 null입니다! 백엔드 업데이트 스킵")
-            // userId가 없으면 로컬만 업데이트
+            android.util.Log.w("ProfileSetupViewModel", "userId가 null입니다!")
             _uiState.value = currentState.copy(
-                isProfileComplete = true,
-                errorMessage = ""
+                errorMessage = "로그인 정보가 없습니다"
             )
         }
-        // 백엔드에 프로필 업데이트
-        if (currentState.userId != null) {
-            android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 시작 - userId: ${currentState.userId}")
-            viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(isLoading = true)
-
-                // 관심사와 사진 임베딩 관심사 배열로 전송
-                val userInterests = currentState.interests.map { it.name }
-                val photoBasedInterests = currentState.photoInterests.map { it.name }
-
-                val profileData = mapOf(
-                    "age" to currentState.age,
-                    "gender" to currentState.gender,
-                    "region" to currentState.region,
-                    "bio" to currentState.bio,
-                    "interests" to userInterests,
-                    "photo_interests" to photoBasedInterests,
-                    "image_count" to currentState.images.size
-                )
-
-                android.util.Log.d("ProfileSetupViewModel", "백엔드 updateUser 호출 - userId: ${currentState.userId}, nickname: ${currentState.nickname}")
-                when (val result = backendRepository.updateUser(
-                    userId = currentState.userId!!,
-                    nickname = currentState.nickname,
-                    profileData = profileData
-                )) {
-                    is ApiResult.Success -> {
-                        android.util.Log.d("ProfileSetupViewModel", "프로필 업데이트 성공")
-                        _uiState.value = currentState.copy(
-                            isLoading = false,
-                            isProfileComplete = true,
-                            errorMessage = ""
-                        )
-                    }
-                    is ApiResult.Error -> {
-                        android.util.Log.e("ProfileSetupViewModel", "프로필 업데이트 실패: ${result.message}")
-                        _uiState.value = currentState.copy(
-                            isLoading = false,
-                            errorMessage = "프로필 저장 실패: ${result.message}"
-                        )
-                    }
-                    is ApiResult.Loading -> {}
+    }
+    
+    /**
+     * 추천 태그를 photoInterests에 추가/제거 (토글)
+     */
+    fun toggleRecommendedTag(tagName: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val existing = currentState.photoInterests.find { it.name == tagName }
+            
+            if (existing != null) {
+                // 이미 선택된 태그면 제거
+                val updatedPhotoInterests = removeTagUseCase(existing.id, currentState.photoInterests)
+                _uiState.value = currentState.copy(photoInterests = updatedPhotoInterests)
+            } else {
+                // 선택되지 않은 태그면 추가
+                val (isSuccess, updatedTags) = addTagUseCase(tagName, "photo_interest", currentState.photoInterests)
+                if (isSuccess) {
+                    _uiState.value = currentState.copy(photoInterests = updatedTags)
                 }
             }
-        } else {
-            android.util.Log.w("ProfileSetupViewModel", "userId가 null입니다! 백엔드 업데이트 스킵")
-            // userId가 없으면 로컬만 업데이트
-            _uiState.value = currentState.copy(
-                isProfileComplete = true,
-                errorMessage = ""
+        }
+    }
+    
+    /**
+     * 태그 선택 완료 후 최종 프로필 저장
+     */
+    fun completeProfileSetup() {
+        val currentState = _uiState.value
+        
+        if (currentState.userId == null) {
+            _uiState.value = currentState.copy(errorMessage = "로그인 정보가 없습니다")
+            return
+        }
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+            
+            val userInterests = currentState.interests.map { it.name }
+            val photoBasedInterests = currentState.photoInterests.map { it.name }
+
+            val profileData = mapOf(
+                "age" to currentState.age,
+                "gender" to currentState.gender,
+                "region" to currentState.region,
+                "bio" to currentState.bio,
+                "interests" to userInterests,
+                "photo_interests" to photoBasedInterests,
+                "image_count" to currentState.images.size
             )
+
+            android.util.Log.d("ProfileSetupViewModel", "최종 프로필 저장 - userId: ${currentState.userId}")
+            when (val result = backendRepository.updateUser(
+                userId = currentState.userId!!,
+                nickname = currentState.nickname,
+                profileImageUrl = currentState.uploadedImageUrls.firstOrNull(),
+                profileData = profileData
+            )) {
+                is ApiResult.Success -> {
+                    android.util.Log.d("ProfileSetupViewModel", "프로필 저장 성공")
+                    _uiState.value = currentState.copy(
+                        isLoading = false,
+                        isProfileComplete = true,
+                        errorMessage = ""
+                    )
+                }
+                is ApiResult.Error -> {
+                    android.util.Log.e("ProfileSetupViewModel", "프로필 저장 실패: ${result.message}")
+                    _uiState.value = currentState.copy(
+                        isLoading = false,
+                        errorMessage = "프로필 저장 실패: ${result.message}"
+                    )
+                }
+                is ApiResult.Loading -> {}
+            }
         }
     }
     

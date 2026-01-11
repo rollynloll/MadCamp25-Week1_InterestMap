@@ -101,6 +101,58 @@ class BackendRepository @Inject constructor(
         }
     }
     
+    /**
+     * 사진과 함께 유저 생성 (사진 배치 업로드 후 유저 생성)
+     */
+    suspend fun createUserWithPhotos(
+        context: Context,
+        provider: String,
+        providerUserId: String,
+        nickname: String? = null,
+        profileData: Map<String, Any>? = null,
+        photoUris: List<android.net.Uri>
+    ): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
+        try {
+            // 1. 먼저 유저를 생성 (사진 없이)
+            val createResult = createUser(provider, providerUserId, nickname, null, profileData)
+            
+            if (createResult !is ApiResult.Success) {
+                return@withContext createResult
+            }
+            
+            val userId = createResult.data.id
+            
+            // 2. 사진들을 최적화
+            val optimizedFiles = photoUris.mapNotNull { uri ->
+                optimizeImage(context, uri)
+            }
+            
+            if (optimizedFiles.isEmpty()) {
+                return@withContext createResult
+            }
+            
+            // 3. 배치로 사진 업로드
+            val uploadResult = uploadPhotos(userId, optimizedFiles)
+            
+            // 4. 임시 파일 삭제
+            optimizedFiles.forEach { it.delete() }
+            
+            if (uploadResult !is ApiResult.Success) {
+                return@withContext ApiResult.Error("User created but photo upload failed: ${(uploadResult as? ApiResult.Error)?.message}")
+            }
+            
+            // 5. 첫 번째 사진을 프로필 이미지로 설정
+            val firstPhotoUrl = uploadResult.data.firstOrNull()?.fileUrl
+            if (firstPhotoUrl != null) {
+                updateUser(userId, profileImageUrl = firstPhotoUrl)
+            } else {
+                createResult
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
+        }
+    }
+    
     suspend fun getUser(userId: String): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getUser(userId)
@@ -132,6 +184,44 @@ class BackendRepository @Inject constructor(
             } else {
                 ApiResult.Error("Failed to update user", response.code())
             }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+    
+    /**
+     * 사진과 함께 유저 프로필 업데이트 (사진 배치 업로드 후 프로필 업데이트)
+     */
+    suspend fun updateUserWithPhotos(
+        context: Context,
+        userId: String,
+        nickname: String? = null,
+        profileData: Map<String, Any>? = null,
+        photoUris: List<android.net.Uri>
+    ): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
+        try {
+            // 1. 사진들을 최적화
+            val optimizedFiles = photoUris.mapNotNull { uri ->
+                optimizeImage(context, uri)
+            }
+            
+            var profileImageUrl: String? = null
+            
+            // 2. 사진이 있으면 배치로 업로드
+            if (optimizedFiles.isNotEmpty()) {
+                val uploadResult = uploadPhotos(userId, optimizedFiles)
+                
+                // 임시 파일 삭제
+                optimizedFiles.forEach { it.delete() }
+                
+                if (uploadResult is ApiResult.Success) {
+                    // 첫 번째 사진을 프로필 이미지로 사용
+                    profileImageUrl = uploadResult.data.firstOrNull()?.fileUrl
+                }
+            }
+            
+            // 3. 프로필 업데이트
+            updateUser(userId, nickname, profileImageUrl, profileData)
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Network error")
         }
@@ -175,10 +265,13 @@ class BackendRepository @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {
-                ApiResult.Error("Failed to upload photos", response.code())
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                android.util.Log.e("BackendRepository", "Upload failed: code=${response.code()}, body=$errorBody")
+                ApiResult.Error("Failed to upload photos: $errorBody", response.code())
             }
         } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Network error")
+            android.util.Log.e("BackendRepository", "Upload exception", e)
+            ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
         }
     }
 

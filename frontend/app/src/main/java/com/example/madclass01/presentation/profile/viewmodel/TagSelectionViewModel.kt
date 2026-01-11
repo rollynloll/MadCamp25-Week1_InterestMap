@@ -156,6 +156,27 @@ class TagSelectionViewModel @Inject constructor(
     
     fun getSelectedTags(): List<Tag> {
         val currentState = _uiState.value
+        // 사용자가 직접 선택한 태그만 반환 (AI 추천 태그만 포함, photoInterests 제외)
+        // 최대 5개로 제한
+        val userSelectedTags = currentState.extractedTags.filter { it.isSelected } +
+                currentState.recommendedTags.filter { it.isSelected } +
+                currentState.customTags
+        return userSelectedTags.take(5)
+    }
+    
+    /**
+     * 프로필 표시용: 사용자가 직접 선택한 관심사만 최대 5개 반환
+     * (photoInterests는 제외)
+     */
+    fun getUserInterestsForProfile(): List<Tag> {
+        return getSelectedTags()
+    }
+    
+    /**
+     * 백엔드 저장용: 모든 선택된 태그 반환 (photoInterests 포함)
+     */
+    fun getAllSelectedTags(): List<Tag> {
+        val currentState = _uiState.value
         return currentState.extractedTags.filter { it.isSelected } +
                 currentState.recommendedTags.filter { it.isSelected } +
                 currentState.customTags +

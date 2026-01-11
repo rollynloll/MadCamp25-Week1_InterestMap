@@ -31,6 +31,7 @@ data class LoginUiState(
     val userId: String? = null,  // 백엔드 userId 추가
     val nickname: String? = null,
     val profileAge: Int? = null,
+    val profileGender: String? = null,  // gender 추가
     val profileRegion: String? = null,
     val profileBio: String? = null,
     val isProfileComplete: Boolean = false,
@@ -138,6 +139,7 @@ class LoginViewModel @Inject constructor(
                     android.util.Log.d("LoginViewModel", "백엔드 유저 생성 성공 - userId: ${user.id}, nickname: ${user.nickname}")
 
                     val profileAge = user.profileData["age"].toIntOrNull()
+                    val profileGender = user.profileData["gender"] as? String
                     val profileRegion = user.profileData["region"] as? String
                     val profileBio = user.profileData["bio"] as? String
                     val imageCount = user.profileData["image_count"].toIntOrNull() ?: 0
@@ -150,6 +152,7 @@ class LoginViewModel @Inject constructor(
                         userId = user.id,
                         nickname = user.nickname ?: nickname,
                         profileAge = profileAge,
+                        profileGender = profileGender,
                         profileRegion = profileRegion,
                         profileBio = profileBio,
                         isProfileComplete = isProfileComplete,
