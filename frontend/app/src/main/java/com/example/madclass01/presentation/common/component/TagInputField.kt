@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun TagInputField(
     onAddTag: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    placeholderText: String = "관심사를 입력하세요"
 ) {
     var inputValue by remember { mutableStateOf(TextFieldValue("")) }
     
@@ -57,7 +58,7 @@ fun TagInputField(
                 ) {
                     if (inputValue.text.isEmpty()) {
                         Text(
-                            text = "태그를 입력하세요",
+                            text = placeholderText,
                             fontSize = 14.sp,
                             color = Color(0xFFCCCCCC)
                         )

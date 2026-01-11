@@ -123,6 +123,12 @@ async def list_groups(
 
     items = []
     for group, member_count in result.all():
+        # group_profile에서 tags, region, image_url 추출
+        profile = group.group_profile or {}
+        tags = profile.get("tags", [])
+        region = profile.get("region", "")
+        image_url = profile.get("image_url", "")
+        
         items.append(
             GroupListItem(
                 id=str(group.id),
@@ -130,6 +136,9 @@ async def list_groups(
                 description=group.description,
                 member_count=member_count,
                 is_member=group.id in member_group_ids,
+                tags=tags,
+                region=region,
+                image_url=image_url,
             )
         )
 

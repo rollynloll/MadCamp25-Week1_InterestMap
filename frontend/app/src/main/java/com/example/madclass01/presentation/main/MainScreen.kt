@@ -64,7 +64,8 @@ fun MainScreen(
     profileTags: List<String> = emptyList(),
     onNavigateToGroupDetail: (String) -> Unit = {},
     onNavigateToCreateGroup: () -> Unit = {},
-    onNavigateToEditProfile: () -> Unit = {}
+    onNavigateToEditProfile: () -> Unit = {},
+    onNavigateToQRScanner: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val tabs = listOf(MainTab.Groups, MainTab.Search, MainTab.Profile)
@@ -127,7 +128,8 @@ fun MainScreen(
                 GroupListScreen(
                     userId = userId,  // userId 전달
                     onGroupClick = onNavigateToGroupDetail,
-                    onCreateGroupClick = onNavigateToCreateGroup
+                    onCreateGroupClick = onNavigateToCreateGroup,
+                    onQRScanClick = onNavigateToQRScanner
                 )
             }
             

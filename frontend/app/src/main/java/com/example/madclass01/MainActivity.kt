@@ -1,6 +1,9 @@
 package com.example.madclass01
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.example.madclass01.presentation.login.screen.LoginScreen
 import com.example.madclass01.presentation.login.model.LoginSource
 import com.example.madclass01.presentation.profile.screen.ProfileSetupScreen
@@ -18,23 +22,70 @@ import com.example.madclass01.presentation.test.ApiTestScreen
 import com.example.madclass01.presentation.chat.ChatScreen
 import com.example.madclass01.presentation.group.screen.CreateGroupScreen
 import com.example.madclass01.presentation.group.screen.GroupDetailScreen
+import com.example.madclass01.presentation.group.screen.QRInviteScreen
+import com.example.madclass01.presentation.group.screen.QRScannerScreen
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Deep Link 처리
+        val deepLinkData = handleDeepLink(intent)
+        
         setContent {
             TasteMapTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation()
+                    AppNavigation(initialDeepLink = deepLinkData)
                 }
             }
         }
     }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // 앱이 이미 실행 중일 때 Deep Link 처리
+        handleDeepLink(intent)?.let { deepLinkData ->
+            Toast.makeText(this, "그룹 초대 링크를 처리합니다...", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun handleDeepLink(intent: Intent?): DeepLinkData? {
+        val data: Uri? = intent?.data
+        if (data != null) {
+            // madcamp://invite/{groupId} 또는 https://madcamp.app/invite/{groupId}
+            if ((data.scheme == "madcamp" || data.scheme == "https") && 
+                (data.host == "invite" || data.path?.startsWith("/invite") == true)) {
+                
+                val groupId = data.lastPathSegment ?: data.getQueryParameter("groupId")
+                val inviteCode = data.getQueryParameter("code")
+                
+                if (groupId != null || inviteCode != null) {
+                    return DeepLinkData(
+                        type = DeepLinkType.GROUP_INVITE,
+                        groupId = groupId,
+                        inviteCode = inviteCode
+                    )
+                }
+            }
+        }
+        return null
+    }
+}
+
+data class DeepLinkData(
+    val type: DeepLinkType,
+    val groupId: String? = null,
+    val inviteCode: String? = null
+)
+
+enum class DeepLinkType {
+    GROUP_INVITE
 }
 
 enum class ProfileFlowEntry {
@@ -43,9 +94,10 @@ enum class ProfileFlowEntry {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
     // 🧪 테스트 모드: true로 설정하면 API 테스트 화면으로 시작
     val isTestMode = false  // 테스트 완료!
+    val context = LocalContext.current
 
     var currentScreen by remember { mutableStateOf<AppScreen>(
         if (isTestMode) AppScreen.ApiTest else AppScreen.Login
@@ -61,6 +113,26 @@ fun AppNavigation() {
     var userTags by remember { mutableStateOf<List<String>>(emptyList()) }
     var profileFlowEntry by remember { mutableStateOf(ProfileFlowEntry.Login) }
     var homeStartTabRoute by remember { mutableStateOf("groups") }
+    
+    // Deep Link 처리
+    LaunchedEffect(initialDeepLink) {
+        initialDeepLink?.let { deepLink ->
+            when (deepLink.type) {
+                DeepLinkType.GROUP_INVITE -> {
+                    if (userId != null) {
+                        // 로그인된 상태면 바로 그룹 상세로 이동
+                        deepLink.groupId?.let { groupId ->
+                            currentScreen = AppScreen.GroupDetail(groupId)
+                            Toast.makeText(context, "그룹으로 이동합니다...", Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        // 로그인 안 된 상태면 로그인 후 처리하도록 대기
+                        Toast.makeText(context, "먼저 로그인해주세요", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+    }
 
     when (currentScreen) {
         AppScreen.ApiTest -> {
@@ -217,6 +289,22 @@ fun AppNavigation() {
                 }
             )
         }
+        AppScreen.QRScanner -> {
+            QRScannerScreen(
+                userId = userId ?: "",
+                onBackPress = {
+                    currentScreen = AppScreen.Home
+                },
+                onScanSuccess = { groupId ->
+                    currentScreen = AppScreen.GroupDetail(groupId)
+                }
+            )
+        }
+        is AppScreen.QRInvite -> {
+            val qrInvite = currentScreen as AppScreen.QRInvite
+            // QRInvite 화면은 GroupDetailScreen에서 onQRCodeClick으로 처리되므로 여기서는 Home으로 리다이렉트
+            currentScreen = AppScreen.Home
+        }
         AppScreen.Home -> {
             com.example.madclass01.presentation.main.MainScreen(
                 userId = userId,  // userId 전달
@@ -237,6 +325,9 @@ fun AppNavigation() {
                 onNavigateToEditProfile = {
                     homeStartTabRoute = "profile"
                     currentScreen = AppScreen.ProfileEdit
+                },
+                onNavigateToQRScanner = {
+                    currentScreen = AppScreen.QRScanner
                 }
             )
         }
@@ -253,6 +344,8 @@ sealed class AppScreen {
     data class GroupDetail(val groupId: String) : AppScreen()
     object CreateGroup : AppScreen()
     data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅") : AppScreen()
+    object QRScanner : AppScreen()
+    data class QRInvite(val groupId: String, val groupName: String) : AppScreen()
     object Home : AppScreen()
 }
 

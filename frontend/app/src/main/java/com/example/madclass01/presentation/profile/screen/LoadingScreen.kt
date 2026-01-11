@@ -62,11 +62,21 @@ fun LoadingScreen(
                 .align(Alignment.TopStart),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(
+                onClick = { 
+                    if (!uiState.isComplete || uiState.errorMessage.isNotEmpty()) {
+                        onBack()
+                    }
+                },
+                enabled = !uiState.isComplete || uiState.errorMessage.isNotEmpty()
+            ) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "뒤로가기",
-                    tint = Color(0xFFFF9945)
+                    tint = if (!uiState.isComplete || uiState.errorMessage.isNotEmpty()) 
+                        Color(0xFFFF9945) 
+                    else 
+                        Color(0xFFCCCCCC)
                 )
             }
         }

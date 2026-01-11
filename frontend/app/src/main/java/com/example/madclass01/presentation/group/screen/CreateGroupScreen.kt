@@ -77,14 +77,19 @@ fun CreateGroupScreen(
             ) {
                 // Close Button
                 IconButton(
-                    onClick = onBackPress,
+                    onClick = { 
+                        if (!uiState.isLoading) {
+                            onBackPress()
+                        }
+                    },
+                    enabled = !uiState.isLoading,
                     modifier = Modifier.size(40.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Close",
                         modifier = Modifier.size(28.dp),
-                        tint = Color(0xFF111827)
+                        tint = if (uiState.isLoading) Color(0xFFCCCCCC) else Color(0xFF111827)
                     )
                 }
 

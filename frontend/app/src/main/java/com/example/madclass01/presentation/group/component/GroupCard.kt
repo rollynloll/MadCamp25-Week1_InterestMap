@@ -79,66 +79,46 @@ fun GroupCard(
                     )
                     
                     Text(
-                        text = "${group.memberCount}명 · ${group.activity}",
+                        text = "${group.memberCount}명",
                         fontSize = 12.sp,
                         color = Color(0xFF999999)
                     )
                 }
                 
-                // 태그
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    group.tags.take(2).forEach { tag ->
-                        TagChip(
-                            label = tag.name,
-                            isSelected = false,
-                            onToggle = {},
-                            modifier = Modifier
-                        )
+                // 그룹 소개
+                if (group.description.isNotBlank()) {
+                    Text(
+                        text = group.description,
+                        fontSize = 13.sp,
+                        color = Color(0xFF666666),
+                        maxLines = 1
+                    )
+                }
+                
+                // 태그 (MAX 3개)
+                if (group.tags.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        group.tags.take(3).forEach { tag ->
+                            TagChip(
+                                label = tag.name,
+                                isSelected = false,
+                                onToggle = {},
+                                modifier = Modifier
+                            )
+                        }
                     }
                 }
                 
-                // 활동 정보
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ChatBubble,
-                            contentDescription = "메시지",
-                            tint = Color(0xFFFF9945),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = group.messageCount.toString(),
-                            fontSize = 12.sp,
-                            color = Color(0xFF666666)
-                        )
-                    }
-                    
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "날짜",
-                            tint = Color(0xFFFF9945),
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = group.lastActivityDate,
-                            fontSize = 12.sp,
-                            color = Color(0xFF666666)
-                        )
-                    }
+                // 지역 정보
+                if (group.region.isNotBlank()) {
+                    Text(
+                        text = "📍 ${group.region}",
+                        fontSize = 12.sp,
+                        color = Color(0xFF999999)
+                    )
                 }
             }
             

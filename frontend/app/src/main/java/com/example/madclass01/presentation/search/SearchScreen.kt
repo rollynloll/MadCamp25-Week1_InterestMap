@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -26,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -40,6 +43,18 @@ fun SearchScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showFilterSheet by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    // 에러 메시지 표시
+    LaunchedEffect(uiState.errorMessage) {
+        if (uiState.errorMessage.isNotEmpty()) {
+            snackbarHostState.showSnackbar(
+                message = uiState.errorMessage,
+                duration = SnackbarDuration.Short
+            )
+            viewModel.clearErrorMessage()
+        }
+    }
     
     Box(
         modifier = Modifier
@@ -100,6 +115,14 @@ fun SearchScreen(
                             fontSize = 14.sp,
                             color = Color(0xFF1A1A1A)
                         ),
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Search
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                viewModel.performSearch()
+                            }
+                        ),
                         decorationBox = { innerTextField ->
                             if (uiState.searchQuery.isEmpty()) {
                                 Text(
@@ -135,21 +158,92 @@ fun SearchScreen(
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            // 검색 결과
-            LazyColumn(
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(uiState.searchResults) { group ->
-                    SearchResultCard(
-                        group = group,
-                        onClick = { onGroupClick(group.id) }
-                    )
-                    HorizontalDivider(
-                        color = Color(0xFFF5F5F5),
-                        thickness = 1.dp
-                    )
+            // 로딩 및 검색 결과
+            when {
+                uiState.isLoading -> {
+                    // 로딩 중
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFFF9945),
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Text(
+                                text = "검색 중...",
+                                fontSize = 16.sp,
+                                color = Color(0xFF666666),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+                uiState.searchResults.isEmpty() && uiState.searchQuery.isNotEmpty() && !uiState.isLoading -> {
+                    // 검색 결과 없음
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "🔍",
+                                fontSize = 48.sp
+                            )
+                            Text(
+                                text = "검색 결과가 없습니다",
+                                fontSize = 16.sp,
+                                color = Color(0xFF666666),
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "다른 키워드로 검색해보세요",
+                                fontSize = 14.sp,
+                                color = Color(0xFF999999)
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    // 검색 결과 표시
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(uiState.searchResults) { group ->
+                            SearchResultCard(
+                                group = group,
+                                onClick = { onGroupClick(group.id) }
+                            )
+                            HorizontalDivider(
+                                color = Color(0xFFF5F5F5),
+                                thickness = 1.dp
+                            )
+                        }
+                    }
                 }
             }
+        }
+        
+        // Snackbar
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = Color(0xFF323232),
+                contentColor = Color.White,
+                shape = RoundedCornerShape(8.dp)
+            )
         }
         
         // 필터 바텀 시트
@@ -184,15 +278,21 @@ fun FilterBottomSheet(
     val inactiveText = Color(0xFF595959)
 
     val categories = listOf("운동", "카페", "예술", "음악", "사진", "등산")
-    val regions = listOf("전체", "서울특별시", "경기도", "인천광역시", "부산광역시")
+    val regions = listOf(
+        "전체",
+        "서울특별시", "부산광역시", "대구광역시", "인천광역시",
+        "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+        "경기도", "강원특별자치도", "충청북도", "충청남도",
+        "전북특별자치도", "전라남도", "경상북도", "경상남도",
+        "제주특별자치도"
+    )
     val memberRanges = listOf("전체", "10명 이하", "10-30명", "30명 이상")
-    val activities = listOf("전체", "활발함", "보통", "조용함")
+    
+    var regionExpanded by remember { mutableStateOf(false) }
 
     val selectedCategory = filters["category"] as? String ?: "모든종류"
     val selectedRegion = filters["region"] as? String ?: "전체"
     val selectedMemberRange = filters["memberRange"] as? String ?: "전체"
-    val selectedActivity = filters["activity"] as? String ?: "전체"
-    val matchPercent = (filters["matchPercentage"] as? Int ?: 70).coerceIn(0, 100)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -202,9 +302,7 @@ fun FilterBottomSheet(
         tonalElevation = 0.dp
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 0.dp, max = 745.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
             // Header
             Column(
@@ -253,8 +351,6 @@ fun FilterBottomSheet(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f, fill = true)
-                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
@@ -297,42 +393,66 @@ fun FilterBottomSheet(
                         color = textPrimary
                     )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .background(Color(0xFFFFFAF5), RoundedCornerShape(12.dp))
-                            .border(1.dp, border, RoundedCornerShape(12.dp))
-                            .clickable {
-                                val currentIndex = regions.indexOf(selectedRegion).let { if (it < 0) 0 else it }
-                                val next = regions[(currentIndex + 1) % regions.size]
-                                onFilterUpdate("region", next)
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .background(Color(0xFFFFFAF5), RoundedCornerShape(12.dp))
+                                .border(1.dp, border, RoundedCornerShape(12.dp))
+                                .clickable { regionExpanded = true }
+                                .padding(horizontal = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "지역",
+                                    tint = primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = selectedRegion,
+                                    fontSize = 15.sp,
+                                    color = textPrimary
+                                )
                             }
-                            .padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+
                             Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "지역",
-                                tint = primary,
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "선택",
+                                tint = inactiveText,
                                 modifier = Modifier.size(20.dp)
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = selectedRegion,
-                                fontSize = 15.sp,
-                                color = textPrimary
-                            )
                         }
-
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "선택",
-                            tint = inactiveText,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        
+                        DropdownMenu(
+                            expanded = regionExpanded,
+                            onDismissRequest = { regionExpanded = false },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White)
+                                .heightIn(max = 300.dp)
+                        ) {
+                            regions.forEach { region ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = region,
+                                            fontSize = 15.sp,
+                                            color = if (region == selectedRegion) primary else textPrimary,
+                                            fontWeight = if (region == selectedRegion) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    onClick = {
+                                        onFilterUpdate("region", region)
+                                        regionExpanded = false
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -364,70 +484,6 @@ fun FilterBottomSheet(
                         }
                     }
                 }
-
-                // Activity
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "활동 정도",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = textPrimary
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        activities.forEach { label ->
-                            val isSelected = selectedActivity == label
-                            FilterPill(
-                                label = label,
-                                isSelected = isSelected,
-                                onClick = { onFilterUpdate("activity", label) },
-                                selectedColor = primary,
-                                borderColor = border,
-                                selectedTextColor = Color.White,
-                                unselectedTextColor = inactiveText,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                }
-
-                // Match Slider
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "매칭도",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = textPrimary
-                    )
-
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Slider(
-                            value = matchPercent.toFloat(),
-                            onValueChange = { onFilterUpdate("matchPercentage", it.toInt()) },
-                            valueRange = 0f..100f,
-                            colors = SliderDefaults.colors(
-                                thumbColor = primary,
-                                activeTrackColor = primary,
-                                inactiveTrackColor = Color(0xFFFFFAF5)
-                            )
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = "0%", fontSize = 12.sp, color = textSecondary)
-                            Text(text = "70% 이상", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = primary)
-                            Text(text = "100%", fontSize = 12.sp, color = textSecondary)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // Actions
@@ -435,7 +491,7 @@ fun FilterBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp)
-                    .padding(bottom = 32.dp, top = 12.dp),
+                    .padding(bottom = 32.dp, top = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(

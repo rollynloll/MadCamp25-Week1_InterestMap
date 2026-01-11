@@ -63,33 +63,13 @@ fun SearchResultCard(
                     .fillMaxHeight(),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // 그룹명 및 매칭도
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = group.name,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A1A)
-                    )
-                    
-                    Surface(
-                        modifier = Modifier,
-                        color = Color(0xFFFFF3E0),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = "✨ ${group.matchPercentage}%",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF9945),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
+                // 그룹명
+                Text(
+                    text = group.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1A1A1A)
+                )
                 
                 // 설명
                 Text(

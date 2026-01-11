@@ -22,9 +22,7 @@ data class SearchUiState(
         "category" to "모든종류",
         "region" to "전체",
         "age" to "전체",
-        "memberRange" to "전체",
-        "activity" to "전체",
-        "matchPercentage" to 70
+        "memberRange" to "전체"
     )
 )
 
@@ -44,37 +42,37 @@ class SearchViewModel @Inject constructor(
     
     fun updateSearchQuery(query: String) {
         _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+    
+    fun performSearch() {
+        val query = _uiState.value.searchQuery.trim()
         
-        // 검색어가 비어있으면 검색 취소
+        // 검색어가 비어있으면 검색 안함
         if (query.isEmpty()) {
-            searchJob?.cancel()
-            _uiState.value = _uiState.value.copy(searchResults = emptyList())
             return
         }
         
-        // 기존 검색 작업 취소 후 새로운 작업 시작 (500ms 디바운스)
+        // 기존 검색 작업 취소
         searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            delay(500)
-            searchGroups()
-        }
+        searchGroups()
     }
     
     fun searchGroups() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
             
             try {
                 val results = searchGroupsUseCase(_uiState.value.searchQuery, _uiState.value.filters)
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
                     isLoading = false,
-                    errorMessage = if (results.isEmpty() && _uiState.value.searchQuery.isNotEmpty()) "검색 결과가 없습니다" else ""
+                    errorMessage = ""
                 )
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "검색에 실패했습니다"
+                    searchResults = emptyList(),
+                    errorMessage = "검색에 실패했습니다. 다시 시도해주세요."
                 )
             }
         }
@@ -92,11 +90,13 @@ class SearchViewModel @Inject constructor(
                 "category" to "모든종류",
                 "region" to "전체",
                 "age" to "전체",
-                "memberRange" to "전체",
-                "activity" to "전체",
-                "matchPercentage" to 70
+                "memberRange" to "전체"
             )
         )
+    }
+    
+    fun clearErrorMessage() {
+        _uiState.value = _uiState.value.copy(errorMessage = "")
     }
     
     override fun onCleared() {

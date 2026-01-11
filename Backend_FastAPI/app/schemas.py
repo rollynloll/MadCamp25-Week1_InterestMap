@@ -80,6 +80,9 @@ class GroupListItem(BaseSchema):
     description: str | None
     member_count: int
     is_member: bool
+    tags: list[str] = []
+    region: str = ""
+    image_url: str = ""
 
 
 class GroupListResponse(BaseSchema):

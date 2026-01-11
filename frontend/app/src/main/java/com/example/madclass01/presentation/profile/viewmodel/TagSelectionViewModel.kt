@@ -19,6 +19,7 @@ data class TagSelectionUiState(
     val extractedTags: List<Tag> = emptyList(),
     val recommendedTags: List<Tag> = emptyList(),
     val customTags: List<Tag> = emptyList(),
+    val photoInterests: List<Tag> = emptyList(),  // 사진 임베딩으로 AI가 추천한 관심사
     val errorMessage: String = "",
     val isSelectionComplete: Boolean = false
 )
@@ -106,6 +107,41 @@ class TagSelectionViewModel @Inject constructor(
         }
     }
     
+    fun addPhotoInterest(tagName: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val allCurrentTags = currentState.extractedTags + currentState.recommendedTags + 
+                                currentState.customTags + currentState.photoInterests
+            val (isSuccess, updatedTags) = addTagUseCase(tagName, "photo_interest", allCurrentTags)
+            
+            if (isSuccess) {
+                _uiState.value = currentState.copy(
+                    photoInterests = currentState.photoInterests + updatedTags.last()
+                )
+            }
+        }
+    }
+    
+    fun removePhotoInterest(tagId: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val updatedPhotoInterests = removeTagUseCase(tagId, currentState.photoInterests)
+            _uiState.value = currentState.copy(photoInterests = updatedPhotoInterests)
+        }
+    }
+    
+    fun setPhotoInterests(interests: List<String>) {
+        val photoInterestTags = interests.map { tagName ->
+            Tag(
+                id = "photo_${System.currentTimeMillis()}_${tagName.hashCode()}",
+                name = tagName,
+                category = "photo_interest",
+                isSelected = true
+            )
+        }
+        _uiState.value = _uiState.value.copy(photoInterests = photoInterestTags)
+    }
+    
     fun completeSelection() {
         _uiState.value = _uiState.value.copy(isSelectionComplete = true)
     }
@@ -122,6 +158,7 @@ class TagSelectionViewModel @Inject constructor(
         val currentState = _uiState.value
         return currentState.extractedTags.filter { it.isSelected } +
                 currentState.recommendedTags.filter { it.isSelected } +
-                currentState.customTags
+                currentState.customTags +
+                currentState.photoInterests.filter { it.isSelected }
     }
 }
