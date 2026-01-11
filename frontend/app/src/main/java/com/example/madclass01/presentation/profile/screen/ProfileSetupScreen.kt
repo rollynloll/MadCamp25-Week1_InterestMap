@@ -289,7 +289,7 @@ fun ProfileSetupScreen(
                         color = Color(0xFF1A1A1A)
                     )
                     
-                    val totalSelected = uiState.hobbies.size + uiState.interests.size
+                    val totalSelected = uiState.interests.size
                     Text(
                         text = "$totalSelected 개 선택 (최소 3개)",
                         fontSize = 12.sp,
@@ -308,12 +308,12 @@ fun ProfileSetupScreen(
                 // 직접 입력
                 TagInputField(
                     onAddTag = { viewModel.addHobby(it) },
-                    placeholderText = "직접 입력"
+                    placeholderText = "직접 입력",
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
                 
                 // 선택된 태그 표시
-                val allSelectedTags = uiState.hobbies + uiState.interests
+                val allSelectedTags = uiState.interests
                 if (allSelectedTags.isNotEmpty()) {
                     Text(
                         text = "선택된 관심사",
@@ -335,11 +335,7 @@ fun ProfileSetupScreen(
                                 label = tag.name,
                                 isSelected = true,
                                 onRemove = { 
-                                    if (uiState.hobbies.contains(tag)) {
-                                        viewModel.removeHobby(tag.id)
-                                    } else {
-                                        viewModel.removeInterest(tag.id)
-                                    }
+                                    viewModel.removeHobby(tag.id)
                                 }
                             )
                         }
@@ -356,7 +352,7 @@ fun ProfileSetupScreen(
                 )
                 
                 val displayTags = if (showAllTags) PREDEFINED_INTEREST_TAGS else PREDEFINED_INTEREST_TAGS.take(12)
-                val selectedTagNames = allSelectedTags.map { it.name }
+                val selectedTagNames = uiState.interests.map { it.name }
                 
                 FlowRow(
                     modifier = Modifier
@@ -371,14 +367,8 @@ fun ProfileSetupScreen(
                             selected = isSelected,
                             onClick = {
                                 if (isSelected) {
-                                    val tag = allSelectedTags.find { it.name == tagName }
-                                    tag?.let {
-                                        if (uiState.hobbies.contains(it)) {
-                                            viewModel.removeHobby(it.id)
-                                        } else {
-                                            viewModel.removeInterest(it.id)
-                                        }
-                                    }
+                                    val tag = uiState.interests.find { it.name == tagName }
+                                    tag?.let { viewModel.removeHobby(it.id) }
                                 } else {
                                     viewModel.addHobby(tagName)
                                 }
@@ -459,7 +449,12 @@ fun ProfileSetupScreen(
             
             // 다음 버튼
             Button(
-                onClick = { viewModel.proceedToNextStep(context) },
+                onClick = { 
+                    if (!uiState.isLoading) {
+                        viewModel.proceedToNextStep(context)
+                    }
+                },
+                enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
@@ -469,12 +464,20 @@ fun ProfileSetupScreen(
                     disabledContainerColor = Color(0xFFCCCCCC)
                 )
             ) {
-                Text(
-                    text = "다음",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "다음",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(32.dp))

@@ -27,8 +27,8 @@ data class ProfileSetupUiState(
     val gender: String = "",  // 성별: "male", "female", "undecided"
     val bio: String = "",
     val images: List<ImageItem> = emptyList(),
-    val hobbies: List<Tag> = emptyList(),
-    val interests: List<Tag> = emptyList(),
+    val interests: List<Tag> = emptyList(),  // 사용자가 직접 선택/입력한 관심사
+    val photoInterests: List<Tag> = emptyList(),  // 사진 임베딩으로 AI가 추천한 관심사
     val isLoading: Boolean = false,
     val errorMessage: String = "",
     val isProfileComplete: Boolean = false,
@@ -127,10 +127,10 @@ class ProfileSetupViewModel @Inject constructor(
     fun addHobby(hobbyName: String) {
         viewModelScope.launch {
             val currentState = _uiState.value
-            val (isSuccess, updatedTags) = addTagUseCase(hobbyName, "hobby", currentState.hobbies)
+            val (isSuccess, updatedTags) = addTagUseCase(hobbyName, "interest", currentState.interests)
             
             if (isSuccess) {
-                _uiState.value = currentState.copy(hobbies = updatedTags)
+                _uiState.value = currentState.copy(interests = updatedTags)
             } else {
                 _uiState.value = currentState.copy(
                     errorMessage = "동일한 태그가 이미 존재합니다"
@@ -142,8 +142,31 @@ class ProfileSetupViewModel @Inject constructor(
     fun removeHobby(tagId: String) {
         viewModelScope.launch {
             val currentState = _uiState.value
-            val updatedHobbies = removeTagUseCase(tagId, currentState.hobbies)
-            _uiState.value = currentState.copy(hobbies = updatedHobbies)
+            val updatedInterests = removeTagUseCase(tagId, currentState.interests)
+            _uiState.value = currentState.copy(interests = updatedInterests)
+        }
+    }
+    
+    fun addPhotoInterest(tagName: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val (isSuccess, updatedTags) = addTagUseCase(tagName, "photo_interest", currentState.photoInterests)
+            
+            if (isSuccess) {
+                _uiState.value = currentState.copy(photoInterests = updatedTags)
+            } else {
+                _uiState.value = currentState.copy(
+                    errorMessage = "동일한 태그가 이미 존재합니다"
+                )
+            }
+        }
+    }
+    
+    fun removePhotoInterest(tagId: String) {
+        viewModelScope.launch {
+            val currentState = _uiState.value
+            val updatedPhotoInterests = removeTagUseCase(tagId, currentState.photoInterests)
+            _uiState.value = currentState.copy(photoInterests = updatedPhotoInterests)
         }
     }
     
@@ -172,6 +195,12 @@ class ProfileSetupViewModel @Inject constructor(
     
     fun proceedToNextStep(context: Context) {
         val currentState = _uiState.value
+        
+        // 이미 로딩 중이면 중복 요청 방지
+        if (currentState.isLoading) {
+            android.util.Log.d("ProfileSetupViewModel", "이미 처리 중입니다. 중복 요청 무시")
+            return
+        }
         
         // 닉네임 검증
         if (currentState.nickname.isEmpty()) {
@@ -235,11 +264,17 @@ class ProfileSetupViewModel @Inject constructor(
                     tempFile.delete()
                 }
 
+                // 관심사와 사진 임베딩 관심사 배열로 전송
+                val userInterests = currentState.interests.map { it.name }
+                val photoBasedInterests = currentState.photoInterests.map { it.name }
+
                 val profileData = mapOf(
                     "age" to currentState.age,
                     "gender" to currentState.gender,
                     "region" to currentState.region,
                     "bio" to currentState.bio,
+                    "interests" to userInterests,
+                    "photo_interests" to photoBasedInterests,
                     "image_count" to currentState.images.size
                 )
 
@@ -282,11 +317,17 @@ class ProfileSetupViewModel @Inject constructor(
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(isLoading = true)
 
+                // 관심사와 사진 임베딩 관심사 배열로 전송
+                val userInterests = currentState.interests.map { it.name }
+                val photoBasedInterests = currentState.photoInterests.map { it.name }
+
                 val profileData = mapOf(
                     "age" to currentState.age,
                     "gender" to currentState.gender,
                     "region" to currentState.region,
                     "bio" to currentState.bio,
+                    "interests" to userInterests,
+                    "photo_interests" to photoBasedInterests,
                     "image_count" to currentState.images.size
                 )
 
