@@ -67,10 +67,10 @@ class GroupListViewModel @Inject constructor(
                             id = groupResponse.id,
                             name = groupResponse.name,
                             description = groupResponse.description ?: "",
-                            memberCount = groupResponse.memberIds.size,
-                            tags = groupResponse.tags.map { Tag(id = it, name = it) },
-                            imageUrl = groupResponse.imageUrl,
-                            region = groupResponse.region
+                            memberCount = groupResponse.memberIds?.size ?: 0,
+                            tags = groupResponse.tags?.map { Tag(id = it, name = it) } ?: emptyList(),
+                            imageUrl = groupResponse.imageUrl ?: "",
+                            region = groupResponse.region ?: ""
                         )
                     }
                     _uiState.value = _uiState.value.copy(
