@@ -51,8 +51,16 @@ fun QRInviteScreen(
         viewModel.initializeWithGroup(group)
     }
     
-    // QR 코드 생성
+    // 초대 링크 자동 복사
     LaunchedEffect(uiState.inviteLink?.inviteUrl) {
+        if (uiState.inviteLink?.inviteUrl != null) {
+            copyToClipboard(context, uiState.inviteLink!!.inviteUrl)
+            viewModel.copyInviteLink()
+        }
+    }
+    
+    // QR 코드 생성
+    LaunchedEffect(key1 = uiState.inviteLink?.inviteUrl, key2 = Unit) {
         if (uiState.inviteLink?.inviteUrl != null) {
             scope.launch {
                 qrBitmap = QRCodeGenerator.generateQRCode(

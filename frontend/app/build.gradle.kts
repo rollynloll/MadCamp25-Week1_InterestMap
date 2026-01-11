@@ -27,11 +27,25 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 네이티브 라이브러리 ABI 필터 설정
+        ndk {
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
     }
 
     buildTypes {
-        release {
+        debug {
             isMinifyEnabled = false
+            isShrinkResources = false
+            // 네이티브 라이브러리 디버깅 심볼 제거 방지
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -50,6 +64,19 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    
+    packaging {
+        resources {
+            // 중복 파일 제외
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // 네이티브 라이브러리 병합
+            pickFirsts += "lib/*/libpenguin.so"
+            pickFirsts += "lib/*/libc++_shared.so"
+        }
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
 }
 
