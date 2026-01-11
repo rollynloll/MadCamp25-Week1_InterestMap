@@ -237,6 +237,7 @@ class ProfileSetupViewModel @Inject constructor(
 
                 val profileData = mapOf(
                     "age" to currentState.age,
+                    "gender" to currentState.gender,
                     "region" to currentState.region,
                     "bio" to currentState.bio,
                     "image_count" to currentState.images.size
@@ -283,6 +284,7 @@ class ProfileSetupViewModel @Inject constructor(
 
                 val profileData = mapOf(
                     "age" to currentState.age,
+                    "gender" to currentState.gender,
                     "region" to currentState.region,
                     "bio" to currentState.bio,
                     "image_count" to currentState.images.size
