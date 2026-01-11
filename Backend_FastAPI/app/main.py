@@ -619,7 +619,7 @@ async def upload_photos_batch(
             if caption and caption not in seen:
                 seen.add(caption)
                 unique_captions.append(caption)
-        image_captions_for_embedding = unique_captions[:5]
+        image_captions_for_embedding = unique_captions
         final_text = build_final_text(
             selected_tags=list(selected_tags)[:10],
             user_description=user_description,
@@ -644,6 +644,7 @@ async def upload_photos_batch(
             user_id=str(user.id),
             input_text=final_text,
             image_captions=image_captions_for_embedding,
+            image_tags=suggested_tags,
             embedding=embedding,
             model_name=model_name,
             model_version=model_version,
@@ -657,6 +658,7 @@ async def upload_photos_batch(
     return BatchPhotoUploadResponse(
         photos=uploaded_photos,
         suggested_tags=suggested_tags,
+        image_tags=suggested_tags,
         embedding=embedding,
         map_position=map_position,
     )
@@ -909,6 +911,7 @@ async def generate_embedding(
         user_id=str(user.id),
         input_text=final_text,
         image_captions=image_captions,
+        image_tags=selected_tags[:5],
         embedding=embedding,
         model_name=model_name,
         model_version=model_version,
@@ -953,6 +956,7 @@ async def generate_embedding_from_text(
         user_id=str(user.id),
         input_text=final_text,
         image_captions=[],
+        image_tags=[],
         embedding=embedding,
         model_name=model_name,
         model_version=model_version,

@@ -19,7 +19,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.common.component.TagChip
-import com.example.madclass01.presentation.common.component.TagInputField
 import com.example.madclass01.presentation.profile.viewmodel.TagSelectionViewModel
 
 @Composable
@@ -37,11 +36,7 @@ fun TagSelectionScreen(
     
     // 추천 태그 설정
     LaunchedEffect(recommendedTags) {
-        if (recommendedTags.isNotEmpty()) {
-            viewModel.setRecommendedTags(recommendedTags)
-        } else {
-            viewModel.analyzeImages()
-        }
+        viewModel.setRecommendedTags(recommendedTags)
     }
     
     LaunchedEffect(uiState.isSelectionComplete) {
@@ -158,12 +153,12 @@ fun TagSelectionScreen(
                 // 자동 추출된 태그 (AI 추천)
                 TagSection(
                     title = "AI 추천 관심사",
-                    tags = uiState.extractedTags,
-                    onToggleTag = { viewModel.toggleExtractedTag(it) }
+                    tags = uiState.recommendedTags,
+                    onToggleTag = { viewModel.toggleRecommendedTag(it) }
                 )
                 
                 // 선택된 태그 개수 표시
-                if (uiState.extractedTags.isNotEmpty()) {
+                if (uiState.recommendedTags.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -171,7 +166,7 @@ fun TagSelectionScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "선택된 관심사: ${uiState.extractedTags.count { it.isSelected }}개",
+                            text = "선택된 관심사: ${uiState.recommendedTags.count { it.isSelected }}개",
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFFFF9945)
