@@ -200,6 +200,17 @@ interface ApiService {
         @Part file: okhttp3.MultipartBody.Part
     ): Response<PhotoResponse>
 
+    /**
+     * 다중 사진 업로드 (배치)
+     * POST /api/photos/batch
+     */
+    @Multipart
+    @POST("/api/photos/batch")
+    suspend fun uploadPhotos(
+        @Part("user_id") userId: RequestBody,
+        @Part files: List<okhttp3.MultipartBody.Part>
+    ): Response<List<PhotoResponse>>
+
     @GET("/api/photos/user/{userId}")
     suspend fun getUserPhotos(@Path("userId") userId: String): Response<List<PhotoResponse>>
 

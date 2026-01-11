@@ -231,37 +231,55 @@ class ProfileSetupViewModel @Inject constructor(
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(isLoading = true)
 
-                val uploadedUrls = mutableListOf<String>()
-                for (image in currentState.images) {
-                    val tempFile = copyToTempFile(context, image)
-                    if (tempFile == null) {
+                // 모든 이미지를 최적화 (리사이징 + WebP 압축)
+                val optimizedFiles = currentState.images.mapNotNull { imageItem ->
+                    backendRepository.optimizeImage(context, android.net.Uri.parse(imageItem.uri))
+                }
+
+                if (optimizedFiles.isEmpty()) {
+                    _uiState.value = currentState.copy(
+                        isLoading = false,
+                        errorMessage = "프로필 사진 처리 실패"
+                    )
+                    return@launch
+                }
+
+                android.util.Log.d(
+                    "ProfileSetupViewModel",
+                    "이미지 최적화 완료: ${optimizedFiles.size}개 파일"
+                )
+
+                // 한 번에 모든 사진 업로드
+                val uploadedUrls = when (val uploadResult = backendRepository.uploadPhotos(
+                    userId = currentState.userId!!,
+                    files = optimizedFiles
+                )) {
+                    is ApiResult.Success -> {
+                        android.util.Log.d(
+                            "ProfileSetupViewModel",
+                            "사진 업로드 성공: ${uploadResult.data.size}개"
+                        )
+                        
+                        // 임시 파일 삭제
+                        optimizedFiles.forEach { it.delete() }
+                        
+                        // URL 리스트 반환
+                        uploadResult.data.map { it.fileUrl }
+                    }
+                    is ApiResult.Error -> {
+                        android.util.Log.e(
+                            "ProfileSetupViewModel",
+                            "사진 업로드 실패: ${uploadResult.message}"
+                        )
+                        // 임시 파일 삭제
+                        optimizedFiles.forEach { it.delete() }
                         _uiState.value = currentState.copy(
                             isLoading = false,
-                            errorMessage = "프로필 사진 처리 실패"
+                            errorMessage = "사진 업로드 실패: ${uploadResult.message}"
                         )
                         return@launch
                     }
-
-                    when (val uploadResult = backendRepository.uploadPhoto(
-                        userId = currentState.userId!!,
-                        file = tempFile
-                    )) {
-                        is ApiResult.Success -> uploadedUrls.add(uploadResult.data.fileUrl)
-                        is ApiResult.Error -> {
-                            android.util.Log.e(
-                                "ProfileSetupViewModel",
-                                "사진 업로드 실패: ${uploadResult.message}"
-                            )
-                            tempFile.delete()
-                            _uiState.value = currentState.copy(
-                                isLoading = false,
-                                errorMessage = "사진 업로드 실패: ${uploadResult.message}"
-                            )
-                            return@launch
-                        }
-                        is ApiResult.Loading -> {}
-                    }
-                    tempFile.delete()
+                    is ApiResult.Loading -> emptyList()
                 }
 
                 // 관심사와 사진 임베딩 관심사 배열로 전송

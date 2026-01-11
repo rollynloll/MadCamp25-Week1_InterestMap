@@ -52,7 +52,59 @@ def _configure_logging() -> None:
 
 _configure_logging()
 
-app = FastAPI(title="InterestMap API", version="1.0.0")
+app = FastAPI(
+    title="InterestMap API",
+    version="1.0.0",
+    description="""
+    ## InterestMap - 사진 기반 관심사 매칭 플랫폼
+    
+    사용자의 프로필 사진을 AI로 분석하여 관심사를 추출하고, 
+    유사한 관심사를 가진 사람들과 그룹을 매칭해주는 서비스입니다.
+    
+    ### 주요 기능
+    * 🔐 카카오 로그인 인증
+    * 📸 사진 업로드 및 AI 분석
+    * 🤖 AI 기반 관심사 추출
+    * 👥 그룹 생성 및 참여
+    * 💬 그룹 채팅
+    * 🗺️ Interest Map 시각화
+    
+    ### API 구조
+    * `/auth/*` - 인증 관련
+    * `/me/*` - 사용자 정보 및 프로필
+    * `/groups/*` - 그룹 관리
+    * `/api/*` - Legacy 엔드포인트
+    """,
+    contact={
+        "name": "InterestMap Team",
+        "email": "support@interestmap.com"
+    },
+    license_info={
+        "name": "MIT License",
+    },
+    openapi_tags=[
+        {
+            "name": "auth",
+            "description": "인증 및 로그인 관련 API"
+        },
+        {
+            "name": "me",
+            "description": "내 정보 및 프로필 관리"
+        },
+        {
+            "name": "groups",
+            "description": "그룹 생성, 조회, 참여"
+        },
+        {
+            "name": "messages",
+            "description": "그룹 메시지 및 채팅"
+        },
+        {
+            "name": "legacy",
+            "description": "레거시 API (마이그레이션 예정)"
+        }
+    ]
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_ROOT = BASE_DIR / "uploads"
@@ -385,6 +437,131 @@ async def upload_photo(
     _cache_user(user)
     logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
     return _photo_response(photo, request)
+
+@app.post("/api/photos/batch", response_model=List[PhotoUploadResponse])
+async def upload_photos_batch(
+    request: Request,
+    user_id: str = Form(...),
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """다중 사진 업로드 (배치)"""
+    logger = logging.getLogger("uvicorn.error")
+    user = await _get_user_by_id(db, user_id)
+    
+    uploaded_photos = []
+    
+    # 현재 최대 sort_order 조회
+    result = await db.execute(
+        select(func.max(UserPhoto.sort_order)).where(UserPhoto.user_id == user.id)
+    )
+    max_sort = result.scalar() or 0
+    is_first_photo = max_sort == 0
+    
+    user_dir = UPLOAD_ROOT / user_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    
+    for idx, file in enumerate(files):
+        safe_name = Path(file.filename or f"upload_{idx}").name
+        photo_id = uuid.uuid4()
+        disk_path = user_dir / f"{photo_id}_{safe_name}"
+        hasher = hashlib.sha256()
+        
+        with disk_path.open("wb") as buffer:
+            while True:
+                chunk = file.file.read(1024 * 1024)
+                if not chunk:
+                    break
+                buffer.write(chunk)
+                hasher.update(chunk)
+        
+        content_hash = hasher.hexdigest()
+        file_path = f"/uploads/{user_id}/{disk_path.name}"
+        file_url = _build_file_url(request, file_path)
+        
+        # 중복 확인
+        if content_hash:
+            existing_result = await db.execute(
+                select(UserPhoto).where(
+                    UserPhoto.user_id == user.id,
+                    UserPhoto.content_hash == content_hash,
+                )
+            )
+            existing_photo = existing_result.scalar_one_or_none()
+            if existing_photo:
+                disk_path.unlink(missing_ok=True)
+                logger.info("Duplicate photo ignored user_id=%s hash=%s", user_id, content_hash)
+                uploaded_photos.append(_photo_response(existing_photo, request))
+                continue
+        
+        # 새 사진 저장
+        sort_order = max_sort + (idx + 1) * 10
+        is_primary = is_first_photo and idx == 0
+        
+        photo = UserPhoto(
+            id=photo_id,
+            user_id=user.id,
+            url=file_path,
+            content_hash=content_hash,
+            sort_order=sort_order,
+            is_primary=is_primary,
+        )
+        db.add(photo)
+        
+        # 첫 번째 사진을 프로필 이미지로 설정
+        if is_primary:
+            user.profile_image_url = file_url
+        
+        # 비동기 캡셔닝 (백그라운드에서 처리)
+        try:
+            caption_task = asyncio.to_thread(caption_image, str(disk_path))
+            caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=10)
+            
+            caption_ko = caption_raw_en
+            try:
+                translate_task = translate_to_korean(caption_raw_en)
+                caption_ko = await asyncio.wait_for(translate_task, timeout=10)
+            except:
+                pass
+            
+            interest_tags = []
+            try:
+                interest_task = infer_interest_tags(caption_ko)
+                interest_tags = await asyncio.wait_for(interest_task, timeout=8)
+                if interest_tags:
+                    caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
+            except:
+                pass
+            
+            await upsert_image_caption(
+                db,
+                image_id=photo_id,
+                caption_raw_en=caption_raw_en,
+                caption_ko=caption_ko,
+                model_name=model_name,
+                model_version=model_version,
+            )
+        except Exception as exc:
+            logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
+        
+        uploaded_photos.append(_photo_response(photo, request))
+        logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
+    
+    await db.commit()
+    
+    # 모든 사진 refresh
+    for photo_resp in uploaded_photos:
+        photo_id = uuid.UUID(photo_resp["id"])
+        result = await db.execute(select(UserPhoto).where(UserPhoto.id == photo_id))
+        photo = result.scalar_one_or_none()
+        if photo:
+            await db.refresh(photo)
+    
+    await db.refresh(user)
+    _cache_user(user)
+    
+    logger.info("Batch upload completed user_id=%s count=%d", user_id, len(uploaded_photos))
+    return uploaded_photos
 
 @app.get("/api/photos/user/{user_id}", response_model=List[PhotoUploadResponse])
 async def get_user_photos(

@@ -1,5 +1,6 @@
 package com.example.madclass01.data.repository
 
+import android.content.Context
 import com.example.madclass01.data.remote.ApiService
 import com.example.madclass01.data.remote.dto.*
 import kotlinx.coroutines.Dispatchers
@@ -153,6 +154,87 @@ class BackendRepository @Inject constructor(
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    /**
+     * 다중 사진 업로드 (리사이징 + WebP 압축)
+     */
+    suspend fun uploadPhotos(
+        userId: String,
+        files: List<File>
+    ): ApiResult<List<PhotoResponse>> = withContext(Dispatchers.IO) {
+        try {
+            val multipartParts = files.mapIndexed { index, file ->
+                val requestBody = file.asRequestBody("image/webp".toMediaTypeOrNull())
+                MultipartBody.Part.createFormData("files", "photo_${index}.webp", requestBody)
+            }
+            val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
+
+            val response = apiService.uploadPhotos(userIdBody, multipartParts)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to upload photos", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    /**
+     * 이미지 최적화 (리사이징 + WebP 압축 80%)
+     */
+    suspend fun optimizeImage(
+        context: Context,
+        imageUri: android.net.Uri,
+        maxWidth: Int = 1920,
+        maxHeight: Int = 1920
+    ): File? = withContext(Dispatchers.IO) {
+        try {
+            val bitmap = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                val source = android.graphics.ImageDecoder.createSource(context.contentResolver, imageUri)
+                android.graphics.ImageDecoder.decodeBitmap(source)
+            } else {
+                @Suppress("DEPRECATION")
+                android.provider.MediaStore.Images.Media.getBitmap(context.contentResolver, imageUri)
+            }
+
+            // 리사이징
+            val ratio = minOf(
+                maxWidth.toFloat() / bitmap.width,
+                maxHeight.toFloat() / bitmap.height,
+                1.0f
+            )
+            val resizedBitmap = if (ratio < 1.0f) {
+                android.graphics.Bitmap.createScaledBitmap(
+                    bitmap,
+                    (bitmap.width * ratio).toInt(),
+                    (bitmap.height * ratio).toInt(),
+                    true
+                )
+            } else {
+                bitmap
+            }
+
+            // WebP로 압축 (80%)
+            val tempFile = File(context.cacheDir, "photo_${System.currentTimeMillis()}.webp")
+            tempFile.outputStream().use { out ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    resizedBitmap.compress(android.graphics.Bitmap.CompressFormat.WEBP_LOSSY, 80, out)
+                } else {
+                    @Suppress("DEPRECATION")
+                    resizedBitmap.compress(android.graphics.Bitmap.CompressFormat.WEBP, 80, out)
+                }
+            }
+
+            if (resizedBitmap != bitmap) resizedBitmap.recycle()
+            bitmap.recycle()
+
+            tempFile
+        } catch (e: Exception) {
+            android.util.Log.e("BackendRepository", "Image optimization failed", e)
+            null
         }
     }
     
