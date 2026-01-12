@@ -236,7 +236,7 @@ async def group_interest_map(
     )
 
 
-@router.get("/{group_id}/messages", response_model=MessageListResponse)
+@router.get("/{group_id}/messages", response_model=MessageListResponse, tags=["messages"])
 async def list_group_messages(
     group_id: uuid.UUID,
     limit: int = Query(default=30, ge=1, le=100),
@@ -294,7 +294,7 @@ async def list_group_messages(
     return MessageListResponse(items=items, next_before=next_before)
 
 
-@router.post("/{group_id}/messages", response_model=MessageItem, status_code=201)
+@router.post("/{group_id}/messages", response_model=MessageItem, status_code=201, tags=["messages"])
 async def create_group_message(
     group_id: uuid.UUID,
     payload: MessageCreateRequest,

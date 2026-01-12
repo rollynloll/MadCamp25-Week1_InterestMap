@@ -184,17 +184,6 @@ class PhotoUploadResponse(BaseSchema):
     uploaded_at: str | None
 
 
-class TagAnalysisRequest(BaseSchema):
-    user_id: str
-    image_urls: list[str]
-
-
-class TagAnalysisResponse(BaseSchema):
-    tags: list[str]
-    categories: list[str]
-    interests: list[str]
-
-
 class ImageAnalysisRequest(BaseSchema):
     user_id: str
     image_urls: list[str]

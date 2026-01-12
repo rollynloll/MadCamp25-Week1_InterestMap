@@ -39,44 +39,6 @@ class BackendRepository @Inject constructor(
         }
     }
     
-    // Test용 APIs (개발 단계에서 사용)
-    suspend fun createTestUser(
-        provider: String,
-        providerUserId: String,
-        nickname: String? = null
-    ): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
-        try {
-            val request = CreateUserRequest(
-                provider = provider,
-                providerUserId = providerUserId,
-                nickname = nickname,
-                profileImageUrl = null,
-                profileData = null
-            )
-            val response = apiService.createTestUser(request)
-            if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
-            } else {
-                ApiResult.Error("Failed to create user", response.code())
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
-        }
-    }
-    
-    suspend fun getTestUser(userId: String): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getTestUser(userId)
-            if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
-            } else {
-                ApiResult.Error("Failed to get user", response.code())
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
-        }
-    }
-    
     suspend fun createUser(
         provider: String,
         providerUserId: String,
@@ -371,19 +333,6 @@ class BackendRepository @Inject constructor(
         }
     }
     
-    suspend fun getGroup(groupId: String): ApiResult<GroupResponse> = withContext(Dispatchers.IO) {
-        try {
-            val response = apiService.getGroup(groupId)
-            if (response.isSuccessful && response.body() != null) {
-                ApiResult.Success(response.body()!!)
-            } else {
-                ApiResult.Error("Failed to get group", response.code())
-            }
-        } catch (e: Exception) {
-            ApiResult.Error(e.message ?: "Network error")
-        }
-    }
-
     suspend fun getAllGroups(): ApiResult<List<GroupResponse>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getAllGroups()

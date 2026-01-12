@@ -243,7 +243,7 @@ class LoginViewModel @Inject constructor(
             val providerUserId = "test_user_${System.currentTimeMillis()}"
             val nickname = "테스트유저"
 
-            when (val result = backendRepository.createTestUser(
+            when (val result = backendRepository.createUser(
                 provider = provider,
                 providerUserId = providerUserId,
                 nickname = nickname

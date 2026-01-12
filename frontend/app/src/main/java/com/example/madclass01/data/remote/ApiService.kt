@@ -170,14 +170,7 @@ interface ApiService {
         @Header("Authorization") authorization: String
     ): Response<MeEmbedding>
 
-    // ==================== Legacy endpoints (for existing repository calls) ====================
-
-    // Test APIs
-    @POST("/api/users/test")
-    suspend fun createTestUser(@Body request: CreateUserRequest): Response<UserResponse>
-
-    @GET("/api/users/test/{userId}")
-    suspend fun getTestUser(@Path("userId") userId: String): Response<UserResponse>
+    // ==================== App APIs ====================
 
     // User APIs
     @POST("/api/users")
@@ -221,9 +214,6 @@ interface ApiService {
 
     @GET("/api/groups")
     suspend fun getAllGroups(): Response<List<GroupResponse>>
-
-    @GET("/api/groups/{groupId}")
-    suspend fun getGroup(@Path("groupId") groupId: String): Response<GroupResponse>
 
     @GET("/api/groups/user/{userId}")
     suspend fun getUserGroups(@Path("userId") userId: String): Response<List<GroupResponse>>

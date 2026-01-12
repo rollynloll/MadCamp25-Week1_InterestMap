@@ -17,7 +17,7 @@ from app.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
     GroupCreateRequest, GroupResponse, GroupDetailResponse, GroupEmbeddingResponse,
     UserEmbeddingResponse, AddMemberRequest,
-    PhotoUploadResponse, TagAnalysisRequest, TagAnalysisResponse,
+    PhotoUploadResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
     TextEmbeddingRequest, BatchPhotoUploadResponse
@@ -80,8 +80,8 @@ app = FastAPI(
     ### API 구조
     * `/auth/*` - 인증 관련
     * `/me/*` - 사용자 정보 및 프로필
-    * `/groups/*` - 그룹 관리
-    * `/api/*` - Legacy 엔드포인트
+    * `/groups/*` - 그룹/채팅
+    * `/api/*` - 앱 클라이언트용 사용자/사진/그룹/분석/임베딩
     """,
     contact={
         "name": "InterestMap Team",
@@ -108,8 +108,24 @@ app = FastAPI(
             "description": "그룹 메시지 및 채팅"
         },
         {
-            "name": "legacy",
-            "description": "레거시 API (마이그레이션 예정)"
+            "name": "users",
+            "description": "사용자 생성/조회/수정"
+        },
+        {
+            "name": "photos",
+            "description": "사진 업로드 및 조회"
+        },
+        {
+            "name": "analysis",
+            "description": "이미지 분석/추천 태그"
+        },
+        {
+            "name": "embedding",
+            "description": "임베딩 생성 및 조회"
+        },
+        {
+            "name": "system",
+            "description": "헬스 체크 등 시스템 엔드포인트"
         }
     ]
 )
@@ -320,11 +336,11 @@ def _photo_response(photo: UserPhoto, request: Request) -> dict:
         "uploaded_at": photo.created_at.isoformat() if photo.created_at else None,
     }
 
-@app.get("/")
+@app.get("/", tags=["system"])
 def read_root():
     return {"message": "Hello FastAPI"}
 
-@app.get("/health")
+@app.get("/health", tags=["system"])
 def health_check():
     return {
         "status": "healthy",
@@ -334,7 +350,7 @@ def health_check():
 
 # ==================== User APIs ====================
 
-@app.post("/api/users", response_model=UserResponse)
+@app.post("/api/users", response_model=UserResponse, tags=["users"])
 async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get_db)):
     """카카오 로그인 후 사용자 생성 또는 조회"""
     stmt = select(User).where(
@@ -375,13 +391,13 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
         await db.refresh(user)
         return _cache_user(user, is_new_user=True)
 
-@app.get("/api/users/{user_id}", response_model=UserResponse)
+@app.get("/api/users/{user_id}", response_model=UserResponse, tags=["users"])
 async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자 정보 조회"""
     user = await _get_user_by_id(db, user_id)
     return _cache_user(user)
 
-@app.put("/api/users/{user_id}", response_model=UserResponse)
+@app.put("/api/users/{user_id}", response_model=UserResponse, tags=["users"])
 async def update_user(user_id: str, request: UserUpdateRequest, db: AsyncSession = Depends(get_db)):
     """사용자 프로필 업데이트"""
     user = await _get_user_by_id(db, user_id)
@@ -416,7 +432,7 @@ async def update_user(user_id: str, request: UserUpdateRequest, db: AsyncSession
 
 # ==================== Photo APIs ====================
 
-@app.post("/api/photos", response_model=PhotoUploadResponse)
+@app.post("/api/photos", response_model=PhotoUploadResponse, tags=["photos"])
 async def upload_photo(
     request: Request,
     user_id: str = Form(...),
@@ -740,7 +756,7 @@ async def upload_photos_batch(
         map_position=map_position,
     )
 
-@app.get("/api/photos/user/{user_id}", response_model=List[PhotoUploadResponse])
+@app.get("/api/photos/user/{user_id}", response_model=List[PhotoUploadResponse], tags=["photos"])
 async def get_user_photos(
     user_id: str,
     request: Request,
@@ -756,7 +772,7 @@ async def get_user_photos(
 
 # ==================== Group APIs ====================
 
-@app.post("/api/groups", response_model=GroupResponse)
+@app.post("/api/groups", response_model=GroupResponse, tags=["groups"])
 async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(get_db)):
     """그룹 생성"""
     creator = await _get_user_by_id(db, request.creator_id)
@@ -782,7 +798,7 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
     await db.refresh(group)
     return _group_response(group, [creator.id])
 
-@app.get("/api/groups", response_model=List[GroupResponse])
+@app.get("/api/groups", response_model=List[GroupResponse], tags=["groups"])
 async def list_groups(db: AsyncSession = Depends(get_db)):
     """모든 그룹 목록 조회"""
     result = await db.execute(select(Group))
@@ -793,14 +809,7 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
         responses.append(_group_response(group, member_ids))
     return responses
 
-@app.get("/api/groups/{group_id}", response_model=GroupResponse)
-async def get_group(group_id: str, db: AsyncSession = Depends(get_db)):
-    """그룹 정보 조회"""
-    group = await _get_group_by_id(db, group_id)
-    member_ids = await _get_group_member_ids(db, group.id)
-    return _group_response(group, member_ids)
-
-@app.get("/api/groups/user/{user_id}", response_model=List[GroupResponse])
+@app.get("/api/groups/user/{user_id}", response_model=List[GroupResponse], tags=["groups"])
 async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자가 속한 그룹 목록 조회"""
     user = await _get_user_by_id(db, user_id)
@@ -835,7 +844,7 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
         responses.append(_group_response(group, member_ids))
     return responses
 
-@app.post("/api/groups/{group_id}/members", response_model=GroupResponse)
+@app.post("/api/groups/{group_id}/members", response_model=GroupResponse, tags=["groups"])
 async def add_group_member(
     group_id: str,
     request: AddMemberRequest,
@@ -857,7 +866,7 @@ async def add_group_member(
     member_ids = await _get_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
 
-@app.delete("/api/groups/{group_id}/members/{user_id}")
+@app.delete("/api/groups/{group_id}/members/{user_id}", tags=["groups"])
 async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = Depends(get_db)):
     """그룹에서 멤버 제거"""
     group = await _get_group_by_id(db, group_id)
@@ -872,7 +881,7 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
     return {"message": "Member removed successfully"}
 
 
-@app.get("/api/groups/{group_id}/detail", response_model=GroupDetailResponse)
+@app.get("/api/groups/{group_id}/detail", response_model=GroupDetailResponse, tags=["groups"])
 async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
     group = await _get_group_by_id(db, group_id)
     result = await db.execute(
@@ -895,7 +904,7 @@ async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-@app.get("/api/users/{user_id}/embedding", response_model=UserEmbeddingResponse)
+@app.get("/api/users/{user_id}/embedding", response_model=UserEmbeddingResponse, tags=["embedding"])
 async def get_user_embedding(user_id: str, db: AsyncSession = Depends(get_db)):
     user = await _get_user_by_id(db, user_id)
     active = await get_active_embedding(db, user.id)
@@ -909,7 +918,7 @@ async def get_user_embedding(user_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
-@app.get("/api/groups/{group_id}/embeddings", response_model=GroupEmbeddingResponse)
+@app.get("/api/groups/{group_id}/embeddings", response_model=GroupEmbeddingResponse, tags=["groups"])
 async def get_group_embeddings(
     group_id: str,
     current_user_id: str | None = Query(None),
@@ -972,26 +981,7 @@ async def get_group_embeddings(
 
 # ==================== Tag/Analysis APIs ====================
 
-@app.post("/api/analyze/tags", response_model=TagAnalysisResponse)
-async def analyze_images_for_tags(
-    request: TagAnalysisRequest,
-    db: AsyncSession = Depends(get_db),
-):
-    """이미지를 분석하여 태그 생성 (Mock 구현)"""
-    await _ensure_user_cached(db, request.user_id)
-
-    # Mock 태그 반환 (실제로는 AI 모델 사용)
-    mock_tags = ["여행", "음식", "카페", "운동", "독서", "영화", "음악", "게임"]
-    mock_categories = ["라이프스타일", "취미", "문화"]
-    mock_interests = ["아웃도어", "실내활동", "예술"]
-
-    return {
-        "tags": mock_tags[:5],
-        "categories": mock_categories,
-        "interests": mock_interests[:3]
-    }
-
-@app.post("/api/analyze/images", response_model=ImageAnalysisResponse)
+@app.post("/api/analyze/images", response_model=ImageAnalysisResponse, tags=["analysis"])
 async def analyze_images(
     request: ImageAnalysisRequest,
     db: AsyncSession = Depends(get_db),
@@ -1168,31 +1158,3 @@ async def generate_embedding_from_text(
         embedding=embedding,
         map_position={"x": map_x, "y": map_y},
     )
-
-# ==================== Test APIs (개발용) ====================
-
-@app.post("/api/users/test")
-async def create_test_user(user_data: dict):
-    return {
-        "id": "test-user-123",
-        "provider": user_data.get("provider", "kakao"),
-        "provider_user_id": user_data.get("provider_user_id", "12345"),
-        "nickname": user_data.get("nickname", "Test User"),
-        "profile_image_url": user_data.get("profile_image_url"),
-        "profile_data": {},
-        "created_at": "2026-01-09T14:00:00Z",
-        "updated_at": "2026-01-09T14:00:00Z"
-    }
-
-@app.get("/api/users/test/{user_id}")
-async def get_test_user(user_id: str):
-    return {
-        "id": user_id,
-        "provider": "kakao",
-        "provider_user_id": "12345",
-        "nickname": "Test User",
-        "profile_image_url": None,
-        "profile_data": {},
-        "created_at": "2026-01-09T14:00:00Z",
-        "updated_at": "2026-01-09T14:00:00Z"
-    }
