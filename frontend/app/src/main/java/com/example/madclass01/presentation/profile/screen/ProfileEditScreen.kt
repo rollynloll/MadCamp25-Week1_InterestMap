@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +39,24 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.profile.viewmodel.ProfileEditViewModel
 
 import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
+
+// URI를 File로 변환하는 헬퍼 함수
+private fun uriToFile(context: android.content.Context, uri: Uri): File? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val file = File(context.cacheDir, "profile_${System.currentTimeMillis()}.jpg")
+        val outputStream = FileOutputStream(file)
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+        file
+    } catch (e: Exception) {
+        android.util.Log.e("ProfileEditScreen", "Error converting URI to File", e)
+        null
+    }
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -86,6 +106,27 @@ fun ProfileEditScreen(
     var selectedTags by remember { mutableStateOf(initialTags.toSet()) }
     var photoInterestTags by remember { mutableStateOf(initialPhotoInterests.toSet()) }
     var showTagSelector by remember { mutableStateOf(false) }
+    
+    // 프로필 사진 선택을 위한 이미지 피커
+    val profileImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // URI를 File로 변환해서 업로드
+            val file = uriToFile(context, it)
+            if (file != null) {
+                viewModel.uploadProfileImage(userId, file)
+            }
+        }
+    }
+    
+    // 프로필 이미지 업로드 성공 시 업데이트
+    LaunchedEffect(uiState.uploadedProfileImageUrl) {
+        if (uiState.uploadedProfileImageUrl != null) {
+            profileImage = uiState.uploadedProfileImageUrl
+            Toast.makeText(context, "프로필 사진이 변경되었습니다", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val images = remember {
         mutableStateListOf<String>().apply {
@@ -147,14 +188,12 @@ fun ProfileEditScreen(
                     } else {
                         TextButton(
                             onClick = {
+                                android.util.Log.d("ProfileEditScreen", "저장 버튼 클릭됨")
+                                
                                 val trimmed = nickname.trim()
                                 if (trimmed.length < 2) {
                                     nicknameError = "닉네임은 2자 이상이어야 합니다"
-                                    return@TextButton
-                                }
-
-                                // 최소 20장 검증
-                                if (images.size < 20) {
+                                    android.util.Log.d("ProfileEditScreen", "닉네임 검증 실패: ${trimmed.length}자")
                                     return@TextButton
                                 }
 
@@ -162,6 +201,8 @@ fun ProfileEditScreen(
                                 val finalRegion = region.trim().ifBlank { null }
                                 val finalBio = bio.trim()
 
+                                android.util.Log.d("ProfileEditScreen", "API 호출 시작 - userId: $userId, nickname: $trimmed")
+                                
                                 viewModel.updateProfile(
                                     userId = userId,
                                     nickname = trimmed,
@@ -213,7 +254,8 @@ fun ProfileEditScreen(
                         .size(120.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .border(2.dp, Color(0xFFE0E0E0), CircleShape),
+                        .border(2.dp, Color(0xFFE0E0E0), CircleShape)
+                        .clickable { profileImagePicker.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     if (profileImage != null) {
@@ -223,10 +265,25 @@ fun ProfileEditScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
+                        
+                        // 로딩 오버레이
+                        if (uiState.isUploadingImage) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.5f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
                     } else {
                         Icon(
                             imageVector = Icons.Default.Camera,
-                            contentDescription = "사진 없음",
+                            contentDescription = "사진 선택",
                             tint = Color(0xFFBBBBBB),
                             modifier = Modifier.size(40.dp)
                         )
@@ -277,18 +334,90 @@ fun ProfileEditScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = region,
-                onValueChange = { region = it },
-                label = { Text("지역") },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF9945),
-                    unfocusedBorderColor = Color(0xFFDDDDDD)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 지역 선택
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "지역",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1A1A1A)
+                )
+                
+                var regionExpanded by remember { mutableStateOf(false) }
+                val regions = listOf(
+                    "선택 안함",
+                    "서울특별시", "부산광역시", "대구광역시", "인천광역시",
+                    "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+                    "경기도", "강원특별자치도", "충청북도", "충청남도",
+                    "전북특별자치도", "전라남도", "경상북도", "경상남도",
+                    "제주특별자치도"
+                )
+                
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(8.dp))
+                            .clickable { regionExpanded = true }
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "지역",
+                                tint = Color(0xFFFF9945),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = region.ifBlank { "지역을 선택하세요" },
+                                fontSize = 15.sp,
+                                color = if (region.isBlank()) Color(0xFF999999) else Color(0xFF1A1A1A)
+                            )
+                        }
+                        
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "선택",
+                            tint = Color(0xFF999999),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = regionExpanded,
+                        onDismissRequest = { regionExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .heightIn(max = 300.dp)
+                    ) {
+                        regions.forEach { regionOption ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = regionOption,
+                                        fontSize = 15.sp,
+                                        color = if (regionOption == region || (regionOption == "선택 안함" && region.isBlank())) Color(0xFFFF9945) else Color(0xFF1A1A1A),
+                                        fontWeight = if (regionOption == region || (regionOption == "선택 안함" && region.isBlank())) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    region = if (regionOption == "선택 안함") "" else regionOption
+                                    regionExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = bio,
