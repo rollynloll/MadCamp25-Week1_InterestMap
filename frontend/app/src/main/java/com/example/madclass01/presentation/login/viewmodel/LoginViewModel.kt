@@ -148,11 +148,8 @@ class LoginViewModel @Inject constructor(
                     val profileTags = user.profileData.stringListValue("interests")
                     val profilePhotoInterests = user.profileData.stringListValue("photo_interests")
                     val imageCount = user.profileData.intValue("image_count") ?: 0
-                    val isProfileComplete = if (user.isNewUser) {
-                        false
-                    } else {
-                        true
-                    }
+                    val isProfileComplete = user.profileData.booleanValue("is_profile_complete")
+                        ?: (!user.isNewUser && imageCount > 0)
 
                     android.util.Log.d("LoginViewModel", "Extracted Tags (interests): $profileTags")
                     android.util.Log.d("LoginViewModel", "Extracted Photo Interests: $profilePhotoInterests")
@@ -294,6 +291,16 @@ class LoginViewModel @Inject constructor(
 
     private fun Map<String, Any>.intValue(key: String): Int? {
         return this[key].toIntOrNull()
+    }
+
+    private fun Map<String, Any>.booleanValue(key: String): Boolean? {
+        val value = this[key] ?: return null
+        return when (value) {
+            is Boolean -> value
+            is Number -> value.toInt() != 0
+            is String -> value.equals("true", ignoreCase = true) || value == "1"
+            else -> null
+        }
     }
 
     private fun Map<String, Any>.stringListValue(key: String): List<String> {

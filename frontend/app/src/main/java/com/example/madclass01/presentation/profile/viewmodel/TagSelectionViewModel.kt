@@ -231,7 +231,8 @@ class TagSelectionViewModel @Inject constructor(
                 "region" to (region ?: ""),
                 "bio" to (bio ?: ""),
                 "interests" to userInterests.distinct(),
-                "photo_interests" to finalPhotoInterests.distinct()
+                "photo_interests" to finalPhotoInterests.distinct(),
+                "is_profile_complete" to true
             )
 
             android.util.Log.d("TagSelectionViewModel", "프로필 저장 시작 - userId: $userId, interests: $userInterests")

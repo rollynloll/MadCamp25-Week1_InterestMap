@@ -25,13 +25,13 @@ from app.schemas import (
 from app.auth.router import router as auth_router
 from app.groups.router import router as groups_router
 from app.me.router import router as me_router
-from app.db.session import engine, get_db
+from app.db.session import engine, get_db, AsyncSessionLocal
 from app.db.base import Base
 import app.models  # ensure models are registered for metadata
 from app.models.user import User
 from app.models.photo import UserPhoto
 from app.models.group import Group, GroupMember
-from app.services.embedding.captioning import caption_image
+from app.services.embedding.captioning import caption_image, is_blip_ready
 from app.services.embedding.composer import build_final_text
 from app.services.embedding.embedding_log import log_embedding_io
 from app.services.embedding.interest import infer_interest_tags
@@ -237,13 +237,23 @@ async def init_db_schema() -> None:
 
 
 def _cache_user(user: User, is_new_user: bool = False) -> dict:
+    profile_data = user.profile_data or {}
+    if "is_profile_complete" not in profile_data:
+        profile_data = dict(profile_data)
+        profile_data["is_profile_complete"] = bool(
+            profile_data.get("interests")
+            or profile_data.get("photo_interests")
+            or profile_data.get("image_count")
+            or user.profile_image_url
+        )
+        user.profile_data = profile_data
     user_data = {
         "id": str(user.id),
         "provider": user.provider,
         "provider_user_id": user.provider_user_id,
         "nickname": user.nickname,
         "profile_image_url": user.profile_image_url,
-        "profile_data": user.profile_data or {},
+        "profile_data": profile_data,
         "is_new_user": is_new_user,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
@@ -336,6 +346,192 @@ def _photo_response(photo: UserPhoto, request: Request) -> dict:
         "uploaded_at": photo.created_at.isoformat() if photo.created_at else None,
     }
 
+
+async def _generate_caption_data(
+    disk_path: Path,
+    timeout_caption: int = 30,
+    timeout_translate: int = 15,
+    timeout_interest: int = 10,
+) -> tuple[str, str, str, str, list[str]]:
+    logger = logging.getLogger("uvicorn.error")
+    caption_raw_en = f"an uploaded image ({disk_path.name})"
+    caption_ko = caption_raw_en
+    model_name = "fallback"
+    model_version = "fallback"
+    if not is_blip_ready():
+        timeout_caption = max(timeout_caption, 180)
+        logger.info("Captioning warm-up detected, extending timeout to %ss", timeout_caption)
+
+    try:
+        logger.info("Captioning start image=%s", disk_path.name)
+        caption_task = asyncio.to_thread(caption_image, str(disk_path))
+        caption_raw_en, model_name, model_version = await asyncio.wait_for(
+            caption_task, timeout=timeout_caption
+        )
+        logger.info("Captioning done image=%s", disk_path.name)
+    except asyncio.TimeoutError:
+        logger.warning("Captioning timed out for %s", disk_path.name)
+    except Exception as exc:
+        logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
+
+    try:
+        translate_task = translate_to_korean(caption_raw_en)
+        caption_ko = await asyncio.wait_for(translate_task, timeout=timeout_translate)
+    except asyncio.TimeoutError:
+        logger.warning("Translation timed out for %s", disk_path.name)
+        caption_ko = caption_raw_en
+    except Exception as exc:
+        logger.warning("Translation failed for %s: %s", disk_path.name, exc)
+        caption_ko = caption_raw_en
+
+    interest_tags: list[str] = []
+    try:
+        interest_task = infer_interest_tags(caption_ko)
+        interest_tags = await asyncio.wait_for(interest_task, timeout=timeout_interest)
+    except asyncio.TimeoutError:
+        logger.warning("Interest inference timed out for %s", disk_path.name)
+    except Exception as exc:
+        logger.warning("Interest inference failed for %s: %s", disk_path.name, exc)
+
+    if interest_tags:
+        caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
+
+    return caption_raw_en, caption_ko, model_name, model_version, interest_tags
+
+
+async def _process_photo_captions(
+    user_id: str,
+    photo_jobs: list[tuple[uuid.UUID, Path]],
+    incoming_tags: list[str],
+    compute_embedding: bool,
+) -> None:
+    if not photo_jobs:
+        return
+    logger = logging.getLogger("uvicorn.error")
+    try:
+        async with AsyncSessionLocal() as session:
+            user = await _get_user_by_id(session, user_id)
+            batch_captions: list[str] = []
+            suggested_tag_counts: Counter[str] = Counter()
+
+            for photo_id, disk_path in photo_jobs:
+                (
+                    caption_raw_en,
+                    caption_ko,
+                    caption_model_name,
+                    caption_model_version,
+                    interest_tags,
+                ) = await _generate_caption_data(disk_path)
+                if interest_tags:
+                    suggested_tag_counts.update(interest_tags)
+                batch_captions.append(caption_ko)
+                await upsert_image_caption(
+                    session,
+                    image_id=photo_id,
+                    caption_raw_en=caption_raw_en,
+                    caption_ko=caption_ko,
+                    model_name=caption_model_name,
+                    model_version=caption_model_version,
+                )
+
+            await session.commit()
+
+            if not compute_embedding:
+                return
+
+            selected_tags: set[str] = set(str(item) for item in incoming_tags if item)
+            if user.profile_data:
+                for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
+                    value = user.profile_data.get(key)
+                    if isinstance(value, list):
+                        selected_tags.update(str(item) for item in value if item)
+
+            suggested_tags = [
+                tag for tag, _count in suggested_tag_counts.most_common()
+                if tag not in selected_tags
+            ][:5]
+            profile_data = dict(user.profile_data or {})
+            profile_data["suggested_tags"] = suggested_tags
+            user.profile_data = profile_data
+            await session.commit()
+
+            if batch_captions or selected_tags:
+                user_description = None
+                if user.profile_data:
+                    user_description = user.profile_data.get("bio") or user.profile_data.get("description")
+                unique_captions: list[str] = []
+                seen: set[str] = set()
+                for caption in batch_captions:
+                    if caption and caption not in seen:
+                        seen.add(caption)
+                        unique_captions.append(caption)
+                image_captions_for_embedding = unique_captions
+                final_text = build_final_text(
+                    selected_tags=list(selected_tags)[:10],
+                    user_description=user_description,
+                    image_captions=image_captions_for_embedding,
+                )
+                try:
+                    embedding, model_name, model_version = await embed_text(final_text)
+                except Exception as exc:
+                    logger.warning(
+                        "Embedding generation failed user_id=%s error=%s",
+                        user_id,
+                        exc,
+                    )
+                else:
+                    await deactivate_embeddings(session, user.id)
+                    await create_embedding(
+                        session,
+                        user_id=user.id,
+                        embedding=embedding,
+                    )
+                    await session.commit()
+                    log_embedding_io(
+                        user_name=user.nickname,
+                        user_id=str(user.id),
+                        input_text=final_text,
+                        image_captions=image_captions_for_embedding,
+                        image_tags=suggested_tags,
+                        embedding=embedding,
+                        model_name=model_name,
+                        model_version=model_version,
+                    )
+            if compute_embedding:
+                profile_data = dict(user.profile_data or {})
+                profile_data["captioning_status"] = "done"
+                user.profile_data = profile_data
+                await session.commit()
+                _cache_user(user)
+            logger.info(
+                "Background captioning completed user_id=%s count=%d",
+                user_id,
+                len(photo_jobs),
+            )
+    except Exception as exc:
+        logger.warning("Background captioning failed user_id=%s error=%s", user_id, exc)
+        if compute_embedding:
+            await _set_captioning_status(user_id, "failed")
+
+
+async def _set_captioning_status(user_id: str, status: str) -> None:
+    logger = logging.getLogger("uvicorn.error")
+    try:
+        async with AsyncSessionLocal() as session:
+            user = await _get_user_by_id(session, user_id)
+            profile_data = dict(user.profile_data or {})
+            profile_data["captioning_status"] = status
+            user.profile_data = profile_data
+            await session.commit()
+            _cache_user(user)
+    except Exception as exc:
+        logger.warning(
+            "Failed to update captioning status user_id=%s status=%s error=%s",
+            user_id,
+            status,
+            exc,
+        )
+
 @app.get("/", tags=["system"])
 def read_root():
     return {"message": "Hello FastAPI"}
@@ -372,12 +568,14 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
         await db.refresh(user)
         return _cache_user(user, is_new_user=False)
 
+    profile_data = dict(request.profile_data or {})
+    profile_data.setdefault("is_profile_complete", False)
     user = User(
         provider=request.provider,
         provider_user_id=request.provider_user_id,
         nickname=request.nickname,
         profile_image_url=request.profile_image_url,
-        profile_data=request.profile_data or {},
+        profile_data=profile_data,
     )
     db.add(user)
     try:
@@ -498,53 +696,19 @@ async def upload_photo(
     db.add(photo)
     user.profile_image_url = file_url
 
-    caption_raw_en = f"an uploaded image ({disk_path.name})"
-    model_name = "fallback"
-    model_version = "fallback"
-    try:
-        caption_task = asyncio.to_thread(caption_image, str(disk_path))
-        caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=15)
-    except asyncio.TimeoutError:
-        logger.warning("Captioning timed out for %s", disk_path.name)
-    except Exception as exc:
-        logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
-
-    try:
-        translate_task = translate_to_korean(caption_raw_en)
-        caption_ko = await asyncio.wait_for(translate_task, timeout=15)
-    except asyncio.TimeoutError:
-        logger.warning("Translation timed out for %s", disk_path.name)
-        caption_ko = caption_raw_en
-    except Exception as exc:
-        logger.warning("Translation failed for %s: %s", disk_path.name, exc)
-        caption_ko = caption_raw_en
-
-    interest_tags: list[str] = []
-    try:
-        interest_task = infer_interest_tags(caption_ko)
-        interest_tags = await asyncio.wait_for(interest_task, timeout=10)
-    except asyncio.TimeoutError:
-        logger.warning("Interest inference timed out for %s", disk_path.name)
-    except Exception as exc:
-        logger.warning("Interest inference failed for %s: %s", disk_path.name, exc)
-
-    if interest_tags:
-        caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
-
-    await upsert_image_caption(
-        db,
-        image_id=photo_id,
-        caption_raw_en=caption_raw_en,
-        caption_ko=caption_ko,
-        model_name=model_name,
-        model_version=model_version,
-    )
-
     await db.commit()
     await db.refresh(photo)
     await db.refresh(user)
     _cache_user(user)
     logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
+    asyncio.create_task(
+        _process_photo_captions(
+            user_id=user_id,
+            photo_jobs=[(photo_id, disk_path)],
+            incoming_tags=[],
+            compute_embedding=False,
+        )
+    )
     return _photo_response(photo, request)
 
 @app.post("/api/photos/batch", response_model=BatchPhotoUploadResponse, tags=["photos"])
@@ -561,8 +725,7 @@ async def upload_photos_batch(
     user = await _get_user_by_id(db, user_id)
     
     uploaded_photos = []
-    batch_captions: list[str] = []
-    suggested_tag_counts: Counter[str] = Counter()
+    photo_jobs: list[tuple[uuid.UUID, Path]] = []
     incoming_tags: list[str] = list(selected_tags)
     if selected_tags_json:
         try:
@@ -632,55 +795,16 @@ async def upload_photos_batch(
         # 첫 번째 사진을 프로필 이미지로 설정
         if is_primary:
             user.profile_image_url = file_url
-        
-        # 캡셔닝을 완료한 뒤 응답 (DB에 저장까지 완료)
-        caption_raw_en = f"an uploaded image ({disk_path.name})"
-        model_name = "fallback"
-        model_version = "fallback"
-        try:
-            caption_task = asyncio.to_thread(caption_image, str(disk_path))
-            caption_raw_en, model_name, model_version = await asyncio.wait_for(caption_task, timeout=30)
-        except asyncio.TimeoutError:
-            logger.warning("Captioning timed out for %s", disk_path.name)
-        except Exception as exc:
-            logger.warning("Captioning failed for %s: %s", disk_path.name, exc)
-
-        try:
-            translate_task = translate_to_korean(caption_raw_en)
-            caption_ko = await asyncio.wait_for(translate_task, timeout=15)
-        except asyncio.TimeoutError:
-            logger.warning("Translation timed out for %s", disk_path.name)
-            caption_ko = caption_raw_en
-        except Exception as exc:
-            logger.warning("Translation failed for %s: %s", disk_path.name, exc)
-            caption_ko = caption_raw_en
-
-        interest_tags: list[str] = []
-        try:
-            interest_task = infer_interest_tags(caption_ko)
-            interest_tags = await asyncio.wait_for(interest_task, timeout=10)
-        except asyncio.TimeoutError:
-            logger.warning("Interest inference timed out for %s", disk_path.name)
-        except Exception as exc:
-            logger.warning("Interest inference failed for %s: %s", disk_path.name, exc)
-
-        if interest_tags:
-            suggested_tag_counts.update(interest_tags)
-            caption_ko = f"{caption_ko} | 취미 추정: {', '.join(interest_tags)}"
-
-        batch_captions.append(caption_ko)
-        await upsert_image_caption(
-            db,
-            image_id=photo_id,
-            caption_raw_en=caption_raw_en,
-            caption_ko=caption_ko,
-            model_name=model_name,
-            model_version=model_version,
-        )
+        photo_jobs.append((photo_id, disk_path))
         
         uploaded_photos.append(_photo_response(photo, request))
         logger.info("Photo uploaded user_id=%s file=%s", user_id, disk_path.name)
     
+    if photo_jobs:
+        profile_data = dict(user.profile_data or {})
+        profile_data["captioning_status"] = "processing"
+        user.profile_data = profile_data
+
     await db.commit()
     
     # 모든 사진 refresh
@@ -694,66 +818,23 @@ async def upload_photos_batch(
     await db.refresh(user)
     _cache_user(user)
     
-    selected_tags: set[str] = set(str(item) for item in incoming_tags if item)
-    if user.profile_data:
-        for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
-            value = user.profile_data.get(key)
-            if isinstance(value, list):
-                selected_tags.update(str(item) for item in value)
-
-    suggested_tags = [
-        tag for tag, _count in suggested_tag_counts.most_common()
-        if tag not in selected_tags
-    ][:5]
-
-    embedding: list[float] | None = None
-    map_position: dict[str, float] | None = None
-    if batch_captions or selected_tags:
-        user_description = None
-        if user.profile_data:
-            user_description = user.profile_data.get("bio") or user.profile_data.get("description")
-        unique_captions: list[str] = []
-        seen: set[str] = set()
-        for caption in batch_captions:
-            if caption and caption not in seen:
-                seen.add(caption)
-                unique_captions.append(caption)
-        image_captions_for_embedding = unique_captions
-        final_text = build_final_text(
-            selected_tags=list(selected_tags)[:10],
-            user_description=user_description,
-            image_captions=image_captions_for_embedding,
+    if photo_jobs:
+        asyncio.create_task(
+            _process_photo_captions(
+                user_id=user_id,
+                photo_jobs=photo_jobs,
+                incoming_tags=incoming_tags,
+                compute_embedding=True,
+            )
         )
-        embedding, model_name, model_version = await embed_text(final_text)
-        await deactivate_embeddings(db, user.id)
-        await create_embedding(
-            db,
-            user_id=user.id,
-            embedding=embedding,
-        )
-        await db.commit()
-        log_embedding_io(
-            user_name=user.nickname,
-            user_id=str(user.id),
-            input_text=final_text,
-            image_captions=image_captions_for_embedding,
-            image_tags=suggested_tags,
-            embedding=embedding,
-            model_name=model_name,
-            model_version=model_version,
-        )
-        map_position = {
-            "x": float(embedding[0]) if embedding else 0.0,
-            "y": float(embedding[1]) if embedding else 0.0,
-        }
 
     logger.info("Batch upload completed user_id=%s count=%d", user_id, len(uploaded_photos))
     return BatchPhotoUploadResponse(
         photos=uploaded_photos,
-        suggested_tags=suggested_tags,
-        image_tags=suggested_tags,
-        embedding=embedding,
-        map_position=map_position,
+        suggested_tags=[],
+        image_tags=[],
+        embedding=None,
+        map_position=None,
     )
 
 @app.get("/api/photos/user/{user_id}", response_model=List[PhotoUploadResponse], tags=["photos"])

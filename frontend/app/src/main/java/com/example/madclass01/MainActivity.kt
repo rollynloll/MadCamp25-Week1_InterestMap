@@ -354,6 +354,16 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 },
                 onNavigateToQRScanner = {
                     currentScreen = AppScreen.QRScanner
+                },
+                onProfileLoaded = { nickname, age, gender, region, bio, images, interests, photoInterests ->
+                    userNickname = nickname
+                    userAge = age
+                    userGender = gender
+                    userRegion = region
+                    userBio = bio ?: ""
+                    userImages = images
+                    userTags = interests
+                    userPhotoInterests = photoInterests
                 }
             )
         }

@@ -88,3 +88,5 @@ frontend/build_log.txt
 !README.md
 !**/README.md
 user_embeddings/
+.cache/
+Backend_FastAPI/.cache/

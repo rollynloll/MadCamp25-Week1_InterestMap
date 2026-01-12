@@ -65,7 +65,17 @@ fun MainScreen(
     onNavigateToGroupDetail: (String) -> Unit = {},
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
-    onNavigateToQRScanner: () -> Unit = {}
+    onNavigateToQRScanner: () -> Unit = {},
+    onProfileLoaded: (
+        nickname: String?,
+        age: Int?,
+        gender: String?,
+        region: String?,
+        bio: String?,
+        images: List<String>,
+        interests: List<String>,
+        photoInterests: List<String>
+    ) -> Unit = { _, _, _, _, _, _, _, _ -> }
 ) {
     val navController = rememberNavController()
     val tabs = listOf(MainTab.Groups, MainTab.Search, MainTab.Profile)
@@ -149,7 +159,8 @@ fun MainScreen(
                     bio = profileBio,
                     images = profileImages,
                     tags = profileTags,
-                    onEditClick = onNavigateToEditProfile
+                    onEditClick = onNavigateToEditProfile,
+                    onProfileLoaded = onProfileLoaded
                 )
             }
         }

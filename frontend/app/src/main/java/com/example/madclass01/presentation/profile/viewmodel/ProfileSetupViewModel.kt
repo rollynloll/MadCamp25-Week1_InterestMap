@@ -16,6 +16,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
@@ -302,6 +303,8 @@ class ProfileSetupViewModel @Inject constructor(
                 // 업로드된 URL 저장
                 _uiState.value = _uiState.value.copy(uploadedImageUrls = uploadedUrls)
 
+                recommendedTags = waitForCaptioningResult(currentState.userId!!)
+
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isAnalyzingImages = false,
@@ -404,6 +407,61 @@ class ProfileSetupViewModel @Inject constructor(
     fun resetInputsForEdit() {
         val existingUserId = _uiState.value.userId
         _uiState.value = ProfileSetupUiState(userId = existingUserId)
+    }
+
+    private suspend fun waitForCaptioningResult(userId: String): List<String> {
+        repeat(40) { attempt ->
+            when (val result = backendRepository.getUser(userId)) {
+                is ApiResult.Success -> {
+                    val profileData = result.data.profileData
+                    val status = profileData.stringValue("captioning_status")
+                    if (status == "done" || status == "failed") {
+                        val tags = extractSuggestedTags(profileData)
+                        android.util.Log.d(
+                            "ProfileSetupViewModel",
+                            "캡셔닝 완료 (${attempt + 1}차), status=$status"
+                        )
+                        return tags.take(5)
+                    }
+                }
+                is ApiResult.Error -> {
+                    android.util.Log.w(
+                        "ProfileSetupViewModel",
+                        "캡셔닝 상태 조회 실패: ${result.message}"
+                    )
+                }
+                is ApiResult.Loading -> {}
+            }
+            delay(1000)
+        }
+        android.util.Log.w("ProfileSetupViewModel", "캡셔닝 대기 타임아웃")
+        return emptyList()
+    }
+
+    private fun extractSuggestedTags(profileData: Map<String, Any>): List<String> {
+        val keys = listOf("suggested_tags", "suggestedTags", "recommended_tags", "recommendedTags")
+        for (key in keys) {
+            val tags = profileData.stringListValue(key)
+            if (tags.isNotEmpty()) {
+                return tags
+            }
+        }
+        return emptyList()
+    }
+
+    private fun Map<String, Any>.stringValue(key: String): String? {
+        val value = this[key] ?: return null
+        return value.toString().trim().ifBlank { null }
+    }
+
+    private fun Map<String, Any>.stringListValue(key: String): List<String> {
+        val value = this[key] ?: return emptyList()
+        return when (value) {
+            is List<*> -> value.mapNotNull { it?.toString()?.trim() }.filter { it.isNotEmpty() }
+            is Array<*> -> value.mapNotNull { it?.toString()?.trim() }.filter { it.isNotEmpty() }
+            is String -> value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            else -> emptyList()
+        }
     }
 
     private fun copyToTempFile(context: Context, image: ImageItem): File? {

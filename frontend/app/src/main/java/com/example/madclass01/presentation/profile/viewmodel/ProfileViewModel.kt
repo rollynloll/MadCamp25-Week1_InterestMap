@@ -21,7 +21,9 @@ data class ProfileUiState(
     val region: String? = null,
     val bio: String? = null,
     val images: List<String> = emptyList(),
-    val tags: List<String> = emptyList()
+    val tags: List<String> = emptyList(),
+    val interests: List<String> = emptyList(),
+    val photoInterests: List<String> = emptyList()
 )
 
 @HiltViewModel
@@ -89,7 +91,9 @@ class ProfileViewModel @Inject constructor(
                 region = region,
                 bio = bio,
                 images = images,
-                tags = tags
+                tags = tags,
+                interests = interests,
+                photoInterests = photoInterests
             )
         }
     }

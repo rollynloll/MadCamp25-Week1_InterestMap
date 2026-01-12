@@ -1,35 +1,71 @@
 import logging
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 _MODEL_NAME = "blip-base"
 _MODEL_VERSION = "salesforce/blip-image-captioning-base"
+_CACHE_DIR = Path.home() / ".cache" / "huggingface"
 
 _processor: Any | None = None
 _model: Any | None = None
+_LOAD_LOCK = Lock()
+
+
+def is_blip_ready() -> bool:
+    return _processor is not None and _model is not None
 
 
 def _load_blip() -> bool:
     global _processor, _model
     if _processor is not None and _model is not None:
         return True
-    try:
-        from transformers import BlipForConditionalGeneration, BlipProcessor  # type: ignore
-    except Exception as exc:
-        logging.getLogger("uvicorn.error").warning("BLIP not available: %s", exc)
-        return False
+    with _LOAD_LOCK:
+        if _processor is not None and _model is not None:
+            return True
+        try:
+            from transformers import BlipForConditionalGeneration, BlipProcessor  # type: ignore
+        except Exception as exc:
+            logging.getLogger("uvicorn.error").warning("BLIP not available: %s", exc)
+            return False
 
-    try:
-        _processor = BlipProcessor.from_pretrained(_MODEL_VERSION)
-        _model = BlipForConditionalGeneration.from_pretrained(
-            _MODEL_VERSION, use_safetensors=True
-        )
-    except Exception as exc:
-        logging.getLogger("uvicorn.error").warning("BLIP load failed: %s", exc)
-        _processor = None
-        _model = None
-        return False
-    return True
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_dir = str(_CACHE_DIR)
+        try:
+            _processor = BlipProcessor.from_pretrained(
+                _MODEL_VERSION,
+                cache_dir=cache_dir,
+                use_fast=False,
+            )
+            _model = BlipForConditionalGeneration.from_pretrained(
+                _MODEL_VERSION,
+                cache_dir=cache_dir,
+                use_safetensors=True,
+            )
+        except Exception as exc:
+            logging.getLogger("uvicorn.error").warning("BLIP load failed: %s", exc)
+            try:
+                _processor = BlipProcessor.from_pretrained(
+                    _MODEL_VERSION,
+                    cache_dir=cache_dir,
+                    local_files_only=True,
+                    use_fast=False,
+                )
+                _model = BlipForConditionalGeneration.from_pretrained(
+                    _MODEL_VERSION,
+                    cache_dir=cache_dir,
+                    local_files_only=True,
+                    use_safetensors=True,
+                )
+            except Exception as exc2:
+                logging.getLogger("uvicorn.error").warning(
+                    "BLIP load failed (cache): %s",
+                    exc2,
+                )
+                _processor = None
+                _model = None
+                return False
+        return True
 
 
 def caption_image(image_path: str) -> tuple[str, str, str]:

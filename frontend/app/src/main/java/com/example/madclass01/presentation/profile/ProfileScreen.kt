@@ -33,6 +33,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.madclass01.presentation.profile.viewmodel.ProfileUiState
 import com.example.madclass01.presentation.profile.viewmodel.ProfileViewModel
 
 @Composable
@@ -56,13 +60,40 @@ fun ProfileScreen(
     images: List<String> = emptyList(),
     tags: List<String> = emptyList(),
     onEditClick: () -> Unit,
+    onProfileLoaded: (
+        nickname: String?,
+        age: Int?,
+        gender: String?,
+        region: String?,
+        bio: String?,
+        images: List<String>,
+        interests: List<String>,
+        photoInterests: List<String>
+    ) -> Unit = { _, _, _, _, _, _, _, _ -> },
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var lastEmitted by remember { mutableStateOf<ProfileUiState?>(null) }
 
     LaunchedEffect(userId) {
         if (userId != null) {
             viewModel.loadProfile(userId)
+        }
+    }
+
+    LaunchedEffect(uiState) {
+        if (!uiState.isLoading && uiState.userId != null && lastEmitted != uiState) {
+            lastEmitted = uiState
+            onProfileLoaded(
+                uiState.nickname ?: nickname,
+                uiState.age ?: age,
+                uiState.gender ?: gender,
+                uiState.region ?: region,
+                uiState.bio ?: bio,
+                if (uiState.images.isNotEmpty()) uiState.images else images,
+                uiState.interests,
+                uiState.photoInterests
+            )
         }
     }
 
