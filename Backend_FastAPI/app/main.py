@@ -20,7 +20,8 @@ from app.schemas import (
     PhotoUploadResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
-    TextEmbeddingRequest, BatchPhotoUploadResponse
+    TextEmbeddingRequest, BatchPhotoUploadResponse,
+    PublicMessageCreateRequest, PublicMessageItem
 )
 from app.auth.router import router as auth_router
 from app.groups.router import router as groups_router
@@ -31,6 +32,7 @@ import app.models  # ensure models are registered for metadata
 from app.models.user import User
 from app.models.photo import UserPhoto
 from app.models.group import Group, GroupMember
+from app.models.message import GroupMessage
 from app.services.embedding.captioning import caption_image, is_blip_ready
 from app.services.embedding.composer import build_final_text
 from app.services.embedding.embedding_log import log_embedding_io
@@ -365,6 +367,17 @@ def _photo_response(photo: UserPhoto, request: Request) -> dict:
         "file_url": _build_file_url(request, file_path),
         "uploaded_at": photo.created_at.isoformat() if photo.created_at else None,
     }
+
+
+async def _get_primary_photo_url(db: AsyncSession, user_id: uuid.UUID) -> str | None:
+    result = await db.execute(
+        select(UserPhoto.url).where(
+            UserPhoto.user_id == user_id,
+            UserPhoto.is_primary == True,  # noqa: E712
+        )
+    )
+    row = result.first()
+    return row[0] if row else None
 
 
 async def _generate_caption_data(
@@ -1021,6 +1034,145 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
     )
     await db.commit()
     return {"message": "Member removed successfully"}
+
+
+@app.get("/api/groups/{group_id}/messages", response_model=List[PublicMessageItem], tags=["messages"])
+async def list_group_messages_public(
+    group_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+
+    query = (
+        select(GroupMessage, User, UserPhoto.url)
+        .join(User, GroupMessage.sender_id == User.id)
+        .outerjoin(
+            UserPhoto,
+            (UserPhoto.user_id == User.id) & (UserPhoto.is_primary == True),  # noqa: E712
+        )
+        .where(GroupMessage.group_id == group.id)
+        .order_by(GroupMessage.created_at.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(query)).all()
+
+    items: list[PublicMessageItem] = []
+    for message, sender, primary_url in rows:
+        content = message.content or {}
+        items.append(
+            PublicMessageItem(
+                id=str(message.id),
+                group_id=str(message.group_id),
+                user_id=str(sender.id),
+                nickname=sender.nickname,
+                primary_photo_url=primary_url,
+                text=content.get("text"),
+                image_url=content.get("image_url"),
+                sent_at=message.created_at,
+            )
+        )
+
+    return items
+
+
+@app.post("/api/groups/{group_id}/messages", response_model=PublicMessageItem, status_code=201, tags=["messages"])
+async def create_group_message_public(
+    group_id: str,
+    payload: PublicMessageCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+    user = await _get_user_by_id(db, payload.user_id)
+
+    existing = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group.id,
+            GroupMember.user_id == user.id,
+        )
+    )
+    if existing.scalar_one_or_none() is None:
+        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+        await db.commit()
+
+    message = GroupMessage(
+        group_id=group.id,
+        sender_id=user.id,
+        content={"text": payload.text},
+    )
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+
+    primary_url = await _get_primary_photo_url(db, user.id)
+    return PublicMessageItem(
+        id=str(message.id),
+        group_id=str(message.group_id),
+        user_id=str(user.id),
+        nickname=user.nickname,
+        primary_photo_url=primary_url,
+        text=payload.text,
+        image_url=None,
+        sent_at=message.created_at,
+    )
+
+
+@app.post("/api/groups/{group_id}/photos", response_model=PublicMessageItem, status_code=201, tags=["messages"])
+async def create_group_image_message_public(
+    request: Request,
+    group_id: str,
+    user_id: str = Form(...),
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+    user = await _get_user_by_id(db, user_id)
+
+    existing = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group.id,
+            GroupMember.user_id == user.id,
+        )
+    )
+    if existing.scalar_one_or_none() is None:
+        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+        await db.commit()
+
+    safe_name = Path(file.filename or "group_message").name
+    group_dir = UPLOAD_ROOT / "groups" / group_id / "messages"
+    group_dir.mkdir(parents=True, exist_ok=True)
+    disk_path = group_dir / f"{uuid.uuid4()}_{safe_name}"
+
+    with disk_path.open("wb") as buffer:
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            buffer.write(chunk)
+
+    file_path = f"/uploads/groups/{group_id}/messages/{disk_path.name}"
+    file_url = _build_file_url(request, file_path)
+
+    message = GroupMessage(
+        group_id=group.id,
+        sender_id=user.id,
+        content={"image_url": file_url},
+    )
+    db.add(message)
+    await db.commit()
+    await db.refresh(message)
+
+    primary_url = await _get_primary_photo_url(db, user.id)
+    return PublicMessageItem(
+        id=str(message.id),
+        group_id=str(message.group_id),
+        user_id=str(user.id),
+        nickname=user.nickname,
+        primary_photo_url=primary_url,
+        text=None,
+        image_url=file_url,
+        sent_at=message.created_at,
+    )
 
 
 @app.get("/api/groups/{group_id}/detail", response_model=GroupDetailResponse, tags=["groups"])

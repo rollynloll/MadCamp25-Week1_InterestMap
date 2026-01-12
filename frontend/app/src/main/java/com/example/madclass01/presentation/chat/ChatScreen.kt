@@ -134,18 +134,38 @@ fun ChatScreen(
                         key = { it.id }
                     ) { message ->
                         val isMe = message.userId == userId
+                        val timestamp = formatTimestamp(message.timestamp)
+                        val isImageMessage =
+                            message.type == DomainChatMessage.MessageType.IMAGE &&
+                                !message.imageUrl.isNullOrBlank()
                         if (isMe) {
-                            MyMessageItem(
-                                message = message.content ?: "",
-                                timestamp = formatTimestamp(message.timestamp)
-                            )
+                            if (isImageMessage) {
+                                MyImageMessageItem(
+                                    imageUrl = message.imageUrl ?: "",
+                                    timestamp = timestamp
+                                )
+                            } else {
+                                MyMessageItem(
+                                    message = message.content ?: "",
+                                    timestamp = timestamp
+                                )
+                            }
                         } else {
-                            OtherMessageItem(
-                                userName = message.userName ?: "알 수 없음",
-                                message = message.content ?: "",
-                                timestamp = formatTimestamp(message.timestamp),
-                                avatarUrl = null // TODO: 프로필 사진 URL
-                            )
+                            if (isImageMessage) {
+                                OtherImageMessageItem(
+                                    userName = message.userName ?: "알 수 없음",
+                                    imageUrl = message.imageUrl ?: "",
+                                    timestamp = timestamp,
+                                    avatarUrl = null
+                                )
+                            } else {
+                                OtherMessageItem(
+                                    userName = message.userName ?: "알 수 없음",
+                                    message = message.content ?: "",
+                                    timestamp = timestamp,
+                                    avatarUrl = null // TODO: 프로필 사진 URL
+                                )
+                            }
                         }
                     }
                 }
@@ -411,6 +431,126 @@ fun MyMessageItem(
                 fontWeight = FontWeight.Normal,
                 color = Color.White,
                 modifier = Modifier.padding(12.dp)
+            )
+        }
+    }
+}
+
+@Composable
+fun OtherImageMessageItem(
+    userName: String,
+    imageUrl: String,
+    timestamp: String,
+    avatarUrl: String? = null
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .background(
+                    color = Color(0xFFFF9945),
+                    shape = CircleShape
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            if (avatarUrl != null) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "프로필 사진",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = userName.take(1),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = userName,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6B7280)
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = 4.dp,
+                        topEnd = 16.dp,
+                        bottomStart = 16.dp,
+                        bottomEnd = 16.dp
+                    ),
+                    color = Color.White,
+                    shadowElevation = 1.dp
+                ) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "이미지 메시지",
+                        modifier = Modifier.size(180.dp),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                Text(
+                    text = timestamp,
+                    fontSize = 11.sp,
+                    color = Color(0xFF9CA3AF)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MyImageMessageItem(
+    imageUrl: String,
+    timestamp: String
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Text(
+            text = timestamp,
+            fontSize = 11.sp,
+            color = Color(0xFF9CA3AF)
+        )
+
+        Spacer(modifier = Modifier.width(4.dp))
+
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 4.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp
+            ),
+            color = Color.White,
+            shadowElevation = 1.dp
+        ) {
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "이미지 메시지",
+                modifier = Modifier.size(180.dp),
+                contentScale = ContentScale.Crop
             )
         }
     }

@@ -38,9 +38,10 @@ class ChatViewModel @Inject constructor(
      * 채팅방 초기화 및 메시지 로드
      */
     fun initializeChatRoom(groupId: String, userId: String) {
-        currentGroupId = groupId
-        loadMessages(groupId, userId)
-        startPolling(groupId, userId)
+        val normalizedGroupId = normalizeGroupId(groupId)
+        currentGroupId = normalizedGroupId
+        loadMessages(normalizedGroupId, userId)
+        startPolling(normalizedGroupId, userId)
     }
 
     /**
@@ -102,13 +103,14 @@ class ChatViewModel @Inject constructor(
     fun sendMessage(groupId: String, userId: String, message: String) {
         if (message.isBlank()) return
 
+        val normalizedGroupId = normalizeGroupId(groupId)
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSending = true)
 
-            when (val result = backendRepository.sendGroupMessage(groupId, message)) {
+            when (val result = backendRepository.sendGroupMessage(normalizedGroupId, userId, message)) {
                 is ApiResult.Success -> {
                     // 메시지 전송 성공 후 즉시 새로고침
-                    loadMessages(groupId, userId)
+                    loadMessages(normalizedGroupId, userId)
                     _uiState.value = _uiState.value.copy(isSending = false)
                 }
                 is ApiResult.Error -> {
@@ -126,13 +128,14 @@ class ChatViewModel @Inject constructor(
      * 이미지 메시지 전송
      */
     fun sendImageMessage(groupId: String, userId: String, imageFile: java.io.File) {
+        val normalizedGroupId = normalizeGroupId(groupId)
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSending = true)
 
-            when (val result = backendRepository.sendGroupImageMessage(groupId, userId, imageFile)) {
+            when (val result = backendRepository.sendGroupImageMessage(normalizedGroupId, userId, imageFile)) {
                 is ApiResult.Success -> {
                     // 이미지 전송 성공 후 새로고침
-                    loadMessages(groupId, userId)
+                    loadMessages(normalizedGroupId, userId)
                     _uiState.value = _uiState.value.copy(isSending = false)
                 }
                 is ApiResult.Error -> {
@@ -156,5 +159,9 @@ class ChatViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         pollingJob?.cancel()
+    }
+
+    private fun normalizeGroupId(groupId: String): String {
+        return groupId.removePrefix("group_")
     }
 }

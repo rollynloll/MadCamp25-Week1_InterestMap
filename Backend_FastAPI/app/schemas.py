@@ -316,3 +316,19 @@ class MessageListResponse(BaseSchema):
 
 class MessageCreateRequest(BaseSchema):
     text: str
+
+
+class PublicMessageCreateRequest(BaseSchema):
+    user_id: str
+    text: str
+
+
+class PublicMessageItem(BaseSchema):
+    id: str
+    group_id: str
+    user_id: str
+    nickname: str | None = None
+    primary_photo_url: str | None = None
+    text: str | None = None
+    image_url: str | None = None
+    sent_at: datetime
