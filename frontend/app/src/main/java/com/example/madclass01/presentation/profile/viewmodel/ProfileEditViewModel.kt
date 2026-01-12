@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.profile.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.madclass01.data.repository.ApiResult
@@ -37,6 +38,7 @@ class ProfileEditViewModel @Inject constructor(
         tags: List<String>
     ) {
         viewModelScope.launch {
+            android.util.Log.d("ProfileEditViewModel", "저장눌림")
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, isSuccess = false)
 
             val profileData = mapOf(

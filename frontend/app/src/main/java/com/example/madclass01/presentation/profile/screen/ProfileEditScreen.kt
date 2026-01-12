@@ -147,14 +147,12 @@ fun ProfileEditScreen(
                     } else {
                         TextButton(
                             onClick = {
+                                android.util.Log.d("ProfileEditScreen", "저장 버튼 클릭됨")
+                                
                                 val trimmed = nickname.trim()
                                 if (trimmed.length < 2) {
                                     nicknameError = "닉네임은 2자 이상이어야 합니다"
-                                    return@TextButton
-                                }
-
-                                // 최소 20장 검증
-                                if (images.size < 20) {
+                                    android.util.Log.d("ProfileEditScreen", "닉네임 검증 실패: ${trimmed.length}자")
                                     return@TextButton
                                 }
 
@@ -162,6 +160,8 @@ fun ProfileEditScreen(
                                 val finalRegion = region.trim().ifBlank { null }
                                 val finalBio = bio.trim()
 
+                                android.util.Log.d("ProfileEditScreen", "API 호출 시작 - userId: $userId, nickname: $trimmed")
+                                
                                 viewModel.updateProfile(
                                     userId = userId,
                                     nickname = trimmed,
