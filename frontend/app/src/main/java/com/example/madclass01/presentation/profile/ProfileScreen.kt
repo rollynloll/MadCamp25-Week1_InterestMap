@@ -1,7 +1,6 @@
 package com.example.madclass01.presentation.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,12 +24,15 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Female
 import androidx.compose.material.icons.filled.Male
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,23 +41,64 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.madclass01.presentation.profile.viewmodel.ProfileViewModel
 
 @Composable
 fun ProfileScreen(
-    userId: String? = null,  // userId 추가
+    userId: String? = null,
     nickname: String? = null,
     age: Int? = null,
-    gender: String? = null,  // "male" 또는 "female"
+    gender: String? = null,
+    region: String? = null,
+    bio: String? = null,
+    images: List<String> = emptyList(),
+    tags: List<String> = emptyList(),
+    onEditClick: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(userId) {
+        if (userId != null) {
+            viewModel.loadProfile(userId)
+        }
+    }
+
+    if (uiState.isLoading) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color(0xFFFF9945))
+        }
+    } else {
+        // API 데이터가 있으면 사용, 없으면(초기 상태) 전달받은 props 사용
+        ProfileContent(
+            nickname = uiState.nickname ?: nickname,
+            age = uiState.age ?: age,
+            gender = uiState.gender ?: gender,
+            region = uiState.region ?: region,
+            bio = uiState.bio ?: bio,
+            images = if (uiState.images.isNotEmpty()) uiState.images else images,
+            tags = if (uiState.tags.isNotEmpty()) uiState.tags else tags,
+            onEditClick = onEditClick
+        )
+    }
+}
+
+@Composable
+fun ProfileContent(
+    nickname: String? = null,
+    age: Int? = null,
+    gender: String? = null,
     region: String? = null,
     bio: String? = null,
     images: List<String> = emptyList(),
     tags: List<String> = emptyList(),
     onEditClick: () -> Unit
 ) {
-    remember(userId) { Unit }
-
-    // TODO: userId로 프로필 정보 로드
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -204,7 +247,8 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    (if (tags.isEmpty()) listOf("요가", "독서", "서핑") else tags).forEach { tag ->
+                    // 최대 5개의 관심사만 표시
+                    (if (tags.isEmpty()) listOf("요가", "독서", "서핑") else tags.take(5)).forEach { tag ->
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = Color.White,

@@ -49,4 +49,10 @@ abstract class RepositoryModule {
     abstract fun bindGroupDetailRepository(
         groupDetailRepositoryImpl: GroupDetailRepositoryImpl
     ): GroupDetailRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindUserRepository(
+        userRepositoryImpl: com.example.madclass01.data.repository.UserRepositoryImpl
+    ): com.example.madclass01.domain.repository.UserRepository
 }

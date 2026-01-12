@@ -38,8 +38,7 @@ fun GroupDetailHeaderComponent(
     activityStatus: String = "오늘 활동",
     groupIcon: String = "👥",
     onBackClick: () -> Unit = {},
-    onQRCodeClick: () -> Unit = {},
-    onMoreClick: () -> Unit = {}
+    onQRCodeClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -70,42 +69,20 @@ fun GroupDetailHeaderComponent(
             )
         }
 
-        // 오른쪽 액션 버튼들
-        Row(
+        // 오른쪽 액션 버튼 (초대하기)
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = 0.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .size(24.dp)
+                .clickable { onQRCodeClick() },
+            contentAlignment = Alignment.Center
         ) {
-            // 사람 초대 아이콘
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .clickable { onQRCodeClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PersonAdd,
-                    contentDescription = "초대하기",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            // 더보기 아이콘
-            Box(
-                modifier = Modifier
-                    .size(24.dp)
-                    .padding(start = 12.dp)
-                    .clickable { onMoreClick() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "⋮",
-                    color = Color.White,
-                    fontSize = 18.sp
-                )
-            }
+            Icon(
+                imageVector = Icons.Default.PersonAdd,
+                contentDescription = "초대하기",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
         }
 
         // 그룹 정보 (중앙)

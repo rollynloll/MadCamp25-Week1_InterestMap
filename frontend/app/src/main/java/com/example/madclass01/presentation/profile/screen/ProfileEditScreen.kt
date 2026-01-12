@@ -327,46 +327,21 @@ fun ProfileEditScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // 사용자가 선택한 관심사 태그
-                        selectedTags.forEach { tag ->
+1                        // 모든 관심사 태그 (사용자 선택 + 사진 추출)를 같은 스타일로 통합 표시
+                        (selectedTags + photoInterestTags).forEach { tag ->
                             TagChip(
                                 label = tag,
                                 isSelected = true,
                                 onToggle = {
                                     // 클릭하면 태그 제거
-                                    selectedTags = selectedTags - tag
+                                    if (tag in selectedTags) {
+                                        selectedTags = selectedTags - tag
+                                    } else if (tag in photoInterestTags) {
+                                        photoInterestTags = photoInterestTags - tag
+                                    }
                                 },
                                 modifier = Modifier
                             )
-                        }
-                        
-                        // 사진에서 추출한 관심사 태그 (파란색 배경으로 구분)
-                        photoInterestTags.forEach { tag ->
-                            Surface(
-                                shape = RoundedCornerShape(20.dp),
-                                color = Color(0xFFE3F2FD),  // 파란색 배경으로 구분
-                                modifier = Modifier.clickable {
-                                    // 클릭하면 태그 제거
-                                    photoInterestTags = photoInterestTags - tag
-                                }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "📸",
-                                        fontSize = 12.sp
-                                    )
-                                    Text(
-                                        text = tag,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = Color(0xFF1976D2)
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -493,64 +468,12 @@ fun ProfileEditScreen(
                     
                     HorizontalDivider(color = Color(0xFFEEEEEE))
                     
-                    // 사진에서 추출한 관심사 섹션
-                    if (photoInterestTags.isNotEmpty()) {
-                        Column(
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Text(
-                                text = "📸 사진에서 추출한 관심사",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF1976D2)
-                            )
-                            
-                            @OptIn(ExperimentalLayoutApi::class)
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                photoInterestTags.forEach { tag ->
-                                    Surface(
-                                        shape = RoundedCornerShape(20.dp),
-                                        color = Color(0xFFE3F2FD),
-                                        modifier = Modifier.clickable {
-                                            photoInterestTags = photoInterestTags - tag
-                                        }
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = tag,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color(0xFF1976D2)
-                                            )
-                                            Icon(
-                                                imageVector = Icons.Default.Close,
-                                                contentDescription = "제거",
-                                                tint = Color(0xFF1976D2),
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        
-                        HorizontalDivider(color = Color(0xFFEEEEEE))
-                    }
-                    
-                    // 사용자 선택 관심사 섹션
+                    // 모든 관심사 통합 섹션 (사용자 선택 + 사진 추출)
                     Text(
-                        text = "✨ 선택한 관심사",
+                        text = "관심사 태그",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFFF9945)
+                        color = Color(0xFF1A1A1A)
                     )
                     
                     @OptIn(ExperimentalLayoutApi::class)
@@ -560,15 +483,18 @@ fun ProfileEditScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         allAvailableTags.forEach { tag ->
-                            val isSelected = tag in selectedTags
+                            val isSelected = tag in selectedTags || tag in photoInterestTags
                             TagChip(
                                 label = tag,
                                 isSelected = isSelected,
                                 onToggle = {
-                                    selectedTags = if (isSelected) {
-                                        selectedTags - tag
+                                    if (isSelected) {
+                                        // 둘 중 어디에 있든 제거
+                                        selectedTags = selectedTags - tag
+                                        photoInterestTags = photoInterestTags - tag
                                     } else {
-                                        selectedTags + tag
+                                        // 사용자 선택 태그에 추가
+                                        selectedTags = selectedTags + tag
                                     }
                                 },
                                 modifier = Modifier
