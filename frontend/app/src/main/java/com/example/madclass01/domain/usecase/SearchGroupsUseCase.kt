@@ -20,15 +20,38 @@ class SearchGroupsUseCase @Inject constructor(
             is ApiResult.Loading -> emptyList()
         }
 
+        val publicGroups = groups.filter { it.isPublic }
+
         val trimmedQuery = query.trim()
-        val filtered = if (trimmedQuery.isBlank()) {
-            groups
+        val filteredByQuery = if (trimmedQuery.isBlank()) {
+            publicGroups
         } else {
-            groups.filter { it.name.contains(trimmedQuery, ignoreCase = true) }
+            publicGroups.filter { group ->
+                val inName = group.name.contains(trimmedQuery, ignoreCase = true)
+                val inDesc = group.description.contains(trimmedQuery, ignoreCase = true)
+                val inTags = group.tags.any { it.name.contains(trimmedQuery, ignoreCase = true) }
+                inName || inDesc || inTags
+            }
+        }
+
+        val selectedRegion = filters["region"] as? String ?: "전체"
+        val selectedMemberRange = filters["memberRange"] as? String ?: "전체"
+
+        val filteredByRegion = if (selectedRegion == "전체") {
+            filteredByQuery
+        } else {
+            filteredByQuery.filter { it.region == selectedRegion }
+        }
+
+        val filteredByMembers = when (selectedMemberRange) {
+            "10명 이하" -> filteredByRegion.filter { it.memberCount <= 10 }
+            "10-30명" -> filteredByRegion.filter { it.memberCount in 10..30 }
+            "30명 이상" -> filteredByRegion.filter { it.memberCount >= 30 }
+            else -> filteredByRegion
         }
 
         val collator = Collator.getInstance(Locale.KOREAN)
-        return filtered.sortedWith { a, b -> collator.compare(a.name, b.name) }
+        return filteredByMembers.sortedWith { a, b -> collator.compare(a.name, b.name) }
     }
 
     private fun GroupResponse.toDomain(): Group {
@@ -40,7 +63,8 @@ class SearchGroupsUseCase @Inject constructor(
             tags = tags.map { Tag(id = it, name = it) },
             imageUrl = imageUrl,
             iconType = iconType,
-            region = region
+            region = region,
+            isPublic = isPublic
         )
     }
 }

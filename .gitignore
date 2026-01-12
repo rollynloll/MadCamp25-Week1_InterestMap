@@ -90,3 +90,6 @@ frontend/build_log.txt
 user_embeddings/
 .cache/
 Backend_FastAPI/.cache/
+Backend_FastAPI/MadCamp_Profiles/
+.cache/
+Backend_FastAPI/.cache/

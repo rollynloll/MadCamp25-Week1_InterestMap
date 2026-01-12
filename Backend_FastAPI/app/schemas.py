@@ -147,6 +147,7 @@ class GroupResponse(BaseSchema):
     region: str = ""
     image_url: str = ""
     icon_type: str = ""
+    is_public: bool = True
 
 
 class GroupDetailResponse(BaseSchema):

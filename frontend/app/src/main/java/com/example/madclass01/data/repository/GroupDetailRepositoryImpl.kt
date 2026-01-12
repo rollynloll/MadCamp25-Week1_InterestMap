@@ -85,8 +85,8 @@ class GroupDetailRepositoryImpl @Inject constructor(
             val otherUserEmbeddings = otherUserEmbeddingDtos.map { it.toDomainModel() }
 
             // 3. 현재 사용자의 노드 위치 (중심)
-            val centerX = 167f  // 390 / 2
-            val centerY = 460f  // 200 + 260 (Graph Canvas 중앙)
+            val centerX = 195f  // 390 / 2
+            val centerY = 260f  // 520 / 2
             
             val currentUserNode = GraphNodePosition(
                 userId = currentUserId,
@@ -102,7 +102,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
                 otherUserEmbeddings = otherUserEmbeddings,
                 centerX = centerX,
                 centerY = centerY,
-                maxDistance = 150f
+                maxDistance = 180f
             )
 
             // 5. 임베딩 맵 생성

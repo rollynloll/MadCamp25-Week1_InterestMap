@@ -308,6 +308,7 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
     region = profile.get("region") or ""
     image_url = profile.get("image_url") or ""
     icon_type = profile.get("icon_type") or ""
+    is_public = bool(profile.get("is_public", True))
     return {
         "id": str(group.id),
         "name": group.name,
@@ -319,6 +320,7 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
         "region": region,
         "image_url": image_url,
         "icon_type": icon_type,
+        "is_public": is_public,
     }
 
 

@@ -24,19 +24,28 @@ object GraphLayoutCalculator {
     fun calculateNodePositions(
         currentUserEmbedding: UserEmbedding,
         otherUserEmbeddings: List<UserEmbedding>,
-        centerX: Float = 167f,  // 390 / 2
-        centerY: Float = 460f,  // 200 + 260 (Graph Canvas 중앙)
-        maxDistance: Float = 150f
+        centerX: Float = 195f,  // 390 / 2
+        centerY: Float = 260f,  // 520 / 2
+        maxDistance: Float = 180f
     ): List<GraphNodePosition> {
-        return otherUserEmbeddings.mapIndexed { index, userEmbedding ->
-            // 1. 코사인 유사도 계산
-            val similarity = SimilarityCalculator.cosineSimilarity(
+        if (otherUserEmbeddings.isEmpty()) return emptyList()
+
+        val similarities = otherUserEmbeddings.map { userEmbedding ->
+            SimilarityCalculator.cosineSimilarity(
                 currentUserEmbedding.embeddingVector,
                 userEmbedding.embeddingVector
             )
+        }
+        val minSim = similarities.minOrNull() ?: 0f
+        val maxSim = similarities.maxOrNull() ?: 1f
+        val range = (maxSim - minSim).takeIf { it > 1e-6f } ?: 1f
 
-            // 2. 유사도 기반 거리 계산
-            val pixelDistance = SimilarityCalculator.similarityToPixelDistance(similarity, maxDistance)
+        return otherUserEmbeddings.mapIndexed { index, userEmbedding ->
+            val similarity = similarities[index]
+            // Normalize to spread nodes when similarities are clustered.
+            val normalized = ((similarity - minSim) / range).coerceIn(0f, 1f)
+            val adjusted = kotlin.math.sqrt(normalized)
+            val pixelDistance = ((1f - adjusted) * maxDistance).coerceIn(30f, maxDistance)
 
             // 3. 원형 배치: 각도 계산 (균등 분산)
             val totalUsers = otherUserEmbeddings.size
@@ -64,9 +73,9 @@ object GraphLayoutCalculator {
     fun calculateForceDirectedLayout(
         currentUserEmbedding: UserEmbedding,
         otherUserEmbeddings: List<UserEmbedding>,
-        centerX: Float = 167f,
-        centerY: Float = 460f,
-        maxDistance: Float = 150f,
+        centerX: Float = 195f,
+        centerY: Float = 260f,
+        maxDistance: Float = 180f,
         iterations: Int = 50
     ): List<GraphNodePosition> {
         // 초기 위치 (원형 배치)

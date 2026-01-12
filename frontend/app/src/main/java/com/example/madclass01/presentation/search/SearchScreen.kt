@@ -21,7 +21,11 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material3.*
+import androidx.compose.material.pullrefresh.PullRefreshIndicator
+import androidx.compose.material.pullrefresh.pullRefresh
+import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +39,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.search.component.SearchResultCard
 import com.example.madclass01.presentation.search.viewmodel.SearchViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun SearchScreen(
     viewModel: SearchViewModel = hiltViewModel(),
@@ -44,6 +48,14 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showFilterSheet by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val refreshState = rememberPullRefreshState(
+        refreshing = uiState.isLoading,
+        onRefresh = { viewModel.searchGroups() }
+    )
+
+    LaunchedEffect(Unit) {
+        viewModel.searchGroups()
+    }
     
     // 에러 메시지 표시
     LaunchedEffect(uiState.errorMessage) {
@@ -60,7 +72,14 @@ fun SearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
+            .pullRefresh(refreshState)
     ) {
+        PullRefreshIndicator(
+            refreshing = uiState.isLoading,
+            state = refreshState,
+            modifier = Modifier.align(Alignment.TopCenter),
+            contentColor = Color(0xFFFF9945)
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -277,7 +296,6 @@ fun FilterBottomSheet(
     val textSecondary = Color(0xFF8C8C8C)
     val inactiveText = Color(0xFF595959)
 
-    val categories = listOf("운동", "카페", "예술", "음악", "사진", "등산")
     val regions = listOf(
         "전체",
         "서울특별시", "부산광역시", "대구광역시", "인천광역시",
@@ -290,7 +308,6 @@ fun FilterBottomSheet(
     
     var regionExpanded by remember { mutableStateOf(false) }
 
-    val selectedCategory = filters["category"] as? String ?: "모든종류"
     val selectedRegion = filters["region"] as? String ?: "전체"
     val selectedMemberRange = filters["memberRange"] as? String ?: "전체"
 
@@ -354,36 +371,6 @@ fun FilterBottomSheet(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                // Category
-                @OptIn(ExperimentalLayoutApi::class)
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "카테고리",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = textPrimary
-                    )
-
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        categories.forEach { label ->
-                            val isSelected = selectedCategory == label
-                            FilterPill(
-                                label = label,
-                                isSelected = isSelected,
-                                onClick = { onFilterUpdate("category", label) },
-                                selectedColor = primary,
-                                borderColor = border,
-                                selectedTextColor = Color.White,
-                                unselectedTextColor = inactiveText
-                            )
-                        }
-                    }
-                }
-
                 // Location
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(

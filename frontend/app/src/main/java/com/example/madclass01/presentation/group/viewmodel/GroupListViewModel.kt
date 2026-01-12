@@ -71,7 +71,8 @@ class GroupListViewModel @Inject constructor(
                             tags = groupResponse.tags?.map { Tag(id = it, name = it) } ?: emptyList(),
                             imageUrl = groupResponse.imageUrl ?: "",
                             iconType = groupResponse.iconType ?: "",
-                            region = groupResponse.region ?: ""
+                            region = groupResponse.region ?: "",
+                            isPublic = groupResponse.isPublic
                         )
                     }
                     _uiState.value = _uiState.value.copy(

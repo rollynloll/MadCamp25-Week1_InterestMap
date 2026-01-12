@@ -14,5 +14,6 @@ data class Group(
     val matchPercentage: Int = 0, // 매칭도 (0-100)
     val region: String = "",
     val memberAge: String = "",
-    val isJoined: Boolean = false
+    val isJoined: Boolean = false,
+    val isPublic: Boolean = true
 )

@@ -127,7 +127,9 @@ data class GroupResponse(
     @SerializedName("image_url")
     val imageUrl: String = "",
     @SerializedName("icon_type")
-    val iconType: String = ""
+    val iconType: String = "",
+    @SerializedName("is_public")
+    val isPublic: Boolean = true
 )
 
 data class CreateGroupRequest(

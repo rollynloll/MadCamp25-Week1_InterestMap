@@ -19,9 +19,7 @@ data class SearchUiState(
     val isLoading: Boolean = false,
     val errorMessage: String = "",
     val filters: Map<String, Any> = mapOf(
-        "category" to "모든종류",
         "region" to "전체",
-        "age" to "전체",
         "memberRange" to "전체"
     )
 )
@@ -87,9 +85,7 @@ class SearchViewModel @Inject constructor(
     fun resetFilters() {
         _uiState.value = _uiState.value.copy(
             filters = mapOf(
-                "category" to "모든종류",
                 "region" to "전체",
-                "age" to "전체",
                 "memberRange" to "전체"
             )
         )
