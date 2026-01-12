@@ -32,9 +32,16 @@ import com.example.madclass01.domain.model.ImageItem
 import com.example.madclass01.presentation.common.component.TagChip
 import com.example.madclass01.presentation.profile.component.ImageGalleryGrid
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.madclass01.presentation.profile.viewmodel.ProfileEditViewModel
+
+import android.widget.Toast
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 fun ProfileEditScreen(
+    userId: String,
     initialProfileImage: String? = null,
     initialNickname: String,
     initialAge: Int?,
@@ -50,6 +57,7 @@ fun ProfileEditScreen(
         "맛집", "카페", "베이킹", "바리스타", "와인",
         "반려동물", "고양이", "강아지", "식물", "원예"
     ),
+    viewModel: ProfileEditViewModel = hiltViewModel(),
     onBack: () -> Unit,
     onSave: (
         profileImage: String?,
@@ -61,6 +69,9 @@ fun ProfileEditScreen(
         tags: List<String>
     ) -> Unit
 ) {
+    val context = LocalContext.current
+    val uiState by viewModel.uiState.collectAsState()
+
     LaunchedEffect(initialTags, initialPhotoInterests) {
         android.util.Log.d("ProfileEditScreen", "Initial Tags: $initialTags")
         android.util.Log.d("ProfileEditScreen", "Initial Photo Interests: $initialPhotoInterests")
@@ -72,8 +83,8 @@ fun ProfileEditScreen(
     var region by remember { mutableStateOf(initialRegion ?: "") }
     var bio by remember { mutableStateOf(initialBio) }
     var nicknameError by remember { mutableStateOf("") }
-    var selectedTags by remember { mutableStateOf(initialTags.toSet()) }  // 사용자가 선택한 관심사
-    var photoInterestTags by remember { mutableStateOf(initialPhotoInterests.toSet()) }  // 사진에서 추출한 관심사
+    var selectedTags by remember { mutableStateOf(initialTags.toSet()) }
+    var photoInterestTags by remember { mutableStateOf(initialPhotoInterests.toSet()) }
     var showTagSelector by remember { mutableStateOf(false) }
 
     val images = remember {
@@ -82,28 +93,31 @@ fun ProfileEditScreen(
         }
     }
 
-    // 프로필 사진 선택 런처
-    val profileImageLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let {
-            profileImage = it.toString()
+    // API 호출 성공 시 onSave 콜백 호출 (부모 화면 상태 업데이트 및 이동)
+    LaunchedEffect(uiState.isSuccess) {
+        if (uiState.isSuccess) {
+            android.util.Log.d("ProfileEditScreen", "Update success, calling onSave")
+            val parsedAge = ageText.trim().toIntOrNull()
+            val finalRegion = region.trim().ifBlank { null }
+            val finalBio = bio.trim()
+            
+            viewModel.resetSuccess()
+            onSave(
+                profileImage,
+                nickname.trim(),
+                parsedAge,
+                finalRegion,
+                finalBio,
+                images.toList(),
+                selectedTags.toList()
+            )
         }
     }
-
-    // 갤러리 이미지 다중 선택 런처
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetMultipleContents()
-    ) { uris: List<Uri> ->
-        if (uris.isEmpty()) return@rememberLauncherForActivityResult
-
-        val maxCount = 30
-        val remaining = (maxCount - images.size).coerceAtLeast(0)
-        uris.take(remaining).forEach { uri ->
-            val value = uri.toString()
-            if (!images.contains(value)) {
-                images.add(value)
-            }
+    
+    // 에러 발생 시 Toast 표시
+    LaunchedEffect(uiState.error) {
+        if (uiState.error != null) {
+            Toast.makeText(context, "저장 실패: ${uiState.error}", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -124,40 +138,54 @@ fun ProfileEditScreen(
                     }
                 },
                 actions = {
-                    TextButton(
-                        onClick = {
-                            val trimmed = nickname.trim()
-                            if (trimmed.length < 2) {
-                                nicknameError = "닉네임은 2자 이상이어야 합니다"
-                                return@TextButton
-                            }
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp).padding(end = 16.dp),
+                            color = Color(0xFFFF9945),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        TextButton(
+                            onClick = {
+                                val trimmed = nickname.trim()
+                                if (trimmed.length < 2) {
+                                    nicknameError = "닉네임은 2자 이상이어야 합니다"
+                                    return@TextButton
+                                }
 
-                            // 최소 20장 검증
-                            if (images.size < 20) {
-                                return@TextButton
-                            }
+                                // 최소 20장 검증
+                                if (images.size < 20) {
+                                    return@TextButton
+                                }
 
-                            val parsedAge = ageText.trim().toIntOrNull()
-                            val finalRegion = region.trim().ifBlank { null }
-                            val finalBio = bio.trim()
+                                val parsedAge = ageText.trim().toIntOrNull()
+                                val finalRegion = region.trim().ifBlank { null }
+                                val finalBio = bio.trim()
 
-                            onSave(
-                                profileImage,
-                                trimmed,
-                                parsedAge,
-                                finalRegion,
-                                finalBio,
-                                images.toList(),
-                                selectedTags.toList()
-                            )
+                                viewModel.updateProfile(
+                                    userId = userId,
+                                    nickname = trimmed,
+                                    age = parsedAge,
+                                    region = finalRegion,
+                                    bio = finalBio,
+                                    tags = selectedTags.toList()
+                                )
+                            },
+                            enabled = !uiState.isLoading
+                        ) {
+                            Text(text = "저장", color = Color(0xFFFF9945), fontWeight = FontWeight.Bold)
                         }
-                    ) {
-                        Text(text = "저장", color = Color(0xFFFF9945), fontWeight = FontWeight.Bold)
                     }
                 }
             )
         }
     ) { paddingValues ->
+        // Error Snackbar or Dialog logic could be added here
+        if (uiState.error != null) {
+            // Simple error handling for now - maybe a Toast or Snackbar if Scaffold state allowed
+            // For now, let's just log it or maybe show a small error text
+        }
+        
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -166,7 +194,7 @@ fun ProfileEditScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            // 프로필 사진 섹션
+            // 프로필 사진 섹션 (조회 전용)
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -185,8 +213,7 @@ fun ProfileEditScreen(
                         .size(120.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .border(2.dp, Color(0xFFE0E0E0), CircleShape)
-                        .clickable { profileImageLauncher.launch("image/*") },
+                        .border(2.dp, Color(0xFFE0E0E0), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (profileImage != null) {
@@ -199,18 +226,12 @@ fun ProfileEditScreen(
                     } else {
                         Icon(
                             imageVector = Icons.Default.Camera,
-                            contentDescription = "사진 추가",
+                            contentDescription = "사진 없음",
                             tint = Color(0xFFBBBBBB),
                             modifier = Modifier.size(40.dp)
                         )
                     }
                 }
-
-                Text(
-                    text = "탭하여 프로필 사진 변경",
-                    fontSize = 12.sp,
-                    color = Color(0xFF999999)
-                )
             }
 
             // 기본 정보
@@ -347,57 +368,21 @@ fun ProfileEditScreen(
                 }
             }
 
-            // 갤러리 사진 섹션
+            // 갤러리 사진 섹션 (조회 전용)
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "사진 갤러리 (${images.size}/30)",
+                    text = "사진 갤러리 (${images.size})",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1A1A1A)
                 )
 
-                if (images.size < 20) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFFFF4E6),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "⚠️ 최소 20장의 사진이 필요합니다 (현재 ${images.size}장)",
-                            fontSize = 14.sp,
-                            color = Color(0xFFFF9945),
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                } else {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFE8F5E9),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "✓ 최소 사진 개수를 충족했습니다",
-                            fontSize = 14.sp,
-                            color = Color(0xFF4CAF50),
-                            modifier = Modifier.padding(12.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = "최대 30장까지 선택 가능 (20장 이상 필수)",
-                    fontSize = 12.sp,
-                    color = Color(0xFF999999)
-                )
-
                 ImageGalleryGrid(
                     images = images.map { ImageItem(uri = it) },
-                    onRemoveImage = { uri ->
-                        images.remove(uri)
-                    },
-                    onAddImage = { imagePickerLauncher.launch("image/*") },
+                    onRemoveImage = { /* 삭제 기능 비활성화 */ },
+                    onAddImage = { /* 추가 기능 비활성화 */ },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 24.dp)

@@ -105,7 +105,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
     var userId by remember { mutableStateOf<String?>(null) }
     var userNickname by remember { mutableStateOf<String?>(null) }
     var userAge by remember { mutableStateOf<Int?>(null) }
-    var userGender by remember { mutableStateOf<String?>(null) }  // 백엔드에서 받아옴
+    var userGender by remember { mutableStateOf<String?>(null) }
+    var profileRefreshTrigger by remember { mutableStateOf(0) }  // 프로필 새로고침 트리거  // 백엔드에서 받아옴
     var userRegion by remember { mutableStateOf<String?>(null) }
     var userBio by remember { mutableStateOf<String>("") }
     var userImages by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -235,6 +236,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
         }
         AppScreen.ProfileEdit -> {
             ProfileEditScreen(
+                userId = userId ?: "",
                 initialProfileImage = userImages.firstOrNull(),
                 initialNickname = userNickname ?: "",
                 initialAge = userAge,
@@ -248,6 +250,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                     currentScreen = AppScreen.Home
                 },
                 onSave = { profileImage, nickname, age, region, bio, images, tags ->
+                    // API 업데이트가 성공했으므로, 로컬 상태도 업데이트
                     userNickname = nickname
                     userAge = age
                     userRegion = region
@@ -258,6 +261,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                         images
                     }
                     userTags = tags
+                    // Profile 탭으로 이동하고 새로고침 트리거 증가
+                    profileRefreshTrigger++  // 이 값이 변경되면 ProfileScreen이 다시 마운트되어 최신 데이터 로드
                     homeStartTabRoute = "profile"
                     currentScreen = AppScreen.Home
                 }
@@ -342,6 +347,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 profileBio = userBio,
                 profileImages = userImages,
                 profileTags = userTags,
+                profileRefreshTrigger = profileRefreshTrigger,  // 새로고침 트리거 전달
                 onNavigateToGroupDetail = { groupId ->
                     currentScreen = AppScreen.GroupDetail(groupId)
                 },
