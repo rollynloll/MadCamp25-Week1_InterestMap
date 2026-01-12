@@ -63,7 +63,7 @@ fun GroupDetailScreen(
     groupId: String,
     currentUserId: String,
     onBackPress: () -> Unit = {},
-    onQRCodeClick: () -> Unit = {},
+    onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
     onChatRoomCreated: (chatRoomId: String, groupName: String) -> Unit = { _, _ -> },
     viewModel: GroupDetailViewModel = hiltViewModel()
 ) {
@@ -97,7 +97,7 @@ fun GroupDetailScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize(),
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 CircularProgressIndicator(color = Color(0xFF667EEA))
@@ -150,7 +150,7 @@ fun GroupDetailScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Row(
-                                horizontalArrangement = Arrangement.Center,
+                                horizontalArrangement = Arrangement.Absolute.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
@@ -183,8 +183,16 @@ fun GroupDetailScreen(
                         activityStatus = if (isMockMode) "테스트 모드 (목업 데이터)" else "목업 데이터",
                         groupIcon = "👥",
                         onBackClick = onBackPress,
-                        onQRCodeClick = onQRCodeClick,
-                        onMoreClick = { }
+                        onQRCodeClick = {
+                            // 목업 모드에서는 더미 그룹 전달
+                            val dummyGroup = com.example.madclass01.domain.model.Group(
+                                id = groupId,
+                                name = fallbackGroupName,
+                                description = "",
+                                memberCount = fallbackMemberCount
+                            )
+                            onQRCodeClick(dummyGroup)
+                        }
                     )
 
                     MockRelationshipGraphCanvas(
@@ -280,8 +288,7 @@ fun GroupDetailScreen(
                         activityStatus = "오늘 활동",
                         groupIcon = "👥",
                         onBackClick = onBackPress,
-                        onQRCodeClick = onQRCodeClick,
-                        onMoreClick = { /* TODO: 더보기 메뉴 */ }
+                        onQRCodeClick = { onQRCodeClick(uiState.group!!) }
                     )
 
                     // 관계 그래프

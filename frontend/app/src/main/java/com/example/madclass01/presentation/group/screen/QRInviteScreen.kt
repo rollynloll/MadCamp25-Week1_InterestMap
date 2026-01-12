@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.group.screen
 
+import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -31,6 +32,7 @@ import com.example.madclass01.utils.QRCodeGenerator
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+@SuppressLint("RememberReturnType")
 @Composable
 fun QRInviteScreen(
     group: Group,

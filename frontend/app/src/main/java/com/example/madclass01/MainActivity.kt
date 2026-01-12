@@ -272,6 +272,9 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
                 },
+                onQRCodeClick = { group ->
+                    currentScreen = AppScreen.QRInvite(group.id, group.name)
+                },
                 onChatRoomCreated = { chatRoomId, groupName ->
                     currentScreen = AppScreen.Chat(chatRoomId, groupName)
                 }
@@ -313,8 +316,19 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
         }
         is AppScreen.QRInvite -> {
             val qrInvite = currentScreen as AppScreen.QRInvite
-            // QRInvite 화면은 GroupDetailScreen에서 onQRCodeClick으로 처리되므로 여기서는 Home으로 리다이렉트
-            currentScreen = AppScreen.Home
+            // GroupDetailScreen에서 전달받은 그룹 정보로 객체 생성
+            val group = com.example.madclass01.domain.model.Group(
+                id = qrInvite.groupId,
+                name = qrInvite.groupName,
+                description = ""
+            )
+            QRInviteScreen(
+                group = group,
+                userId = userId ?: "mock_user",
+                onBackPress = {
+                    currentScreen = AppScreen.GroupDetail(qrInvite.groupId)
+                }
+            )
         }
         AppScreen.Home -> {
             com.example.madclass01.presentation.main.MainScreen(
