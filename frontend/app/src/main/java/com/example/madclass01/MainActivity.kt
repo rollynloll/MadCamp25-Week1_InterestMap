@@ -273,7 +273,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                     currentScreen = AppScreen.Home
                 },
                 onQRCodeClick = { group ->
-                    currentScreen = AppScreen.QRInvite(group.id, group.name)
+                    currentScreen = AppScreen.QRInvite(group.id, group.name, group.memberCount)
                 },
                 onChatRoomCreated = { chatRoomId, groupName ->
                     currentScreen = AppScreen.Chat(chatRoomId, groupName)
@@ -324,6 +324,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
             )
             QRInviteScreen(
                 group = group,
+                memberCount = qrInvite.memberCount,
                 userId = userId ?: "mock_user",
                 onBackPress = {
                     currentScreen = AppScreen.GroupDetail(qrInvite.groupId)
@@ -370,7 +371,7 @@ sealed class AppScreen {
     object CreateGroup : AppScreen()
     data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅") : AppScreen()
     object QRScanner : AppScreen()
-    data class QRInvite(val groupId: String, val groupName: String) : AppScreen()
+    data class QRInvite(val groupId: String, val groupName: String, val memberCount: Int = 0) : AppScreen()
     object Home : AppScreen()
 }
 

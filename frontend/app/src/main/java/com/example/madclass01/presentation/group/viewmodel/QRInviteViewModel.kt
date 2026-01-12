@@ -78,28 +78,6 @@ class QRInviteViewModel @Inject constructor(
         
         return true
     }
-    
-    fun shareToKakao(inviteLink: String) {
-        // 카카오톡 공유 로직 (KakaoSDK 사용)
-        viewModelScope.launch {
-            // 카카오톡 공유 구현
-        }
-    }
-    
-    fun shareToInstagram(inviteLink: String) {
-        // 인스타그램 공유 로직
-        viewModelScope.launch {
-            // 인스타그램 공유 구현
-        }
-    }
-    
-    fun shareMore(inviteLink: String) {
-        // 기본 공유 (Android Intent 사용)
-        viewModelScope.launch {
-            // 기본 공유 구현
-        }
-    }
-    
     fun joinGroupByLink(inviteUrl: String, userId: String) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(

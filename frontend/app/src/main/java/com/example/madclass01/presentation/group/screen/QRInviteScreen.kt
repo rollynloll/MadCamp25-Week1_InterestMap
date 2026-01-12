@@ -23,10 +23,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.domain.model.Group
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import com.example.madclass01.presentation.group.component.CopyLinkButton
 import com.example.madclass01.presentation.group.component.GroupInfoCard
 import com.example.madclass01.presentation.group.component.QRCodeContainer
-import com.example.madclass01.presentation.group.component.ShareButtonsRow
 import com.example.madclass01.presentation.group.viewmodel.QRInviteViewModel
 import com.example.madclass01.utils.QRCodeGenerator
 import kotlinx.coroutines.delay
@@ -36,6 +37,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun QRInviteScreen(
     group: Group,
+    memberCount: Int = group.memberCount,
     userId: String = "",
     viewModel: QRInviteViewModel = hiltViewModel(),
     onBackPress: () -> Unit = { },
@@ -130,7 +132,7 @@ fun QRInviteScreen(
                     val inviteUrl = uiState.inviteLink?.inviteUrl ?: return@IconButton
                     shareMore(context, inviteUrl)
                 }) {
-                    Text(text = "↗", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Icon(imageVector = Icons.Default.Share, contentDescription = "Share")
                 }
             }
             
@@ -150,7 +152,7 @@ fun QRInviteScreen(
                 // Group Info Card
                 GroupInfoCard(
                     group = group,
-                    memberCount = group.memberCount
+                    memberCount = memberCount
                 )
                 
                 // QR Code Container
@@ -174,22 +176,6 @@ fun QRInviteScreen(
                                 copyToClipboard(context, inviteUrl)
                                 viewModel.copyInviteLink()
                             }
-                        }
-                    )
-                    
-                    // Share Buttons
-                    ShareButtonsRow(
-                        onKakaoClick = {
-                            val inviteUrl = uiState.inviteLink?.inviteUrl ?: return@ShareButtonsRow
-                            shareToKakao(context, group.name, inviteUrl)
-                        },
-                        onInstagramClick = {
-                            val inviteUrl = uiState.inviteLink?.inviteUrl ?: return@ShareButtonsRow
-                            shareToInstagram(context, inviteUrl)
-                        },
-                        onMoreClick = {
-                            val inviteUrl = uiState.inviteLink?.inviteUrl ?: return@ShareButtonsRow
-                            shareMore(context, inviteUrl)
                         }
                     )
                 }
