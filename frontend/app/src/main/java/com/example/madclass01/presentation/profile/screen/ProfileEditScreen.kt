@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -277,18 +279,90 @@ fun ProfileEditScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = region,
-                onValueChange = { region = it },
-                label = { Text("지역") },
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFFF9945),
-                    unfocusedBorderColor = Color(0xFFDDDDDD)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 지역 선택
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "지역",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1A1A1A)
+                )
+                
+                var regionExpanded by remember { mutableStateOf(false) }
+                val regions = listOf(
+                    "선택 안함",
+                    "서울특별시", "부산광역시", "대구광역시", "인천광역시",
+                    "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+                    "경기도", "강원특별자치도", "충청북도", "충청남도",
+                    "전북특별자치도", "전라남도", "경상북도", "경상남도",
+                    "제주특별자치도"
+                )
+                
+                Box {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .background(Color.White, RoundedCornerShape(8.dp))
+                            .border(1.dp, Color(0xFFDDDDDD), RoundedCornerShape(8.dp))
+                            .clickable { regionExpanded = true }
+                            .padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "지역",
+                                tint = Color(0xFFFF9945),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = region.ifBlank { "지역을 선택하세요" },
+                                fontSize = 15.sp,
+                                color = if (region.isBlank()) Color(0xFF999999) else Color(0xFF1A1A1A)
+                            )
+                        }
+                        
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "선택",
+                            tint = Color(0xFF999999),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    
+                    DropdownMenu(
+                        expanded = regionExpanded,
+                        onDismissRequest = { regionExpanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color.White)
+                            .heightIn(max = 300.dp)
+                    ) {
+                        regions.forEach { regionOption ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = regionOption,
+                                        fontSize = 15.sp,
+                                        color = if (regionOption == region || (regionOption == "선택 안함" && region.isBlank())) Color(0xFFFF9945) else Color(0xFF1A1A1A),
+                                        fontWeight = if (regionOption == region || (regionOption == "선택 안함" && region.isBlank())) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                onClick = {
+                                    region = if (regionOption == "선택 안함") "" else regionOption
+                                    regionExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
 
             OutlinedTextField(
                 value = bio,
