@@ -1,13 +1,20 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 import uuid
 
 from sqlalchemy import select, update
-import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.embedding import UserEmbedding
 from app.models.image_caption import ImageCaption
 from app.models.photo import UserPhoto
+from app.models.user import User
+
+
+@dataclass
+class EmbeddingState:
+    embedding: list[float]
+    updated_at: datetime | None
 
 
 async def upsert_image_caption(
@@ -57,14 +64,20 @@ async def get_recent_captions(
 async def get_active_embedding(
     db: AsyncSession,
     user_id: uuid.UUID,
-) -> UserEmbedding | None:
+) -> EmbeddingState | None:
     try:
         result = await db.execute(
-            select(UserEmbedding)
-            .where(UserEmbedding.user_id == user_id, UserEmbedding.is_active == True)  # noqa: E712
+            select(User.embedding, User.embedding_updated_at)
+            .where(User.id == user_id)
             .limit(1)
         )
-        return result.scalar_one_or_none()
+        row = result.one_or_none()
+        if not row or row[0] is None:
+            return None
+        return EmbeddingState(
+            embedding=list(row[0]),
+            updated_at=row[1],
+        )
     except Exception as exc:
         logging.getLogger("uvicorn.error").warning(
             "Failed to load active embedding for user_id=%s: %s",
@@ -76,29 +89,30 @@ async def get_active_embedding(
 
 async def deactivate_embeddings(db: AsyncSession, user_id: uuid.UUID) -> None:
     await db.execute(
-        update(UserEmbedding)
-        .where(UserEmbedding.user_id == user_id, UserEmbedding.is_active == True)  # noqa: E712
-        .values(is_active=False, updated_at=datetime.now(timezone.utc))
+        update(User)
+        .where(User.id == user_id)
+        .values(
+            embedding=None,
+            embedding_updated_at=None,
+        )
     )
 
 
 async def create_embedding(
     db: AsyncSession,
     user_id: uuid.UUID,
-    embedding_type: str,
-    model_name: str,
-    model_version: str | None,
     embedding: list[float],
-    source_hash: str,
-) -> UserEmbedding:
-    entity = UserEmbedding(
-        user_id=user_id,
-        embedding_type=embedding_type,
-        model_name=model_name,
-        model_version=model_version,
-        embedding=embedding,
-        source_hash=source_hash,
-        is_active=True,
+) -> EmbeddingState:
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        update(User)
+        .where(User.id == user_id)
+        .values(
+            embedding=embedding,
+            embedding_updated_at=now,
+        )
     )
-    db.add(entity)
-    return entity
+    return EmbeddingState(
+        embedding=embedding,
+        updated_at=now,
+    )

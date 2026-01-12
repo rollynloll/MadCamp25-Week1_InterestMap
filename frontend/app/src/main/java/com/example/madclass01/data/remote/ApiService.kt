@@ -219,6 +219,9 @@ interface ApiService {
     @POST("/api/groups")
     suspend fun createGroup(@Body request: CreateGroupRequest): Response<GroupResponse>
 
+    @GET("/api/groups")
+    suspend fun getAllGroups(): Response<List<GroupResponse>>
+
     @GET("/api/groups/{groupId}")
     suspend fun getGroup(@Path("groupId") groupId: String): Response<GroupResponse>
 

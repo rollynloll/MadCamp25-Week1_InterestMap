@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models.embedding import UserEmbedding
 from app.models.group import Group, GroupMember
 from app.models.message import GroupMessage
 from app.models.photo import UserPhoto
@@ -207,13 +206,11 @@ async def group_interest_map(
     users = result.scalars().all()
     user_ids = [user.id for user in users]
 
-    embedding_result = await db.execute(
-        select(UserEmbedding.user_id).where(
-            UserEmbedding.user_id.in_(user_ids),
-            UserEmbedding.is_active == True,  # noqa: E712
-        )
-    )
-    embedding_user_ids = {row[0] for row in embedding_result.all()}
+    embedding_user_ids = {
+        user.id
+        for user in users
+        if user.embedding is not None and len(user.embedding) > 0
+    }
 
     primary_photo_map = await _get_primary_photo_map(db, user_ids)
 

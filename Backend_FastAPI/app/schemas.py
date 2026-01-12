@@ -138,6 +138,9 @@ class GroupResponse(BaseSchema):
     description: str | None
     member_ids: list[str]
     created_at: str
+    tags: list[str] = []
+    region: str = ""
+    image_url: str = ""
 
 
 class GroupDetailResponse(BaseSchema):
