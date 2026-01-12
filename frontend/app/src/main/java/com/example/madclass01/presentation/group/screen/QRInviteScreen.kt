@@ -162,23 +162,16 @@ fun QRInviteScreen(
                     expiryTime = uiState.expiryTime
                 )
                 
-                // Share Options
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.838f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Copy Link Button
-                    CopyLinkButton(
-                        onClick = {
-                            val inviteUrl = uiState.inviteLink?.inviteUrl
-                            if (inviteUrl != null) {
-                                copyToClipboard(context, inviteUrl)
-                                viewModel.copyInviteLink()
-                            }
+                // Copy Link Button
+                CopyLinkButton(
+                    onClick = {
+                        val inviteUrl = uiState.inviteLink?.inviteUrl
+                        if (inviteUrl != null) {
+                            copyToClipboard(context, inviteUrl)
+                            viewModel.copyInviteLink()
                         }
-                    )
-                }
+                    }
+                )
                 
                 // Loading Indicator
                 if (uiState.isLoading) {
