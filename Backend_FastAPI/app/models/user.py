@@ -6,6 +6,8 @@ DB: users
 - nickname (VARCHAR(64), NULL)
 - profile_image_url (VARCHAR(512), NULL)
 - profile_data (JSONB, NOT NULL, default={})
+- embedding (JSONB, NULL)
+- embedding_updated_at (timestamptz, NULL)
 - created_at (timestamptz, NOT NULL, default=now())
 - updated_at (timestamptz, NOT NULL, default=now(), onupdate=now())
 
@@ -37,6 +39,10 @@ class User(Base):
     profile_image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     profile_data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    embedding: Mapped[list[float] | None] = mapped_column(JSONB, nullable=True)
+    embedding_updated_at: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

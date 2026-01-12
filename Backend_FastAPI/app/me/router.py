@@ -10,11 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models.embedding import UserEmbedding
 from app.models.photo import UserPhoto
 from app.models.user import User
-from app.services.embedding.composer import build_final_text, compute_source_hash
-from app.services.embedding.openai_embed import embed_text
+from app.services.embedding.composer import build_final_text
+from app.services.embedding.openai_embed import embed_text, MODEL_NAME
 from app.services.embedding.repo import (
     create_embedding,
     deactivate_embeddings,
@@ -57,19 +56,12 @@ async def get_me(
     )
     photos = photos_result.scalars().all()
 
-    embedding_result = await db.execute(
-        select(UserEmbedding).where(
-            UserEmbedding.user_id == current_user.id,
-            UserEmbedding.is_active == True,  # noqa: E712
-        )
-    )
-    embedding = embedding_result.scalar_one_or_none()
-
-    if embedding:
+    has_embedding = bool(current_user.embedding)
+    if has_embedding:
         embedding_payload = MeEmbedding(
             status="ready",
-            model=embedding.model_name,
-            updated_at=embedding.updated_at,
+            model=MODEL_NAME,
+            updated_at=current_user.embedding_updated_at,
         )
     else:
         embedding_payload = MeEmbedding(status="missing")
@@ -265,34 +257,20 @@ async def rebuild_embedding(
         user_description=user_description,
         image_captions=image_captions,
     )
-    source_hash = compute_source_hash(final_text)
-
-    try:
-        active = await get_active_embedding(db, current_user.id)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Embedding storage unavailable") from exc
-    if active and active.source_hash == source_hash:
-        embedding = active
-    else:
-        vector, model_name, model_version = await embed_text(final_text)
-        await deactivate_embeddings(db, current_user.id)
-        embedding = await create_embedding(
-            db,
-            user_id=current_user.id,
-            embedding_type="profile_v1",
-            model_name=model_name,
-            model_version=model_version,
-            embedding=vector,
-            source_hash=source_hash,
-        )
-        await db.commit()
-        await db.refresh(embedding)
+    vector, _model_name, _model_version = await embed_text(final_text)
+    await deactivate_embeddings(db, current_user.id)
+    embedding_state = await create_embedding(
+        db,
+        user_id=current_user.id,
+        embedding=vector,
+    )
+    await db.commit()
 
     return EmbeddingResponse(
         ok=True,
         embedding=MeEmbedding(
             status="ready",
-            model=embedding.model_name,
-            updated_at=embedding.updated_at or datetime.now(timezone.utc),
+            model=MODEL_NAME,
+            updated_at=embedding_state.updated_at or datetime.now(timezone.utc),
         ),
     )

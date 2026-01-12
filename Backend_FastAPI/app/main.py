@@ -22,7 +22,9 @@ from app.schemas import (
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
     TextEmbeddingRequest, BatchPhotoUploadResponse
 )
-from app.router import router as spec_router
+from app.auth.router import router as auth_router
+from app.groups.router import router as groups_router
+from app.me.router import router as me_router
 from app.db.session import engine, get_db
 from app.db.base import Base
 import app.models  # ensure models are registered for metadata
@@ -30,10 +32,10 @@ from app.models.user import User
 from app.models.photo import UserPhoto
 from app.models.group import Group, GroupMember
 from app.services.embedding.captioning import caption_image
-from app.services.embedding.composer import build_final_text, compute_source_hash
+from app.services.embedding.composer import build_final_text
 from app.services.embedding.embedding_log import log_embedding_io
 from app.services.embedding.interest import infer_interest_tags
-from app.services.embedding.openai_embed import embed_text, EMBEDDING_DIM
+from app.services.embedding.openai_embed import embed_text, EMBEDDING_DIM, MODEL_NAME, MODEL_VERSION
 from app.services.embedding.repo import (
     create_embedding,
     deactivate_embeddings,
@@ -132,28 +134,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Spec-based endpoints grouped in router.py
-app.include_router(spec_router)
+# DB-backed auth/me/groups endpoints
+app.include_router(auth_router)
+app.include_router(me_router)
+app.include_router(groups_router)
 
 # In-memory 데이터베이스 (실제로는 PostgreSQL 사용)
 users_db: Dict[str, dict] = {}
 photos_db: Dict[str, dict] = {}
 groups_db: Dict[str, dict] = {}
 user_provider_map: Dict[str, str] = {}  # (provider, provider_user_id) -> user_id
-
-
-async def _ensure_pgvector_extension() -> bool:
-    logger = logging.getLogger("uvicorn.error")
-    try:
-        autocommit_engine = engine.execution_options(isolation_level="AUTOCOMMIT")
-        async with autocommit_engine.connect() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-    except Exception as exc:
-        logger.warning("pgvector extension not created: %s", exc)
-        return False
-    async with engine.connect() as conn:
-        result = await conn.execute(text("SELECT 1 FROM pg_extension WHERE extname='vector'"))
-        return result.first() is not None
 
 
 async def _ensure_photo_hash_index() -> None:
@@ -177,16 +167,56 @@ async def _ensure_photo_hash_index() -> None:
         )
 
 
+async def _ensure_user_embedding_columns() -> None:
+    async with engine.begin() as conn:
+        def _missing_columns(sync_conn) -> list[tuple[str, str]]:
+            insp = inspect(sync_conn)
+            if "users" not in insp.get_table_names():
+                return []
+            cols = {col["name"] for col in insp.get_columns("users")}
+            missing: list[tuple[str, str]] = []
+            if "embedding" not in cols:
+                missing.append(("embedding", "JSONB"))
+            if "embedding_updated_at" not in cols:
+                missing.append(("embedding_updated_at", "TIMESTAMPTZ"))
+            return missing
+
+        missing = await conn.run_sync(_missing_columns)
+        for column_name, ddl in missing:
+            await conn.execute(text(f"ALTER TABLE users ADD COLUMN {column_name} {ddl}"))
+
+async def _backfill_user_embeddings() -> None:
+    logger = logging.getLogger("uvicorn.error")
+    async with engine.begin() as conn:
+        def _has_user_embeddings(sync_conn) -> bool:
+            insp = inspect(sync_conn)
+            return "user_embeddings" in insp.get_table_names()
+
+        has_table = await conn.run_sync(_has_user_embeddings)
+        if not has_table:
+            return
+        try:
+            await conn.execute(
+                text(
+                    "UPDATE users "
+                    "SET embedding = to_jsonb(ue.embedding::real[]), "
+                    "    embedding_updated_at = ue.updated_at "
+                    "FROM user_embeddings ue "
+                    "WHERE ue.user_id = users.id "
+                    "  AND ue.is_active = true "
+                    "  AND users.embedding IS NULL"
+                )
+            )
+        except Exception as exc:
+            logger.warning("Embedding backfill skipped: %s", exc)
+
+
 @app.on_event("startup")
 async def init_db_schema() -> None:
-    logger = logging.getLogger("uvicorn.error")
-    vector_ready = await _ensure_pgvector_extension()
     async with engine.begin() as conn:
-        tables = list(Base.metadata.sorted_tables)
-        if not vector_ready:
-            tables = [table for table in tables if table.name != "user_embeddings"]
-            logger.warning("Skipping user_embeddings table; pgvector is unavailable.")
-        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn, tables=tables))
+        await conn.run_sync(lambda sync_conn: Base.metadata.create_all(sync_conn))
+    await _ensure_user_embedding_columns()
+    await _backfill_user_embeddings()
     await _ensure_photo_hash_index()
 
 
@@ -678,20 +708,14 @@ async def upload_photos_batch(
             user_description=user_description,
             image_captions=image_captions_for_embedding,
         )
-        source_hash = compute_source_hash(final_text)
         embedding, model_name, model_version = await embed_text(final_text)
         await deactivate_embeddings(db, user.id)
-        new_embedding = await create_embedding(
+        await create_embedding(
             db,
             user_id=user.id,
-            embedding_type="profile_v1",
-            model_name=model_name,
-            model_version=model_version,
             embedding=embedding,
-            source_hash=source_hash,
         )
         await db.commit()
-        await db.refresh(new_embedding)
         log_embedding_io(
             user_name=user.nickname,
             user_id=str(user.id),
@@ -1077,30 +1101,14 @@ async def generate_embedding(
         user_description=user_description,
         image_captions=image_captions,
     )
-    source_hash = compute_source_hash(final_text)
-
-    try:
-        active = await get_active_embedding(db, user.id)
-    except Exception as exc:
-        raise HTTPException(status_code=503, detail="Embedding storage unavailable") from exc
-    if active and active.source_hash == source_hash:
-        embedding = active.embedding
-        model_name = active.model_name
-        model_version = active.model_version
-    else:
-        embedding, model_name, model_version = await embed_text(final_text)
-        await deactivate_embeddings(db, user.id)
-        new_embedding = await create_embedding(
-            db,
-            user_id=user.id,
-            embedding_type="profile_v1",
-            model_name=model_name,
-            model_version=model_version,
-            embedding=embedding,
-            source_hash=source_hash,
-        )
-        await db.commit()
-        await db.refresh(new_embedding)
+    embedding, model_name, model_version = await embed_text(final_text)
+    await deactivate_embeddings(db, user.id)
+    await create_embedding(
+        db,
+        user_id=user.id,
+        embedding=embedding,
+    )
+    await db.commit()
 
     user_name = user.nickname or request.nickname
     log_embedding_io(
@@ -1132,21 +1140,14 @@ async def generate_embedding_from_text(
     """텍스트만으로 임베딩 생성"""
     user = await _get_user_by_id(db, request.user_id)
     final_text = request.text
-    source_hash = compute_source_hash(final_text)
-
     embedding, model_name, model_version = await embed_text(final_text)
     await deactivate_embeddings(db, user.id)
-    new_embedding = await create_embedding(
+    await create_embedding(
         db,
         user_id=user.id,
-        embedding_type="profile_v1",
-        model_name=model_name,
-        model_version=model_version,
         embedding=embedding,
-        source_hash=source_hash,
     )
     await db.commit()
-    await db.refresh(new_embedding)
 
     log_embedding_io(
         user_name=user.nickname,
