@@ -78,6 +78,7 @@ fun LoginScreen(
                     
                     // 백엔드에 사용자 등록
                     viewModel.handleKakaoLoginSuccess(
+                        kakaoAccessToken = token.accessToken,
                         kakaoUserId = user.id.toString(),
                         nickname = user.kakaoAccount?.profile?.nickname,
                         profileImageUrl = user.kakaoAccount?.profile?.profileImageUrl

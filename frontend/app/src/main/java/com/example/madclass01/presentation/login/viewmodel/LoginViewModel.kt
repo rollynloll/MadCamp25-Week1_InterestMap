@@ -3,6 +3,7 @@ package com.example.madclass01.presentation.login.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.madclass01.core.TokenManager
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.model.User
@@ -45,7 +46,8 @@ class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val validateEmailUseCase: ValidateEmailUseCase,
     private val validatePasswordUseCase: ValidatePasswordUseCase,
-    private val backendRepository: BackendRepository  // 백엔드 추가
+    private val backendRepository: BackendRepository,  // 백엔드 추가
+    private val tokenManager: TokenManager
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -122,6 +124,7 @@ class LoginViewModel @Inject constructor(
      * 카카오 로그인 성공 후 백엔드에 사용자 등록/조회
      */
     fun handleKakaoLoginSuccess(
+        kakaoAccessToken: String,
         kakaoUserId: String,
         nickname: String?,
         profileImageUrl: String?
@@ -129,6 +132,26 @@ class LoginViewModel @Inject constructor(
         viewModelScope.launch {
             android.util.Log.d("LoginViewModel", "handleKakaoLoginSuccess 시작 - kakaoUserId: $kakaoUserId")
             _uiState.value = _uiState.value.copy(isLoading = true, loginErrorMessage = "")
+
+            // 1) 백엔드에서 우리 JWT 발급받아 저장 (이 토큰이 /me, /groups 등에 필요)
+            when (val authResult = backendRepository.kakaoLogin(kakaoAccessToken)) {
+                is ApiResult.Success -> {
+                    val jwt = authResult.data.accessToken
+                    val backendUserId = authResult.data.user.id
+                    tokenManager.saveToken(jwt)
+                    tokenManager.saveUserId(backendUserId)
+                    android.util.Log.d("LoginViewModel", "JWT 저장 완료 - userId=$backendUserId")
+                }
+                is ApiResult.Error -> {
+                    android.util.Log.e("LoginViewModel", "JWT 발급 실패: ${authResult.message}")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        loginErrorMessage = "카카오 인증(JWT 발급) 실패: ${authResult.message}"
+                    )
+                    return@launch
+                }
+                is ApiResult.Loading -> {}
+            }
             
             when (val result = backendRepository.createUser(
                 provider = "kakao",

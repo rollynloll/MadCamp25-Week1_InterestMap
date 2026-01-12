@@ -1,6 +1,7 @@
 package com.example.madclass01.data.remote
 
 import com.example.madclass01.data.remote.dto.*
+import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -159,6 +160,18 @@ interface ApiService {
         @Header("Authorization") authorization: String
     ): Response<MessageContent>
     
+    /**
+     * 그룹 이미지 메시지 전송
+     * POST /groups/{groupId}/photos
+     */
+    @Multipart
+    @POST("/groups/{groupId}/photos")
+    suspend fun sendGroupImageMessage(
+        @Path("groupId") groupId: String,
+        @Part("user_id") userId: String,
+        @Part file: MultipartBody.Part
+    ): Response<GroupMessageItem>
+    
     // ==================== 임베딩 (Embedding) ====================
     
     /**
@@ -243,27 +256,6 @@ interface ApiService {
 
     @GET("/api/users/{userId}/embedding")
     suspend fun getUserEmbedding(@Path("userId") userId: String): Response<UserEmbeddingResponse>
-
-    // Group Chat APIs
-    @GET("/groups/{groupId}/messages")
-    suspend fun getGroupMessages(
-        @Path("groupId") groupId: String,
-        @Query("limit") limit: Int = 50
-    ): Response<GroupMessagesResponse>
-
-    @POST("/groups/{groupId}/messages")
-    suspend fun sendGroupTextMessage(
-        @Path("groupId") groupId: String,
-        @Body request: MessageCreateRequest
-    ): Response<GroupMessageItem>
-
-    @Multipart
-    @POST("/groups/{groupId}/photos")
-    suspend fun sendGroupImageMessage(
-        @Path("groupId") groupId: String,
-        @Part("user_id") userId: String,
-        @Part("file") file: okhttp3.MultipartBody.Part
-    ): Response<GroupMessageItem>
 
     @POST("/api/groups/{groupId}/members")
     suspend fun joinGroupChat(

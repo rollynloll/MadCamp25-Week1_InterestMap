@@ -1,5 +1,6 @@
 package com.example.madclass01.di
 
+import com.example.madclass01.core.AuthInterceptor
 import com.example.madclass01.data.remote.ApiService
 import dagger.Module
 import dagger.Provides
@@ -25,12 +26,13 @@ object NetworkModule {
     
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
+    fun provideOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
         
         return OkHttpClient.Builder()
+            .addInterceptor(authInterceptor) // 인증 인터셉터 추가
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

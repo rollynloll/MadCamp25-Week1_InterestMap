@@ -329,3 +329,27 @@ data class MapPosition(
     val x: Float,
     val y: Float
 )
+
+// Extension functions for domain conversion
+fun MessageContent.toDomain(): com.example.madclass01.domain.model.ChatMessage {
+    return com.example.madclass01.domain.model.ChatMessage(
+        id = this.id,
+        groupId = "", // groupId는 별도로 전달됨
+        userId = this.userId,
+        userName = this.nickname ?: "알 수 없음",
+        type = if (this.imageUrl != null) {
+            com.example.madclass01.domain.model.ChatMessage.MessageType.IMAGE
+        } else {
+            com.example.madclass01.domain.model.ChatMessage.MessageType.TEXT
+        },
+        content = this.text,
+        imageUrl = this.imageUrl,
+        timestamp = try {
+            // ISO 8601 형식의 날짜를 timestamp로 변환
+            java.time.Instant.parse(this.sentAt).toEpochMilli()
+        } catch (e: Exception) {
+            System.currentTimeMillis()
+        },
+        readCount = 0
+    )
+}
