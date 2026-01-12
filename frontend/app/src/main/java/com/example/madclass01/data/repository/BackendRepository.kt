@@ -375,6 +375,24 @@ class BackendRepository @Inject constructor(
             ApiResult.Error(e.message ?: "Network error")
         }
     }
+
+    suspend fun uploadGroupProfileImage(
+        groupId: String,
+        file: File
+    ): ApiResult<GroupResponse> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = file.asRequestBody("image/webp".toMediaTypeOrNull())
+            val multipartBody = MultipartBody.Part.createFormData("file", file.name, requestBody)
+            val response = apiService.uploadGroupProfileImage(groupId, multipartBody)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to upload group profile image", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
     
     // ==================== Image Analysis APIs ====================
     

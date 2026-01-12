@@ -1,5 +1,6 @@
 package com.example.madclass01.presentation.group.viewmodel
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.madclass01.domain.model.Tag
@@ -10,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.example.madclass01.data.repository.BackendRepository
 
 data class CreateGroupUiState(
     val groupName: String = "",
@@ -28,7 +30,8 @@ data class CreateGroupUiState(
 
 @HiltViewModel
 class CreateGroupViewModel @Inject constructor(
-    private val createGroupUseCase: CreateGroupUseCase
+    private val createGroupUseCase: CreateGroupUseCase,
+    private val backendRepository: BackendRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(CreateGroupUiState())
@@ -94,7 +97,7 @@ class CreateGroupViewModel @Inject constructor(
         )
     }
     
-    fun createGroup(userId: String) {
+    fun createGroup(userId: String, context: Context) {
         val currentState = _uiState.value
         
         // 유효성 검사
@@ -124,12 +127,24 @@ class CreateGroupViewModel @Inject constructor(
                 iconType = currentState.selectedIconType,
                 tags = currentState.selectedTags,
                 region = currentState.selectedRegion,
-                imageUrl = if (currentState.useCustomImage) currentState.profileImageUri else null,
+                imageUrl = null,
                 isPublic = currentState.isPublic,
                 userId = userId
             )
             
             result.onSuccess { group ->
+                if (currentState.useCustomImage && currentState.profileImageUri != null) {
+                    val optimized = backendRepository.optimizeImage(
+                        context,
+                        android.net.Uri.parse(currentState.profileImageUri)
+                    )
+                    if (optimized != null) {
+                        viewModelScope.launch {
+                            backendRepository.uploadGroupProfileImage(group.id, optimized)
+                            optimized.delete()
+                        }
+                    }
+                }
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isCreateSuccess = true,

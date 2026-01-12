@@ -1028,6 +1028,39 @@ async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
     )
 
 
+@app.post("/api/groups/{group_id}/profile-image", response_model=GroupResponse, tags=["groups"])
+async def upload_group_profile_image(
+    request: Request,
+    group_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+    safe_name = Path(file.filename or "group_profile").name
+    group_dir = UPLOAD_ROOT / "groups" / group_id
+    group_dir.mkdir(parents=True, exist_ok=True)
+    disk_path = group_dir / f"{uuid.uuid4()}_{safe_name}"
+
+    with disk_path.open("wb") as buffer:
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            buffer.write(chunk)
+
+    file_path = f"/uploads/groups/{group_id}/{disk_path.name}"
+    file_url = _build_file_url(request, file_path)
+
+    profile = dict(group.group_profile or {})
+    profile["image_url"] = file_url
+    group.group_profile = profile
+    await db.commit()
+    await db.refresh(group)
+
+    member_ids = await _get_group_member_ids(db, group.id)
+    return _group_response(group, member_ids)
+
+
 @app.get("/api/users/{user_id}/embedding", response_model=UserEmbeddingResponse, tags=["embedding"])
 async def get_user_embedding(user_id: str, db: AsyncSession = Depends(get_db)):
     user = await _get_user_by_id(db, user_id)

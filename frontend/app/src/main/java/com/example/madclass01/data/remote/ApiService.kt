@@ -224,12 +224,22 @@ interface ApiService {
         @Body request: AddMemberRequest
     ): Response<GroupResponse>
 
+    @Multipart
+    @POST("/api/groups/{groupId}/profile-image")
+    suspend fun uploadGroupProfileImage(
+        @Path("groupId") groupId: String,
+        @Part file: okhttp3.MultipartBody.Part
+    ): Response<GroupResponse>
+
     // Group Detail / Embedding
     @GET("/api/groups/{groupId}/detail")
     suspend fun getGroupDetail(@Path("groupId") groupId: String): Response<GroupDetailResponse>
 
     @GET("/api/groups/{groupId}/embeddings")
-    suspend fun getGroupUserEmbeddings(@Path("groupId") groupId: String): Response<GroupEmbeddingResponse>
+    suspend fun getGroupUserEmbeddings(
+        @Path("groupId") groupId: String,
+        @Query("current_user_id") currentUserId: String? = null
+    ): Response<GroupEmbeddingResponse>
 
     @GET("/api/users/{userId}/embedding")
     suspend fun getUserEmbedding(@Path("userId") userId: String): Response<UserEmbeddingResponse>

@@ -17,7 +17,10 @@ interface GroupDetailRepository {
     /**
      * 그룹 내 사용자들의 임베딩 데이터 조회
      */
-    suspend fun getGroupUserEmbeddings(groupId: String): Result<List<UserEmbedding>>
+    suspend fun getGroupUserEmbeddings(
+        groupId: String,
+        currentUserId: String? = null
+    ): Result<List<UserEmbedding>>
     
     /**
      * 현재 사용자의 임베딩 데이터 조회

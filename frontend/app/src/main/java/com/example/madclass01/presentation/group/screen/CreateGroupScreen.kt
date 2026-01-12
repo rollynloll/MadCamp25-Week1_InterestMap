@@ -45,6 +45,7 @@ fun CreateGroupScreen(
     onBackPress: () -> Unit = { }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
     var tagInputValue by remember { mutableStateOf("") }
     var regionExpanded by remember { mutableStateOf(false) }
     val regions = listOf(
@@ -114,7 +115,7 @@ fun CreateGroupScreen(
                 // Create Button
                 Button(
                     onClick = {
-                        viewModel.createGroup(userId)
+                        viewModel.createGroup(userId, context)
                     },
                     enabled = !uiState.isLoading,
                     colors = ButtonDefaults.buttonColors(

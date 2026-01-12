@@ -33,9 +33,12 @@ class GroupDetailRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getGroupUserEmbeddings(groupId: String): Result<List<UserEmbedding>> {
+    override suspend fun getGroupUserEmbeddings(
+        groupId: String,
+        currentUserId: String?
+    ): Result<List<UserEmbedding>> {
         return try {
-            val response = apiService.getGroupUserEmbeddings(groupId)
+            val response = apiService.getGroupUserEmbeddings(groupId, currentUserId)
             if (response.isSuccessful && response.body() != null) {
                 val embeddings = response.body()!!
                 val userEmbeddings = listOf(embeddings.currentUserEmbedding) + 
@@ -68,7 +71,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
     ): Result<RelationshipGraph> {
         return try {
             // 1. 그룹 임베딩 데이터 조회
-            val embeddingsResponse = apiService.getGroupUserEmbeddings(groupId)
+            val embeddingsResponse = apiService.getGroupUserEmbeddings(groupId, currentUserId)
             if (!embeddingsResponse.isSuccessful || embeddingsResponse.body() == null) {
                 return Result.failure(Exception("Failed to get embeddings"))
             }
