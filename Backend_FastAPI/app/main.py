@@ -246,6 +246,11 @@ async def _get_group_member_ids(db: AsyncSession, group_id: uuid.UUID) -> list[u
 
 
 def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
+    profile = group.group_profile or {}
+    raw_tags = profile.get("tags") or profile.get("interests") or []
+    tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
+    region = profile.get("region") or ""
+    image_url = profile.get("image_url") or ""
     return {
         "id": str(group.id),
         "name": group.name,
@@ -253,6 +258,9 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
         "description": group.description,
         "member_ids": [str(member_id) for member_id in member_ids],
         "created_at": group.created_at.isoformat() if group.created_at else "",
+        "tags": tags,
+        "region": region,
+        "image_url": image_url,
     }
 
 
@@ -749,6 +757,17 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
         raise HTTPException(status_code=409, detail="Group already exists")
     await db.refresh(group)
     return _group_response(group, [creator.id])
+
+@app.get("/api/groups", response_model=List[GroupResponse])
+async def list_groups(db: AsyncSession = Depends(get_db)):
+    """모든 그룹 목록 조회"""
+    result = await db.execute(select(Group))
+    groups = result.scalars().all()
+    responses: list[dict] = []
+    for group in groups:
+        member_ids = await _get_group_member_ids(db, group.id)
+        responses.append(_group_response(group, member_ids))
+    return responses
 
 @app.get("/api/groups/{group_id}", response_model=GroupResponse)
 async def get_group(group_id: str, db: AsyncSession = Depends(get_db)):

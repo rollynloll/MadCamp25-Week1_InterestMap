@@ -383,7 +383,20 @@ class BackendRepository @Inject constructor(
             ApiResult.Error(e.message ?: "Network error")
         }
     }
-    
+
+    suspend fun getAllGroups(): ApiResult<List<GroupResponse>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getAllGroups()
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to get groups", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+
     suspend fun getUserGroups(userId: String): ApiResult<List<GroupResponse>> = withContext(Dispatchers.IO) {
         try {
             val response = apiService.getUserGroups(userId)
