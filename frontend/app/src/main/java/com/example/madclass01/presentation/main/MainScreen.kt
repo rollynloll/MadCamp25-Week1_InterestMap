@@ -62,6 +62,7 @@ fun MainScreen(
     profileBio: String? = null,
     profileImages: List<String> = emptyList(),
     profileTags: List<String> = emptyList(),
+    profileRefreshTrigger: Int = 0,  // 프로필 새로고침 트리거
     onNavigateToGroupDetail: (String) -> Unit = {},
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
@@ -150,18 +151,21 @@ fun MainScreen(
             }
             
             composable(MainTab.Profile.route) {
-                ProfileScreen(
-                    userId = userId,  // userId 전달
-                    nickname = profileNickname,
-                    age = profileAge,
-                    gender = profileGender,
-                    region = profileRegion,
-                    bio = profileBio,
-                    images = profileImages,
-                    tags = profileTags,
-                    onEditClick = onNavigateToEditProfile,
-                    onProfileLoaded = onProfileLoaded
-                )
+                // profileRefreshTrigger가 변경될 때마다 새 ProfileScreen 인스턴스 생성
+                key(profileRefreshTrigger) {
+                    ProfileScreen(
+                        userId = userId,  // userId 전달
+                        nickname = profileNickname,
+                        age = profileAge,
+                        gender = profileGender,
+                        region = profileRegion,
+                        bio = profileBio,
+                        images = profileImages,
+                        tags = profileTags,
+                        onEditClick = onNavigateToEditProfile,
+                        onProfileLoaded = onProfileLoaded
+                    )
+                }
             }
         }
     }
