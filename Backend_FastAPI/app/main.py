@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from collections import Counter
@@ -10,12 +10,13 @@ import uuid
 from datetime import datetime
 import logging
 from pathlib import Path
-from sqlalchemy import text, select, func, inspect
+from sqlalchemy import text, select, func, inspect, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
-    GroupCreateRequest, GroupResponse, AddMemberRequest,
+    GroupCreateRequest, GroupResponse, GroupDetailResponse, GroupEmbeddingResponse,
+    UserEmbeddingResponse, AddMemberRequest,
     PhotoUploadResponse, TagAnalysisRequest, TagAnalysisResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
@@ -27,11 +28,12 @@ from app.db.base import Base
 import app.models  # ensure models are registered for metadata
 from app.models.user import User
 from app.models.photo import UserPhoto
+from app.models.group import Group, GroupMember
 from app.services.embedding.captioning import caption_image
 from app.services.embedding.composer import build_final_text, compute_source_hash
 from app.services.embedding.embedding_log import log_embedding_io
 from app.services.embedding.interest import infer_interest_tags
-from app.services.embedding.openai_embed import embed_text
+from app.services.embedding.openai_embed import embed_text, EMBEDDING_DIM
 from app.services.embedding.repo import (
     create_embedding,
     deactivate_embeddings,
@@ -188,7 +190,7 @@ async def init_db_schema() -> None:
     await _ensure_photo_hash_index()
 
 
-def _cache_user(user: User) -> dict:
+def _cache_user(user: User, is_new_user: bool = False) -> dict:
     user_data = {
         "id": str(user.id),
         "provider": user.provider,
@@ -196,6 +198,7 @@ def _cache_user(user: User) -> dict:
         "nickname": user.nickname,
         "profile_image_url": user.profile_image_url,
         "profile_data": user.profile_data or {},
+        "is_new_user": is_new_user,
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "updated_at": user.updated_at.isoformat() if user.updated_at else None,
     }
@@ -221,6 +224,47 @@ async def _ensure_user_cached(db: AsyncSession, user_id: str) -> dict:
         return users_db[user_id]
     user = await _get_user_by_id(db, user_id)
     return _cache_user(user)
+
+
+async def _get_group_by_id(db: AsyncSession, group_id: str) -> Group:
+    try:
+        group_uuid = uuid.UUID(group_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Group not found") from exc
+    result = await db.execute(select(Group).where(Group.id == group_uuid))
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return group
+
+
+async def _get_group_member_ids(db: AsyncSession, group_id: uuid.UUID) -> list[uuid.UUID]:
+    result = await db.execute(
+        select(GroupMember.user_id).where(GroupMember.group_id == group_id)
+    )
+    return [row[0] for row in result.all()]
+
+
+def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
+    return {
+        "id": str(group.id),
+        "name": group.name,
+        "creator_id": str(group.created_by) if group.created_by else "",
+        "description": group.description,
+        "member_ids": [str(member_id) for member_id in member_ids],
+        "created_at": group.created_at.isoformat() if group.created_at else "",
+    }
+
+
+def _embedding_vector_or_zero(embedding: list[float] | None) -> list[float]:
+    if embedding is None:
+        return [0.0] * EMBEDDING_DIM
+    try:
+        if len(embedding) == 0:
+            return [0.0] * EMBEDDING_DIM
+    except TypeError:
+        return [0.0] * EMBEDDING_DIM
+    return list(embedding)
 
 
 def _build_file_url(request: Request, file_path: str) -> str:
@@ -272,7 +316,7 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
             user.profile_data = merged
         await db.commit()
         await db.refresh(user)
-        return _cache_user(user)
+        return _cache_user(user, is_new_user=False)
 
     user = User(
         provider=request.provider,
@@ -288,9 +332,10 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
         await db.rollback()
         result = await db.execute(stmt)
         user = result.scalar_one()
+        return _cache_user(user, is_new_user=False)
     else:
         await db.refresh(user)
-    return _cache_user(user)
+        return _cache_user(user, is_new_user=True)
 
 @app.get("/api/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
@@ -682,41 +727,70 @@ async def get_user_photos(
 @app.post("/api/groups", response_model=GroupResponse)
 async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(get_db)):
     """그룹 생성"""
-    await _ensure_user_cached(db, request.creator_id)
-
-    group_id = str(uuid.uuid4())
-    now = datetime.now().isoformat()
-
-    group_data = {
-        "id": group_id,
-        "name": request.name,
-        "creator_id": request.creator_id,
-        "description": request.description,
-        "member_ids": [request.creator_id],  # 생성자는 자동으로 멤버
-        "created_at": now
-    }
-
-    groups_db[group_id] = group_data
-
-    return group_data
+    creator = await _get_user_by_id(db, request.creator_id)
+    group = Group(
+        name=request.name,
+        description=request.description,
+        created_by=creator.id,
+    )
+    db.add(group)
+    try:
+        await db.flush()
+        db.add(
+            GroupMember(
+                group_id=group.id,
+                user_id=creator.id,
+                role="owner",
+            )
+        )
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Group already exists")
+    await db.refresh(group)
+    return _group_response(group, [creator.id])
 
 @app.get("/api/groups/{group_id}", response_model=GroupResponse)
-async def get_group(group_id: str):
+async def get_group(group_id: str, db: AsyncSession = Depends(get_db)):
     """그룹 정보 조회"""
-    if group_id not in groups_db:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return groups_db[group_id]
+    group = await _get_group_by_id(db, group_id)
+    member_ids = await _get_group_member_ids(db, group.id)
+    return _group_response(group, member_ids)
 
 @app.get("/api/groups/user/{user_id}", response_model=List[GroupResponse])
 async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자가 속한 그룹 목록 조회"""
-    await _ensure_user_cached(db, user_id)
+    user = await _get_user_by_id(db, user_id)
+    result = await db.execute(
+        select(Group)
+        .join(GroupMember, GroupMember.group_id == Group.id)
+        .where(GroupMember.user_id == user.id)
+    )
+    group_by_id = {group.id: group for group in result.scalars().all()}
 
-    user_groups = [
-        group for group in groups_db.values()
-        if user_id in group["member_ids"]
+    creator_result = await db.execute(
+        select(Group).where(Group.created_by == user.id)
+    )
+    for group in creator_result.scalars().all():
+        group_by_id.setdefault(group.id, group)
+
+    existing_membership = await db.execute(
+        select(GroupMember.group_id).where(GroupMember.user_id == user.id)
+    )
+    membership_ids = {row[0] for row in existing_membership.all()}
+    missing_memberships = [
+        group_id for group_id in group_by_id.keys() if group_id not in membership_ids
     ]
-    return user_groups
+    if missing_memberships:
+        for group_id in missing_memberships:
+            db.add(GroupMember(group_id=group_id, user_id=user.id, role="owner"))
+        await db.commit()
+
+    responses: list[dict] = []
+    for group in group_by_id.values():
+        member_ids = await _get_group_member_ids(db, group.id)
+        responses.append(_group_response(group, member_ids))
+    return responses
 
 @app.post("/api/groups/{group_id}/members", response_model=GroupResponse)
 async def add_group_member(
@@ -725,29 +799,133 @@ async def add_group_member(
     db: AsyncSession = Depends(get_db),
 ):
     """그룹에 멤버 추가"""
-    if group_id not in groups_db:
-        raise HTTPException(status_code=404, detail="Group not found")
-    await _ensure_user_cached(db, request.user_id)
-
-    group = groups_db[group_id]
-
-    if request.user_id not in group["member_ids"]:
-        group["member_ids"].append(request.user_id)
-
-    return group
+    group = await _get_group_by_id(db, group_id)
+    user = await _get_user_by_id(db, request.user_id)
+    result = await db.execute(
+        select(GroupMember).where(
+            GroupMember.group_id == group.id,
+            GroupMember.user_id == user.id,
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if not existing:
+        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+        await db.commit()
+    member_ids = await _get_group_member_ids(db, group.id)
+    return _group_response(group, member_ids)
 
 @app.delete("/api/groups/{group_id}/members/{user_id}")
-async def remove_group_member(group_id: str, user_id: str):
+async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = Depends(get_db)):
     """그룹에서 멤버 제거"""
-    if group_id not in groups_db:
-        raise HTTPException(status_code=404, detail="Group not found")
-
-    group = groups_db[group_id]
-
-    if user_id in group["member_ids"]:
-        group["member_ids"].remove(user_id)
-
+    group = await _get_group_by_id(db, group_id)
+    user = await _get_user_by_id(db, user_id)
+    await db.execute(
+        delete(GroupMember).where(
+            GroupMember.group_id == group.id,
+            GroupMember.user_id == user.id,
+        )
+    )
+    await db.commit()
     return {"message": "Member removed successfully"}
+
+
+@app.get("/api/groups/{group_id}/detail", response_model=GroupDetailResponse)
+async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
+    group = await _get_group_by_id(db, group_id)
+    result = await db.execute(
+        select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group.id)
+    )
+    member_count = result.scalar() or 0
+    created_at = group.created_at.isoformat() if group.created_at else ""
+    return GroupDetailResponse(
+        id=str(group.id),
+        name=group.name,
+        description=group.description,
+        iconType="default",
+        memberCount=member_count,
+        isPublic=True,
+        createdByUserId=str(group.created_by) if group.created_by else "",
+        createdAt=created_at,
+        updatedAt=created_at,
+        profileImageUrl=None,
+        activityStatus="오늘 활동",
+    )
+
+
+@app.get("/api/users/{user_id}/embedding", response_model=UserEmbeddingResponse)
+async def get_user_embedding(user_id: str, db: AsyncSession = Depends(get_db)):
+    user = await _get_user_by_id(db, user_id)
+    active = await get_active_embedding(db, user.id)
+    vector = _embedding_vector_or_zero(active.embedding if active else None)
+    return UserEmbeddingResponse(
+        userId=str(user.id),
+        userName=user.nickname or "",
+        profileImageUrl=user.profile_image_url,
+        embeddingVector=vector,
+        activityStatus="활동중",
+    )
+
+
+@app.get("/api/groups/{group_id}/embeddings", response_model=GroupEmbeddingResponse)
+async def get_group_embeddings(
+    group_id: str,
+    current_user_id: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+    member_ids = await _get_group_member_ids(db, group.id)
+    if not member_ids:
+        raise HTTPException(status_code=404, detail="Group has no members")
+
+    current_uuid: uuid.UUID | None = None
+    if current_user_id:
+        try:
+            candidate = uuid.UUID(current_user_id)
+        except ValueError:
+            candidate = None
+        if candidate and candidate in member_ids:
+            current_uuid = candidate
+    if current_uuid is None:
+        if group.created_by and group.created_by in member_ids:
+            current_uuid = group.created_by
+        else:
+            current_uuid = member_ids[0]
+
+    result = await db.execute(select(User).where(User.id.in_(member_ids)))
+    users = {user.id: user for user in result.scalars().all()}
+
+    async def _build_embedding(user_id: uuid.UUID) -> UserEmbeddingResponse:
+        user = users.get(user_id)
+        if not user:
+            return UserEmbeddingResponse(
+                userId=str(user_id),
+                userName="",
+                profileImageUrl=None,
+                embeddingVector=_embedding_vector_or_zero(None),
+            )
+        active = await get_active_embedding(db, user.id)
+        vector = _embedding_vector_or_zero(active.embedding if active else None)
+        return UserEmbeddingResponse(
+            userId=str(user.id),
+            userName=user.nickname or "",
+            profileImageUrl=user.profile_image_url,
+            embeddingVector=vector,
+            activityStatus="활동중",
+        )
+
+    current_embedding = await _build_embedding(current_uuid)
+    other_embeddings = []
+    for member_id in member_ids:
+        if member_id == current_uuid:
+            continue
+        other_embeddings.append(await _build_embedding(member_id))
+
+    return GroupEmbeddingResponse(
+        groupId=str(group.id),
+        currentUserId=str(current_uuid),
+        currentUserEmbedding=current_embedding,
+        otherUserEmbeddings=other_embeddings,
+    )
 
 # ==================== Tag/Analysis APIs ====================
 

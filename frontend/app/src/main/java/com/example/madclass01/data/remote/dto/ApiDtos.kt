@@ -232,6 +232,8 @@ data class UserResponse(
     val profileImageUrl: String? = null,
     @SerializedName("profile_data")
     val profileData: Map<String, Any>,
+    @SerializedName("is_new_user")
+    val isNewUser: Boolean = false,
     @SerializedName("created_at")
     val createdAt: String,
     @SerializedName("updated_at")

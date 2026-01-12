@@ -141,16 +141,18 @@ class LoginViewModel @Inject constructor(
                     android.util.Log.d("LoginViewModel", "백엔드 유저 생성 성공 - userId: ${user.id}, nickname: ${user.nickname}")
                     android.util.Log.d("LoginViewModel", "RAW ProfileData: ${user.profileData}")
 
-                    val profileAge = user.profileData["age"].toIntOrNull()
-                    val profileGender = user.profileData["gender"] as? String
-                    val profileRegion = user.profileData["region"] as? String
-                    val profileBio = user.profileData["bio"] as? String
-                    @Suppress("UNCHECKED_CAST")
-                    val profileTags = (user.profileData["interests"] as? List<String>) ?: emptyList()
-                    @Suppress("UNCHECKED_CAST")
-                    val profilePhotoInterests = (user.profileData["photo_interests"] as? List<String>) ?: emptyList()
-                    val imageCount = user.profileData["image_count"].toIntOrNull() ?: 0
-                    val isProfileComplete = profileAge != null && !profileRegion.isNullOrBlank() && imageCount >= 1
+                    val profileAge = user.profileData.intValue("age")
+                    val profileGender = user.profileData.stringValue("gender")
+                    val profileRegion = user.profileData.stringValue("region")
+                    val profileBio = user.profileData.stringValue("bio")
+                    val profileTags = user.profileData.stringListValue("interests")
+                    val profilePhotoInterests = user.profileData.stringListValue("photo_interests")
+                    val imageCount = user.profileData.intValue("image_count") ?: 0
+                    val isProfileComplete = if (user.isNewUser) {
+                        false
+                    } else {
+                        true
+                    }
 
                     android.util.Log.d("LoginViewModel", "Extracted Tags (interests): $profileTags")
                     android.util.Log.d("LoginViewModel", "Extracted Photo Interests: $profilePhotoInterests")
@@ -279,6 +281,27 @@ class LoginViewModel @Inject constructor(
             is Float -> this.toInt()
             is String -> this.toIntOrNull()
             else -> null
+        }
+    }
+
+    private fun Map<String, Any>.stringValue(key: String): String? {
+        val value = this[key] ?: return null
+        return when (value) {
+            is String -> value
+            else -> value.toString().takeIf { it.isNotBlank() }
+        }
+    }
+
+    private fun Map<String, Any>.intValue(key: String): Int? {
+        return this[key].toIntOrNull()
+    }
+
+    private fun Map<String, Any>.stringListValue(key: String): List<String> {
+        val value = this[key] ?: return emptyList()
+        return when (value) {
+            is List<*> -> value.mapNotNull { it?.toString()?.takeIf { item -> item.isNotBlank() } }
+            is String -> if (value.isBlank()) emptyList() else listOf(value)
+            else -> listOf(value.toString()).filter { it.isNotBlank() }
         }
     }
 }

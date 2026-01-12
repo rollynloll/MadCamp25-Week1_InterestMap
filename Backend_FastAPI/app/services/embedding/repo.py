@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import uuid
 
 from sqlalchemy import select, update
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.embedding import UserEmbedding
@@ -57,12 +58,20 @@ async def get_active_embedding(
     db: AsyncSession,
     user_id: uuid.UUID,
 ) -> UserEmbedding | None:
-    result = await db.execute(
-        select(UserEmbedding)
-        .where(UserEmbedding.user_id == user_id, UserEmbedding.is_active == True)  # noqa: E712
-        .limit(1)
-    )
-    return result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(UserEmbedding)
+            .where(UserEmbedding.user_id == user_id, UserEmbedding.is_active == True)  # noqa: E712
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+    except Exception as exc:
+        logging.getLogger("uvicorn.error").warning(
+            "Failed to load active embedding for user_id=%s: %s",
+            user_id,
+            exc,
+        )
+        return None
 
 
 async def deactivate_embeddings(db: AsyncSession, user_id: uuid.UUID) -> None:

@@ -120,6 +120,7 @@ class UserResponse(BaseSchema):
     nickname: str | None
     profile_image_url: str | None
     profile_data: dict[str, Any]
+    is_new_user: bool = False
     created_at: str | None
     updated_at: str | None
 
@@ -137,6 +138,35 @@ class GroupResponse(BaseSchema):
     description: str | None
     member_ids: list[str]
     created_at: str
+
+
+class GroupDetailResponse(BaseSchema):
+    id: str
+    name: str
+    description: str | None = None
+    iconType: str
+    memberCount: int
+    isPublic: bool
+    createdByUserId: str
+    createdAt: str
+    updatedAt: str
+    profileImageUrl: str | None = None
+    activityStatus: str = "오늘 활동"
+
+
+class UserEmbeddingResponse(BaseSchema):
+    userId: str
+    userName: str
+    profileImageUrl: str | None = None
+    embeddingVector: list[float]
+    activityStatus: str = "활동중"
+
+
+class GroupEmbeddingResponse(BaseSchema):
+    groupId: str
+    currentUserId: str
+    currentUserEmbedding: UserEmbeddingResponse
+    otherUserEmbeddings: list[UserEmbeddingResponse]
 
 
 class AddMemberRequest(BaseSchema):
