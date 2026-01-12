@@ -39,6 +39,24 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.profile.viewmodel.ProfileEditViewModel
 
 import android.widget.Toast
+import java.io.File
+import java.io.FileOutputStream
+
+// URI를 File로 변환하는 헬퍼 함수
+private fun uriToFile(context: android.content.Context, uri: Uri): File? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val file = File(context.cacheDir, "profile_${System.currentTimeMillis()}.jpg")
+        val outputStream = FileOutputStream(file)
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+        file
+    } catch (e: Exception) {
+        android.util.Log.e("ProfileEditScreen", "Error converting URI to File", e)
+        null
+    }
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,6 +106,27 @@ fun ProfileEditScreen(
     var selectedTags by remember { mutableStateOf(initialTags.toSet()) }
     var photoInterestTags by remember { mutableStateOf(initialPhotoInterests.toSet()) }
     var showTagSelector by remember { mutableStateOf(false) }
+    
+    // 프로필 사진 선택을 위한 이미지 피커
+    val profileImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // URI를 File로 변환해서 업로드
+            val file = uriToFile(context, it)
+            if (file != null) {
+                viewModel.uploadProfileImage(userId, file)
+            }
+        }
+    }
+    
+    // 프로필 이미지 업로드 성공 시 업데이트
+    LaunchedEffect(uiState.uploadedProfileImageUrl) {
+        if (uiState.uploadedProfileImageUrl != null) {
+            profileImage = uiState.uploadedProfileImageUrl
+            Toast.makeText(context, "프로필 사진이 변경되었습니다", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val images = remember {
         mutableStateListOf<String>().apply {
@@ -215,7 +254,8 @@ fun ProfileEditScreen(
                         .size(120.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFF5F5F5))
-                        .border(2.dp, Color(0xFFE0E0E0), CircleShape),
+                        .border(2.dp, Color(0xFFE0E0E0), CircleShape)
+                        .clickable { profileImagePicker.launch("image/*") },
                     contentAlignment = Alignment.Center
                 ) {
                     if (profileImage != null) {
@@ -225,10 +265,25 @@ fun ProfileEditScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
+                        
+                        // 로딩 오버레이
+                        if (uiState.isUploadingImage) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.5f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color.White,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        }
                     } else {
                         Icon(
                             imageVector = Icons.Default.Camera,
-                            contentDescription = "사진 없음",
+                            contentDescription = "사진 선택",
                             tint = Color(0xFFBBBBBB),
                             modifier = Modifier.size(40.dp)
                         )
