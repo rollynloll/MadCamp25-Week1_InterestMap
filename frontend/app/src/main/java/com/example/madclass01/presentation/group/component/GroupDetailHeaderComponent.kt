@@ -17,12 +17,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 
 /**
  * 그룹 상세 헤더
@@ -37,6 +41,7 @@ fun GroupDetailHeaderComponent(
     memberCount: Int,
     activityStatus: String = "오늘 활동",
     groupIcon: String = "👥",
+    profileImageUrl: String? = null,
     onBackClick: () -> Unit = {},
     onQRCodeClick: () -> Unit = {}
 ) {
@@ -95,14 +100,26 @@ fun GroupDetailHeaderComponent(
             // 그룹 아이콘 (80x80)
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .background(Color.White, shape = RoundedCornerShape(20.dp)),
+                    .size(84.dp)
+                    .shadow(elevation = 10.dp, shape = RoundedCornerShape(24.dp))
+                    .background(Color.White, shape = RoundedCornerShape(24.dp)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = groupIcon,
-                    fontSize = 40.sp
-                )
+                if (!profileImageUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = profileImageUrl,
+                        contentDescription = "그룹 이미지",
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(RoundedCornerShape(20.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = groupIcon,
+                        fontSize = 38.sp
+                    )
+                }
             }
 
             // 그룹명

@@ -172,11 +172,20 @@ class UserEmbeddingResponse(BaseSchema):
     activityStatus: str = "활동중"
 
 
+class GraphNodePositionResponse(BaseSchema):
+    userId: str
+    x: float
+    y: float
+    distance: float
+    similarityScore: float
+
+
 class GroupEmbeddingResponse(BaseSchema):
     groupId: str
     currentUserId: str
     currentUserEmbedding: UserEmbeddingResponse
     otherUserEmbeddings: list[UserEmbeddingResponse]
+    nodePositions: list[GraphNodePositionResponse]
 
 
 class AddMemberRequest(BaseSchema):

@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.filled.Close
@@ -39,14 +41,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.pow
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -183,6 +190,7 @@ fun GroupDetailScreen(
                         memberCount = fallbackMemberCount,
                         activityStatus = if (isMockMode) "테스트 모드 (목업 데이터)" else "목업 데이터",
                         groupIcon = "👥",
+                        profileImageUrl = null,
                         onBackClick = onBackPress,
                         onQRCodeClick = {
                             // 목업 모드에서는 더미 그룹 전달
@@ -196,13 +204,18 @@ fun GroupDetailScreen(
                         }
                     )
 
-                    MockRelationshipGraphCanvas(
+                    ZoomableGraphContainer(
                         modifier = Modifier
                             .padding(top = 8.dp)
-                            .align(Alignment.CenterHorizontally),
-                        currentUserName = "나",
-                        currentUserImageModel = "https://picsum.photos/seed/me_star/200/200"
-                    )
+                            .align(Alignment.CenterHorizontally)
+                    ) { scale ->
+                        val nodeScale = (1f / scale.pow(1.0f)).coerceIn(0.05f, 2f)
+                        MockRelationshipGraphCanvas(
+                            currentUserName = "나",
+                            currentUserImageModel = "https://picsum.photos/seed/me_star/200/200",
+                            nodeScale = nodeScale
+                        )
+                    }
                 }
             }
 
@@ -287,22 +300,27 @@ fun GroupDetailScreen(
                         groupName = uiState.group!!.name,
                         memberCount = uiState.group!!.memberCount,
                         activityStatus = "오늘 활동",
-                        groupIcon = "👥",
+                        groupIcon = uiState.group!!.iconType.ifBlank { "👥" },
+                        profileImageUrl = uiState.group!!.imageUrl,
                         onBackClick = onBackPress,
                         onQRCodeClick = { onQRCodeClick(uiState.group!!) }
                     )
 
                     // 관계 그래프
-                    RelationshipGraphComponent(
-                        relationshipGraph = uiState.relationshipGraph!!,
-                        selectedUserId = uiState.selectedUserId,
-                        onNodeClick = { userId ->
-                            viewModel.selectUser(userId)
-                        },
-                        onNodeLongClick = { userId ->
-                            viewModel.selectUser(userId)
-                        }
-                    )
+                    ZoomableGraphContainer { scale ->
+                        val nodeScale = (1f / scale.pow(2.5f)).coerceIn(0.2f, 2f)
+                        RelationshipGraphComponent(
+                            relationshipGraph = uiState.relationshipGraph!!,
+                            selectedUserId = uiState.selectedUserId,
+                            nodeScale = nodeScale,
+                            onNodeClick = { userId ->
+                                viewModel.selectUser(userId)
+                            },
+                            onNodeLongClick = { userId ->
+                                viewModel.selectUser(userId)
+                            }
+                        )
+                    }
                 }
             }
 
@@ -330,9 +348,9 @@ fun GroupDetailScreen(
 
 @Composable
 private fun MockRelationshipGraphCanvas(
-    modifier: Modifier = Modifier,
     currentUserName: String,
-    currentUserImageModel: Any? = null
+    currentUserImageModel: Any? = null,
+    nodeScale: Float = 1f
 ) {
     // CSS 스펙에 맞춘 예시 목업 배치 (390x520 캔버스, absolute 배치)
     val avatar1 = "https://picsum.photos/seed/node1/200/200"
@@ -342,7 +360,7 @@ private fun MockRelationshipGraphCanvas(
     val avatar5 = "https://picsum.photos/seed/node5/200/200"
 
     Box(
-        modifier = modifier
+        modifier = Modifier
             .size(width = 390.dp, height = 520.dp)
             .background(Color(0xFFFAFBFC)),
         contentAlignment = Alignment.TopStart
@@ -351,7 +369,8 @@ private fun MockRelationshipGraphCanvas(
         StarNode(
             modifier = Modifier.offset(x = 159.dp, y = 224.dp),
             name = currentUserName,
-            imageModel = currentUserImageModel
+            imageModel = currentUserImageModel,
+            nodeScale = nodeScale
         )
 
         // Node 1
@@ -363,7 +382,8 @@ private fun MockRelationshipGraphCanvas(
             elevation = 12.dp,
             name = "김OO",
             textColor = Color.White,
-            imageModel = avatar1
+            imageModel = avatar1,
+            nodeScale = nodeScale
         )
 
         // Node 2
@@ -375,7 +395,8 @@ private fun MockRelationshipGraphCanvas(
             elevation = 12.dp,
             name = "이OO",
             textColor = Color.White,
-            imageModel = avatar2
+            imageModel = avatar2,
+            nodeScale = nodeScale
         )
 
         // Node 3
@@ -387,7 +408,8 @@ private fun MockRelationshipGraphCanvas(
             elevation = 10.dp,
             name = "박OO",
             textColor = Color.White,
-            imageModel = avatar3
+            imageModel = avatar3,
+            nodeScale = nodeScale
         )
 
         // Node 4
@@ -399,7 +421,8 @@ private fun MockRelationshipGraphCanvas(
             elevation = 10.dp,
             name = "최OO",
             textColor = Color.White,
-            imageModel = avatar4
+            imageModel = avatar4,
+            nodeScale = nodeScale
         )
 
         // Node 5
@@ -411,8 +434,43 @@ private fun MockRelationshipGraphCanvas(
             elevation = 8.dp,
             name = "정OO",
             textColor = Color(0xFF6B7280),
-            imageModel = avatar5
+            imageModel = avatar5,
+            nodeScale = nodeScale
         )
+    }
+}
+
+@Composable
+private fun ZoomableGraphContainer(
+    modifier: Modifier = Modifier,
+    content: @Composable (Float) -> Unit
+) {
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.5f, 3f)
+        offset += panChange
+    }
+
+    Box(
+        modifier = modifier
+            .size(width = 390.dp, height = 520.dp)
+            .clipToBounds()
+            .transformable(transformState)
+    ) {
+        Box(
+            modifier = Modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = offset.x
+                    translationY = offset.y
+                    transformOrigin = TransformOrigin(0.5f, 0.5f)
+                }
+        ) {
+            content(scale)
+        }
     }
 }
 
@@ -420,11 +478,17 @@ private fun MockRelationshipGraphCanvas(
 private fun StarNode(
     modifier: Modifier = Modifier,
     name: String,
-    imageModel: Any? = null
+    imageModel: Any? = null,
+    nodeScale: Float = 1f
 ) {
     Box(
         modifier = modifier
             .size(72.dp)
+            .graphicsLayer {
+                scaleX = nodeScale
+                scaleY = nodeScale
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
+            }
             .shadow(elevation = 20.dp, shape = CircleShape, clip = false)
             .background(
                 brush = Brush.linearGradient(
@@ -463,11 +527,17 @@ private fun PlanetNode(
     elevation: androidx.compose.ui.unit.Dp,
     name: String,
     textColor: Color,
-    imageModel: Any? = null
+    imageModel: Any? = null,
+    nodeScale: Float = 1f
 ) {
     Box(
         modifier = modifier
             .size(size)
+            .graphicsLayer {
+                scaleX = nodeScale
+                scaleY = nodeScale
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
+            }
             .shadow(elevation = elevation, shape = CircleShape, clip = false)
             .background(backgroundColor, CircleShape)
             .border(borderWidth, Color.White, CircleShape),
@@ -647,4 +717,3 @@ fun SelectedUserProfileBottomSheet(
         }
     }
 }
-

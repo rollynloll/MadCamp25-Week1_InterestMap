@@ -12,6 +12,14 @@ data class UserEmbeddingResponse(
     val activityStatus: String = "활동중"
 )
 
+data class GraphNodePositionResponse(
+    val userId: String,
+    val x: Float,
+    val y: Float,
+    val distance: Float,
+    val similarityScore: Float
+)
+
 /**
  * 그룹 임베딩 데이터 응답
  * - 그룹 내 전체 사용자의 임베딩
@@ -20,7 +28,8 @@ data class GroupEmbeddingResponse(
     val groupId: String,
     val currentUserId: String,
     val currentUserEmbedding: UserEmbeddingResponse,
-    val otherUserEmbeddings: List<UserEmbeddingResponse>
+    val otherUserEmbeddings: List<UserEmbeddingResponse>,
+    val nodePositions: List<GraphNodePositionResponse> = emptyList()
 )
 
 /**

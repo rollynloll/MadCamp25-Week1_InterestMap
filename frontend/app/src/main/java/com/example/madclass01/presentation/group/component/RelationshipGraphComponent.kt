@@ -18,6 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -40,25 +42,15 @@ import kotlin.math.abs
 fun RelationshipGraphComponent(
     relationshipGraph: RelationshipGraph,
     selectedUserId: String? = null,
+    nodeScale: Float = 1f,
     onNodeClick: (String) -> Unit = {},
     onNodeLongClick: (String) -> Unit = {}
 ) {
     Box(
         modifier = Modifier
             .size(width = 390.dp, height = 520.dp)
-            .background(Color(0xFFFAFBFC)),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFFFAFBFC))
     ) {
-        // 현재 사용자 노드 (중앙)
-        val currentUserEmbedding = relationshipGraph.embeddings[relationshipGraph.currentUserId]
-        CenterNodeComponent(
-            userName = currentUserEmbedding?.userName ?: "나",
-            profileImageUrl = currentUserEmbedding?.profileImageUrl
-                ?: fallbackAvatarUrl(relationshipGraph.currentUserId),
-            selectedUserId = selectedUserId,
-            onNodeClick = { onNodeClick(relationshipGraph.currentUserId) }
-        )
-
         // 다른 사용자들의 노드
         relationshipGraph.otherUserNodes.forEach { nodePosition ->
             val embedding = relationshipGraph.embeddings[nodePosition.userId]
@@ -70,10 +62,26 @@ fun RelationshipGraphComponent(
                         ?: fallbackAvatarUrl(nodePosition.userId),
                     isSelected = selectedUserId == nodePosition.userId,
                     similarity = nodePosition.similarityScore,
+                    nodeScale = nodeScale,
                     onNodeClick = { onNodeClick(nodePosition.userId) },
                     onNodeLongClick = { onNodeLongClick(nodePosition.userId) }
                 )
             }
+        }
+
+        val currentUserEmbedding = relationshipGraph.embeddings[relationshipGraph.currentUserId]
+        if (currentUserEmbedding != null) {
+            OtherUserNodeComponent(
+                nodePosition = relationshipGraph.currentUserNode,
+                userName = currentUserEmbedding.userName,
+                profileImageUrl = currentUserEmbedding.profileImageUrl
+                    ?: fallbackAvatarUrl(relationshipGraph.currentUserId),
+                isSelected = selectedUserId == relationshipGraph.currentUserId,
+                similarity = relationshipGraph.currentUserNode.similarityScore,
+                nodeScale = nodeScale,
+                onNodeClick = { onNodeClick(relationshipGraph.currentUserId) },
+                onNodeLongClick = { onNodeLongClick(relationshipGraph.currentUserId) }
+            )
         }
     }
 }
@@ -128,7 +136,7 @@ fun CenterNodeComponent(
             )
 
             Text(
-                text = userName.take(2),
+                text = userName.take(3),
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -172,6 +180,7 @@ fun OtherUserNodeComponent(
     profileImageUrl: String? = null,
     isSelected: Boolean = false,
     similarity: Float = 0.5f,
+    nodeScale: Float = 1f,
     onNodeClick: () -> Unit = {},
     onNodeLongClick: () -> Unit = {}
 ) {
@@ -190,13 +199,18 @@ fun OtherUserNodeComponent(
     }
     val labelColor = if (nodeColor == "#E5E7EB") Color(0xFF6B7280) else Color.White
     
-    val xOffset = (nodePosition.x - 195).dp  // 390/2 = 195
-    val yOffset = (nodePosition.y - 260).dp  // 520/2 = 260
+    val xOffset = (nodePosition.x - nodeSize / 2).dp
+    val yOffset = (nodePosition.y - nodeSize / 2).dp
 
     Column(
         modifier = Modifier
             .offset(x = xOffset, y = yOffset)
-            .size(nodeSize.dp),
+            .size(nodeSize.dp)
+            .graphicsLayer {
+                scaleX = nodeScale
+                scaleY = nodeScale
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
+            },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -220,7 +234,7 @@ fun OtherUserNodeComponent(
                 contentScale = ContentScale.Crop
             )
             Text(
-                text = userName.take(2),
+                text = userName.take(3),
                 color = labelColor,
                 fontSize = if (nodeSize >= 48) 13.sp else 12.sp,
                 fontWeight = FontWeight.SemiBold,

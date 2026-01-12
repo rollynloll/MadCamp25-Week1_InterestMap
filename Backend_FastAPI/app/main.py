@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
     GroupCreateRequest, GroupResponse, GroupDetailResponse, GroupEmbeddingResponse,
-    UserEmbeddingResponse, AddMemberRequest,
+    UserEmbeddingResponse, GraphNodePositionResponse, AddMemberRequest,
     PhotoUploadResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
@@ -34,6 +34,7 @@ from app.models.group import Group, GroupMember
 from app.services.embedding.captioning import caption_image, is_blip_ready
 from app.services.embedding.composer import build_final_text
 from app.services.embedding.embedding_log import log_embedding_io
+from app.services.embedding.group_map import GroupMapInput, build_group_map_positions
 from app.services.embedding.interest import infer_interest_tags
 from app.services.embedding.openai_embed import embed_text, EMBEDDING_DIM, MODEL_NAME, MODEL_VERSION
 from app.services.embedding.repo import (
@@ -333,6 +334,21 @@ def _embedding_vector_or_zero(embedding: list[float] | None) -> list[float]:
     except TypeError:
         return [0.0] * EMBEDDING_DIM
     return list(embedding)
+
+
+def _cosine_similarity(a: list[float] | None, b: list[float] | None) -> float:
+    if not a or not b:
+        return 0.0
+    dot = 0.0
+    norm_a = 0.0
+    norm_b = 0.0
+    for x, y in zip(a, b):
+        dot += x * y
+        norm_a += x * x
+        norm_b += y * y
+    if norm_a <= 0.0 or norm_b <= 0.0:
+        return 0.0
+    return dot / (norm_a**0.5 * norm_b**0.5)
 
 
 def _build_file_url(request: Request, file_path: str) -> str:
@@ -1015,17 +1031,22 @@ async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
     )
     member_count = result.scalar() or 0
     created_at = group.created_at.isoformat() if group.created_at else ""
+    updated_at = created_at
+    profile = group.group_profile or {}
+    image_url = profile.get("image_url") or ""
+    icon_type = profile.get("icon_type") or ""
+    is_public = bool(profile.get("is_public", True))
     return GroupDetailResponse(
         id=str(group.id),
         name=group.name,
         description=group.description,
-        iconType="default",
+        iconType=icon_type,
         memberCount=member_count,
-        isPublic=True,
+        isPublic=is_public,
         createdByUserId=str(group.created_by) if group.created_by else "",
         createdAt=created_at,
-        updatedAt=created_at,
-        profileImageUrl=None,
+        updatedAt=updated_at,
+        profileImageUrl=image_url or None,
         activityStatus="오늘 활동",
     )
 
@@ -1105,7 +1126,7 @@ async def get_group_embeddings(
     result = await db.execute(select(User).where(User.id.in_(member_ids)))
     users = {user.id: user for user in result.scalars().all()}
 
-    async def _build_embedding(user_id: uuid.UUID) -> UserEmbeddingResponse:
+    def _build_embedding(user_id: uuid.UUID) -> UserEmbeddingResponse:
         user = users.get(user_id)
         if not user:
             return UserEmbeddingResponse(
@@ -1114,8 +1135,7 @@ async def get_group_embeddings(
                 profileImageUrl=None,
                 embeddingVector=_embedding_vector_or_zero(None),
             )
-        active = await get_active_embedding(db, user.id)
-        vector = _embedding_vector_or_zero(active.embedding if active else None)
+        vector = _embedding_vector_or_zero(user.embedding if user.embedding else None)
         return UserEmbeddingResponse(
             userId=str(user.id),
             userName=user.nickname or "",
@@ -1124,18 +1144,54 @@ async def get_group_embeddings(
             activityStatus="활동중",
         )
 
-    current_embedding = await _build_embedding(current_uuid)
+    member_inputs = []
+    for member_id in member_ids:
+        user = users.get(member_id)
+        member_inputs.append(
+            GroupMapInput(
+                user_id=str(member_id),
+                embedding=list(user.embedding) if user and user.embedding else None,
+                updated_at=user.embedding_updated_at if user else None,
+            )
+        )
+
+    positions = build_group_map_positions(str(group.id), member_inputs)
+
+    current_embedding = _build_embedding(current_uuid)
     other_embeddings = []
     for member_id in member_ids:
         if member_id == current_uuid:
             continue
-        other_embeddings.append(await _build_embedding(member_id))
+        other_embeddings.append(_build_embedding(member_id))
+
+    current_user = users.get(current_uuid)
+    current_vector = list(current_user.embedding) if current_user and current_user.embedding else None
+
+    node_positions = []
+    for member_id in member_ids:
+        user = users.get(member_id)
+        vector = list(user.embedding) if user and user.embedding else None
+        similarity = _cosine_similarity(current_vector, vector)
+        distance = 1.0 - similarity
+        pos = positions.get(str(member_id))
+        if pos is None:
+            pos = (195.0, 260.0)
+        node_positions.append(
+            GraphNodePositionResponse(
+                userId=str(member_id),
+                x=pos[0],
+                y=pos[1],
+                distance=distance,
+                similarityScore=similarity,
+            )
+        )
 
     return GroupEmbeddingResponse(
         groupId=str(group.id),
         currentUserId=str(current_uuid),
         currentUserEmbedding=current_embedding,
         otherUserEmbeddings=other_embeddings,
+        nodePositions=node_positions,
     )
 
 # ==================== Tag/Analysis APIs ====================

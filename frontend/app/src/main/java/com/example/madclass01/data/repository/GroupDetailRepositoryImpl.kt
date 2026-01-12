@@ -79,35 +79,63 @@ class GroupDetailRepositoryImpl @Inject constructor(
             val embeddings = embeddingsResponse.body()!!
             val currentUserEmbeddingDto = embeddings.currentUserEmbedding
             val otherUserEmbeddingDtos = embeddings.otherUserEmbeddings
+            val responseCurrentUserId = embeddings.currentUserId
 
             // 2. DTO를 Domain 모델로 변환
             val currentUserEmbedding = currentUserEmbeddingDto.toDomainModel()
             val otherUserEmbeddings = otherUserEmbeddingDtos.map { it.toDomainModel() }
 
-            // 3. 현재 사용자의 노드 위치 (중심)
-            val centerX = 195f  // 390 / 2
-            val centerY = 260f  // 520 / 2
-            
-            val currentUserNode = GraphNodePosition(
-                userId = currentUserId,
-                x = centerX,
-                y = centerY,
-                distance = 0f,
-                similarityScore = 1f  // 자신과의 유사도는 1
-            )
+            val responsePositions = embeddings.nodePositions
+            val (currentUserNode, otherUserNodes) = if (responsePositions.isNotEmpty()) {
+                val positionsById = responsePositions.associateBy { it.userId }
+                val currentPosition = positionsById[responseCurrentUserId]
+                    ?: positionsById[currentUserId]
 
-            // 4. 다른 사용자들의 노드 위치 계산
-            val otherUserNodes = GraphLayoutCalculator.calculateNodePositions(
-                currentUserEmbedding = currentUserEmbedding,
-                otherUserEmbeddings = otherUserEmbeddings,
-                centerX = centerX,
-                centerY = centerY,
-                maxDistance = 180f
-            )
+                val currentNode = GraphNodePosition(
+                    userId = responseCurrentUserId,
+                    x = currentPosition?.x ?: 195f,
+                    y = currentPosition?.y ?: 260f,
+                    distance = currentPosition?.distance ?: 0f,
+                    similarityScore = currentPosition?.similarityScore ?: 1f
+                )
+
+                val otherNodes = responsePositions
+                    .filter { it.userId != responseCurrentUserId }
+                    .map {
+                        GraphNodePosition(
+                            userId = it.userId,
+                            x = it.x,
+                            y = it.y,
+                            distance = it.distance,
+                            similarityScore = it.similarityScore
+                        )
+                    }
+                currentNode to otherNodes
+            } else {
+                val centerX = 195f  // 390 / 2
+                val centerY = 260f  // 520 / 2
+
+                val currentNode = GraphNodePosition(
+                    userId = currentUserId,
+                    x = centerX,
+                    y = centerY,
+                    distance = 0f,
+                    similarityScore = 1f
+                )
+
+                val otherNodes = GraphLayoutCalculator.calculateNodePositions(
+                    currentUserEmbedding = currentUserEmbedding,
+                    otherUserEmbeddings = otherUserEmbeddings,
+                    centerX = centerX,
+                    centerY = centerY,
+                    maxDistance = 180f
+                )
+                currentNode to otherNodes
+            }
 
             // 5. 임베딩 맵 생성
             val embeddingMap = mutableMapOf<String, UserEmbedding>()
-            embeddingMap[currentUserId] = currentUserEmbedding
+            embeddingMap[responseCurrentUserId] = currentUserEmbedding
             otherUserEmbeddings.forEach { embedding ->
                 embeddingMap[embedding.userId] = embedding
             }
@@ -115,7 +143,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
             // 6. 관계 그래프 생성
             val relationshipGraph = RelationshipGraph(
                 groupId = groupId,
-                currentUserId = currentUserId,
+                currentUserId = responseCurrentUserId,
                 currentUserNode = currentUserNode,
                 otherUserNodes = otherUserNodes,
                 embeddings = embeddingMap
@@ -136,13 +164,15 @@ class GroupDetailRepositoryImpl @Inject constructor(
             memberCount = this.memberCount,
             activity = "보통",
             tags = emptyList(),
-            imageUrl = "",
+            imageUrl = this.profileImageUrl ?: "",
+            iconType = this.iconType,
             lastActivityDate = "",
             messageCount = 0,
             matchPercentage = 0,
             region = "",
             memberAge = "",
-            isJoined = false
+            isJoined = false,
+            isPublic = this.isPublic
         )
     }
 
