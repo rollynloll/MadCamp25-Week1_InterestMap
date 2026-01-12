@@ -106,14 +106,14 @@ interface ApiService {
     ): Response<List<GroupListItem>>
     
     /**
-     * 그룹 참여
-     * POST /groups/{group_id}/join
+     * 그룹 참여 (인증 없이 user_id 전달)
+     * POST /api/groups/{groupId}/members
      */
-    @POST("/groups/{group_id}/join")
+    @POST("/api/groups/{groupId}/members")
     suspend fun joinGroup(
-        @Path("group_id") groupId: String,
-        @Header("Authorization") authorization: String
-    ): Response<OkResponse>
+        @Path("groupId") groupId: String,
+        @Body request: AddMemberRequest
+    ): Response<GroupResponse>
     
     /**
      * 그룹 멤버 조회
