@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class BaseSchema(BaseModel):
@@ -15,7 +15,7 @@ class OkResponse(BaseSchema):
 
 
 class KakaoAuthRequest(BaseSchema):
-    access_token: str
+    access_token: str = Field(validation_alias=AliasChoices("access_token", "accessToken"))
 
 
 class AuthUser(BaseSchema):

@@ -39,11 +39,23 @@ async def _upsert_kakao_user(db: AsyncSession, kakao_user: dict) -> User:
     if not kakao_id:
         raise HTTPException(status_code=400, detail="Kakao user id missing")
 
-    profile = kakao_user.get("kakao_account", {}).get("profile", {})
-    nickname = profile.get("nickname")
-    profile_image_url = profile.get("profile_image_url")
+    # Kakao user payload may vary by consent/scopes.
+    # Prefer kakao_account.profile, but also support legacy `properties`.
+    profile = kakao_user.get("kakao_account", {}).get("profile", {}) or {}
+    properties = kakao_user.get("properties", {}) or {}
+
+    nickname = profile.get("nickname") or properties.get("nickname")
+    profile_image_url = (
+        profile.get("profile_image_url")
+        or profile.get("thumbnail_image_url")
+        or properties.get("profile_image")
+        or properties.get("profile_image_url")
+        or properties.get("thumbnail_image")
+    )
+
+    # If nickname is missing (e.g., user didn't grant profile scope), generate a stable fallback.
     if not nickname:
-        raise HTTPException(status_code=400, detail="Kakao nickname missing")
+        nickname = f"kakao_{kakao_id[-6:]}"
 
     result = await db.execute(
         select(User).where(

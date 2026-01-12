@@ -64,7 +64,7 @@ fun GroupDetailScreen(
     currentUserId: String,
     onBackPress: () -> Unit = {},
     onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
-    onChatRoomCreated: (chatRoomId: String, groupName: String) -> Unit = { _, _ -> },
+    onChatRoomCreated: (chatRoomId: String, groupName: String, memberCount: Int) -> Unit = { _, _, _ -> },
     viewModel: GroupDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -82,7 +82,8 @@ fun GroupDetailScreen(
             } else {
                 "그룹 채팅"
             }
-            onChatRoomCreated(uiState.chatRoomId!!, groupName)
+            val memberCount = uiState.group?.memberCount ?: 0
+            onChatRoomCreated(uiState.chatRoomId!!, groupName, memberCount)
             viewModel.resetChatState()
         }
     }

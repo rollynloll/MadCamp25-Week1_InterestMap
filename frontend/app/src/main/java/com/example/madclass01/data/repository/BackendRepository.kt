@@ -25,6 +25,35 @@ class BackendRepository @Inject constructor(
     private val apiService: ApiService
 ) {
     private val gson = Gson()
+
+    /**
+     * 카카오 SDK access token을 백엔드에 전달해 우리 JWT(access_token)를 발급받는다.
+     * Backend: POST /auth/kakao {"access_token": "..."}
+     */
+    suspend fun kakaoLogin(kakaoAccessToken: String): ApiResult<AuthResponse> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.kakaoLogin(KakaoAuthRequest(accessToken = kakaoAccessToken))
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                val errorText = try {
+                    response.errorBody()?.string()
+                } catch (_: Exception) {
+                    null
+                }
+                val msg = buildString {
+                    append("Failed to login with Kakao")
+                    if (!errorText.isNullOrBlank()) {
+                        append(": ")
+                        append(errorText)
+                    }
+                }
+                ApiResult.Error(msg, response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
+        }
+    }
     
     suspend fun healthCheck(): ApiResult<HealthCheckResponse> = withContext(Dispatchers.IO) {
         try {
@@ -443,6 +472,70 @@ class BackendRepository @Inject constructor(
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Network error: ${e.javaClass.simpleName}")
+        }
+    }
+    
+    // ==================== 그룹 채팅 관련 ====================
+    
+    /**
+     * 그룹 채팅 메시지 목록 조회
+     */
+    suspend fun getGroupMessages(
+        groupId: String,
+        limit: Int = 50
+    ): ApiResult<List<MessageContent>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.getGroupMessages(groupId, limit, "")
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to get messages", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+    
+    /**
+     * 그룹 채팅 텍스트 메시지 전송
+     */
+    suspend fun sendGroupMessage(
+        groupId: String,
+        text: String
+    ): ApiResult<MessageContent> = withContext(Dispatchers.IO) {
+        try {
+            val request = MessageCreateRequest(text = text)
+            val response = apiService.sendGroupMessage(groupId, request, "")
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to send message", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+    
+    /**
+     * 그룹 채팅 이미지 메시지 전송
+     */
+    suspend fun sendGroupImageMessage(
+        groupId: String,
+        userId: String,
+        imageFile: File
+    ): ApiResult<GroupMessageItem> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = imageFile.asRequestBody("image/*".toMediaTypeOrNull())
+            val multipartBody = MultipartBody.Part.createFormData("file", imageFile.name, requestBody)
+            
+            val response = apiService.sendGroupImageMessage(groupId, userId, multipartBody)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to send image", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
         }
     }
 }

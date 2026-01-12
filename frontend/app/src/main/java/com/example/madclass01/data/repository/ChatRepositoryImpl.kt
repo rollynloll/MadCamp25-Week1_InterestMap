@@ -2,6 +2,7 @@ package com.example.madclass01.data.repository
 
 import com.example.madclass01.data.remote.ApiService
 import com.example.madclass01.data.remote.dto.MessageCreateRequest
+import com.example.madclass01.data.remote.dto.toDomain
 import com.example.madclass01.domain.model.ChatMessage
 import com.example.madclass01.domain.repository.ChatRepository
 import javax.inject.Inject
@@ -46,9 +47,9 @@ class ChatRepositoryImpl @Inject constructor(
 
     override fun observeGroupMessages(groupId: String): Flow<List<ChatMessage>> = flow {
         while (true) {
-            val res = apiService.getGroupMessages(groupId, limit = 100)
+            val res = apiService.getGroupMessages(groupId, limit = 100, "")
             if (res.isSuccessful && res.body() != null) {
-                val messages = res.body()!!.items.map { it.toDomain() }
+                val messages: List<ChatMessage> = res.body()!!.map { it.toDomain() }
                 emit(messages.reversed()) // 최신 메시지가 아래로 가도록 역순 정렬
             }
             delay(3000) // 3초 폴링
@@ -57,9 +58,9 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun getRecentMessages(groupId: String, limit: Int): Result<List<ChatMessage>> {
         return try {
-            val res = apiService.getGroupMessages(groupId, limit)
+            val res = apiService.getGroupMessages(groupId, limit, "")
             if (res.isSuccessful && res.body() != null) {
-                val messages = res.body()!!.items.map { it.toDomain() }
+                val messages: List<ChatMessage> = res.body()!!.map { it.toDomain() }
                 Result.success(messages.reversed())
             } else {
                 Result.failure(Exception("get messages failed ${res.code()}"))
@@ -71,7 +72,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendTextMessage(groupId: String, userId: String, content: String): Result<ChatMessage> {
         return try {
-            val res = apiService.sendGroupTextMessage(groupId, MessageCreateRequest(text = content))
+            val res = apiService.sendGroupMessage(groupId, MessageCreateRequest(text = content), "")
             if (res.isSuccessful && res.body() != null) {
                 Result.success(res.body()!!.toDomain())
             } else {

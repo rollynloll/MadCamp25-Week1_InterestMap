@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,78 +30,57 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.example.madclass01.domain.model.ChatMessage as DomainChatMessage
 import java.text.SimpleDateFormat
 import java.util.*
-
-data class ChatMessage(
-    val id: String,
-    val userId: String,
-    val userName: String,
-    val userAvatarUrl: String,
-    val message: String,
-    val timestamp: String,
-    val isMe: Boolean,
-    val avatarGradient: List<Color>
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChatScreen(
     chatRoomId: String,
     chatRoomName: String = "채팅방",
-    onBackPress: () -> Unit = {}
+    memberCount: Int = 0,
+    userId: String,
+    onBackPress: () -> Unit = {},
+    viewModel: ChatViewModel = hiltViewModel()
 ) {
-    remember(chatRoomId) { Unit }
-
+    val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
     var messageText by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
     
-    // Mock data - 그룹 인원 수
-    val memberCount = 8
-    
-    // Mock messages with gradient colors
-    val messages = remember {
-        listOf(
-            ChatMessage(
-                id = "1",
-                userId = "user1",
-                userName = "이OO",
-                userAvatarUrl = "https://picsum.photos/seed/user1/200/200",
-                message = "오늘 한강 러닝 어때요?",
-                timestamp = "오후 2:30",
-                isMe = false,
-                avatarGradient = listOf(Color(0xFFF59E0B), Color(0xFFD97706))
-            ),
-            ChatMessage(
-                id = "2",
-                userId = "user2",
-                userName = "김OO",
-                userAvatarUrl = "https://picsum.photos/seed/user2/200/200",
-                message = "좋아요! 몇 시에 모일까요?",
-                timestamp = "오후 2:32",
-                isMe = false,
-                avatarGradient = listOf(Color(0xFF10B981), Color(0xFF059669))
-            ),
-            ChatMessage(
-                id = "3",
-                userId = "me",
-                userName = "나",
-                userAvatarUrl = "https://picsum.photos/seed/me/200/200",
-                message = "5시쯤 만날까요? 🏃‍♂️",
-                timestamp = "오후 2:35",
-                isMe = true,
-                avatarGradient = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
-            ),
-            ChatMessage(
-                id = "4",
-                userId = "user3",
-                userName = "박OO",
-                userAvatarUrl = "https://picsum.photos/seed/user3/200/200",
-                message = "안녕하세요! 저도 같이 해도 될까요?",
-                timestamp = "오후 2:40",
-                isMe = false,
-                avatarGradient = listOf(Color(0xFFEF4444), Color(0xFFDC2626))
-            )
-        )
+    // 사진 선택을 위한 이미지 피커
+    val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        uri?.let {
+            // URI를 File로 변환해서 업로드
+            val file = uriToFile(context, it)
+            if (file != null) {
+                viewModel.sendImageMessage(chatRoomId, userId, file)
+            }
+        }
+    }
+
+    // 채팅방 초기화
+    LaunchedEffect(chatRoomId, userId) {
+        viewModel.initializeChatRoom(chatRoomId, userId)
+    }
+
+    // 새 메시지 수신 시 스크롤
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.messages.size - 1)
+        }
+    }
+
+    // 에러 표시
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            android.util.Log.e("ChatScreen", "Error: $it")
+            viewModel.clearError()
+        }
     }
 
     Column(
@@ -109,54 +90,109 @@ fun ChatScreen(
             .imePadding()
             .background(Color.White)
     ) {
-        // Chat Header (60dp height)
+        // Chat Header
         ChatHeader(
             groupName = chatRoomName,
             memberCount = memberCount,
             onBackPress = onBackPress
         )
-        
-        // Messages Area (weight to fill space)
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .background(Color(0xFFF9FAFB))
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Date Divider
-            item {
-                DateDivider(date = "2024년 1월 15일")
+
+        if (uiState.isLoading && uiState.messages.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Color(0xFFFF9945))
             }
-            
-            // Messages
-            items(messages) { message ->
-                if (message.isMe) {
-                    MyMessageItem(message = message)
-                } else {
-                    OtherMessageItem(message = message)
+        } else {
+            // Messages Area
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .background(Color(0xFFF9FAFB))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 날짜별로 그룹화하여 표시
+                val messagesByDate = uiState.messages.groupBy { message ->
+                    formatDateDivider(message.timestamp)
                 }
                 
-                // System message after third message
-                if (message.id == "3") {
-                    Spacer(modifier = Modifier.height(0.dp))
-                    SystemMessage(text = "박OO님이 입장했습니다")
+                messagesByDate.forEach { (date, messagesForDate) ->
+                    // 날짜 구분선
+                    item(key = "date_$date") {
+                        DateDivider(date = date)
+                    }
+                    
+                    // 해당 날짜의 메시지들
+                    items(
+                        items = messagesForDate,
+                        key = { it.id }
+                    ) { message ->
+                        val isMe = message.userId == userId
+                        if (isMe) {
+                            MyMessageItem(
+                                message = message.content ?: "",
+                                timestamp = formatTimestamp(message.timestamp)
+                            )
+                        } else {
+                            OtherMessageItem(
+                                userName = message.userName ?: "알 수 없음",
+                                message = message.content ?: "",
+                                timestamp = formatTimestamp(message.timestamp),
+                                avatarUrl = null // TODO: 프로필 사진 URL
+                            )
+                        }
+                    }
                 }
             }
         }
-        
-        // Input Area (68dp height)
+
+        // Input Area
         ChatInputArea(
             messageText = messageText,
             onMessageTextChange = { messageText = it },
             onSendClick = {
                 if (messageText.isNotBlank()) {
-                    // TODO: 메시지 전송 로직
+                    viewModel.sendMessage(chatRoomId, userId, messageText)
                     messageText = ""
                 }
-            }
+            },
+            onImageClick = {
+                imagePickerLauncher.launch("image/*")
+            },
+            enabled = !uiState.isSending
         )
+    }
+}
+
+private fun formatTimestamp(timestamp: Long): String {
+    val sdf = SimpleDateFormat("a h:mm", Locale.KOREAN)
+    return sdf.format(Date(timestamp))
+}
+
+private fun formatDateDivider(timestamp: Long): String {
+    val sdf = SimpleDateFormat("yyyy년 M월 d일", Locale.KOREAN)
+    return sdf.format(Date(timestamp))
+}
+
+// URI를 File로 변환하는 헬퍼 함수
+private fun uriToFile(context: android.content.Context, uri: android.net.Uri): java.io.File? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val file = java.io.File(context.cacheDir, "chat_image_${System.currentTimeMillis()}.jpg")
+        val outputStream = java.io.FileOutputStream(file)
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+        file
+    } catch (e: Exception) {
+        android.util.Log.e("ChatScreen", "Error converting URI to File", e)
+        null
     }
 }
 
@@ -214,15 +250,15 @@ fun ChatHeader(
                 }
             }
             
-            // Right - More menu
+            // Right - Add member button
             IconButton(
-                onClick = { /* TODO: More menu */ },
+                onClick = { /* TODO: Add member */ },
                 modifier = Modifier.size(24.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "더보기",
-                    tint = Color(0xFF6B7280),
+                    imageVector = Icons.Default.PersonAdd,
+                    contentDescription = "초대하기",
+                    tint = Color(0xFF111827),
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -254,7 +290,12 @@ fun DateDivider(date: String) {
 }
 
 @Composable
-fun OtherMessageItem(message: ChatMessage) {
+fun OtherMessageItem(
+    userName: String,
+    message: String,
+    timestamp: String,
+    avatarUrl: String? = null
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start,
@@ -265,21 +306,26 @@ fun OtherMessageItem(message: ChatMessage) {
             modifier = Modifier
                 .size(36.dp)
                 .background(
-                    brush = Brush.linearGradient(
-                        colors = message.avatarGradient,
-                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                        end = androidx.compose.ui.geometry.Offset(100f, 100f)
-                    ),
+                    color = Color(0xFFFF9945),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = message.userAvatarUrl,
-                contentDescription = "프로필 사진",
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
-            )
+            if (avatarUrl != null) {
+                AsyncImage(
+                    model = avatarUrl,
+                    contentDescription = "프로필 사진",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Text(
+                    text = userName.take(1),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            }
         }
         
         Spacer(modifier = Modifier.width(8.dp))
@@ -289,7 +335,7 @@ fun OtherMessageItem(message: ChatMessage) {
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
-                text = message.userName,
+                text = userName,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color(0xFF6B7280)
@@ -311,21 +357,19 @@ fun OtherMessageItem(message: ChatMessage) {
                     shadowElevation = 1.dp
                 ) {
                     Text(
-                        text = message.message,
+                        text = message,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Normal,
                         color = Color(0xFF111827),
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        modifier = Modifier.padding(12.dp)
                     )
                 }
                 
                 // Timestamp
                 Text(
-                    text = message.timestamp,
+                    text = timestamp,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color(0xFF9CA3AF),
-                    modifier = Modifier.padding(bottom = 4.dp)
+                    color = Color(0xFF9CA3AF)
                 )
             }
         }
@@ -333,87 +377,41 @@ fun OtherMessageItem(message: ChatMessage) {
 }
 
 @Composable
-fun MyMessageItem(message: ChatMessage) {
-    Column(
+fun MyMessageItem(
+    message: String,
+    timestamp: String
+) {
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.Bottom
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            // Timestamp (no read count as per user request)
-            Text(
-                text = message.timestamp,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Normal,
-                color = Color(0xFF9CA3AF),
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-            
-            // Message bubble with gradient
-            Surface(
-                shape = RoundedCornerShape(
-                    topStart = 16.dp,
-                    topEnd = 4.dp,
-                    bottomStart = 16.dp,
-                    bottomEnd = 16.dp
-                ),
-                color = Color.Transparent,
-                shadowElevation = 2.dp
-            ) {
-                Box(
-                    modifier = Modifier.background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2)
-                            )
-                        )
-                    )
-                ) {
-                    Text(
-                        text = message.message,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = Color.White,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun SystemMessage(text: String) {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
+        // Timestamp
+        Text(
+            text = timestamp,
+            fontSize = 11.sp,
+            color = Color(0xFF9CA3AF)
+        )
+        
+        Spacer(modifier = Modifier.width(4.dp))
+        
+        // Message bubble
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color(0xFFFEF2F2)
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 4.dp,
+                bottomStart = 16.dp,
+                bottomEnd = 16.dp
+            ),
+            color = Color(0xFFFF9945)
         ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.PersonAdd,
-                    contentDescription = null,
-                    tint = Color(0xFFEF4444),
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    text = text,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF991B1B)
-                )
-            }
+            Text(
+                text = message,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.White,
+                modifier = Modifier.padding(12.dp)
+            )
         }
     }
 }
@@ -422,7 +420,9 @@ fun SystemMessage(text: String) {
 fun ChatInputArea(
     messageText: String,
     onMessageTextChange: (String) -> Unit,
-    onSendClick: () -> Unit
+    onSendClick: () -> Unit,
+    onImageClick: () -> Unit,
+    enabled: Boolean = true
 ) {
     Surface(
         modifier = Modifier
@@ -438,7 +438,7 @@ fun ChatInputArea(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.Bottom
         ) {
-            // Plus Button (44dp)
+            // 사진 버튼 (44dp)
             Box(
                 modifier = Modifier
                     .size(44.dp)
@@ -449,12 +449,13 @@ fun ChatInputArea(
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(
-                    onClick = { /* TODO: Attachment */ },
+                    onClick = onImageClick,
+                    enabled = enabled,
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "첨부",
+                        imageVector = Icons.Default.Image,
+                        contentDescription = "사진 전송",
                         tint = Color(0xFF6B7280),
                         modifier = Modifier.size(22.dp)
                     )
@@ -475,13 +476,12 @@ fun ChatInputArea(
                         color = Color(0xFFE5E7EB),
                         shape = RoundedCornerShape(22.dp)
                     )
-                    .padding(horizontal = 16.dp),
-                contentAlignment = Alignment.CenterStart
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
             ) {
                 BasicTextField(
                     value = messageText,
                     onValueChange = onMessageTextChange,
-                    modifier = Modifier.fillMaxWidth(),
+                    enabled = enabled,
                     textStyle = TextStyle(
                         fontSize = 15.sp,
                         color = Color(0xFF111827)
@@ -489,40 +489,37 @@ fun ChatInputArea(
                     decorationBox = { innerTextField ->
                         if (messageText.isEmpty()) {
                             Text(
-                                text = "메시지를 입력하세요...",
+                                text = "메시지를 입력하세요",
                                 fontSize = 15.sp,
                                 color = Color(0xFF9CA3AF)
                             )
                         }
                         innerTextField()
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
             
-            // Send Button (44dp) with gradient
+            // Send Button (44dp)
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color(0xFF667EEA),
-                                Color(0xFF764BA2)
-                            )
-                        ),
+                        color = if (messageText.isNotBlank() && enabled) Color(0xFFFF9945) else Color(0xFFF3F4F6),
                         shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(
                     onClick = onSendClick,
+                    enabled = messageText.isNotBlank() && enabled,
                     modifier = Modifier.size(44.dp)
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "전송",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
+                        tint = if (messageText.isNotBlank() && enabled) Color.White else Color(0xFF9CA3AF),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

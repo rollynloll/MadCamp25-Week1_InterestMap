@@ -24,10 +24,16 @@ import com.example.madclass01.presentation.group.screen.CreateGroupScreen
 import com.example.madclass01.presentation.group.screen.GroupDetailScreen
 import com.example.madclass01.presentation.group.screen.QRInviteScreen
 import com.example.madclass01.presentation.group.screen.QRScannerScreen
+import com.example.madclass01.core.TokenManager
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    
+    @Inject
+    lateinit var tokenManager: TokenManager
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
@@ -40,7 +46,10 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    AppNavigation(initialDeepLink = deepLinkData)
+                    AppNavigation(
+                        initialDeepLink = deepLinkData,
+                        tokenManager = tokenManager
+                    )
                 }
             }
         }
@@ -50,7 +59,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         // 앱이 이미 실행 중일 때 Deep Link 처리
-        handleDeepLink(intent)?.let { deepLinkData ->
+        handleDeepLink(intent)?.let { _ ->
             Toast.makeText(this, "그룹 초대 링크를 처리합니다...", Toast.LENGTH_SHORT).show()
         }
     }
@@ -94,7 +103,10 @@ enum class ProfileFlowEntry {
 }
 
 @Composable
-fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
+fun AppNavigation(
+    initialDeepLink: DeepLinkData? = null,
+    tokenManager: TokenManager
+) {
     // 🧪 테스트 모드: true로 설정하면 API 테스트 화면으로 시작
     val isTestMode = false  // 테스트 완료!
     val context = LocalContext.current
@@ -145,6 +157,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 onLoginSuccess = { id, nickname, source, isProfileComplete, age, gender, region, bio, tags, photoInterests ->
                     println("MainActivity: Login Success - Tags: $tags, PhotoInterests: $photoInterests")
                     userId = id
+                    tokenManager.saveUserId(id) // TokenManager에 userId 저장
                     userNickname = nickname
                     if (source == LoginSource.Test) {
                         // 프로필 목업 값
@@ -280,8 +293,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 onQRCodeClick = { group ->
                     currentScreen = AppScreen.QRInvite(group.id, group.name, group.memberCount)
                 },
-                onChatRoomCreated = { chatRoomId, groupName ->
-                    currentScreen = AppScreen.Chat(chatRoomId, groupName)
+                onChatRoomCreated = { chatRoomId, groupName, memberCount ->
+                    currentScreen = AppScreen.Chat(chatRoomId, groupName, memberCount)
                 }
             )
         }
@@ -303,6 +316,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
             ChatScreen(
                 chatRoomId = chat.chatRoomId,
                 chatRoomName = chat.chatRoomName,
+                memberCount = chat.memberCount,
+                userId = userId ?: "",
                 onBackPress = {
                     currentScreen = AppScreen.Home
                 }
@@ -385,7 +400,7 @@ sealed class AppScreen {
     object TagSelection : AppScreen()
     data class GroupDetail(val groupId: String) : AppScreen()
     object CreateGroup : AppScreen()
-    data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅") : AppScreen()
+    data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅", val memberCount: Int = 0) : AppScreen()
     object QRScanner : AppScreen()
     data class QRInvite(val groupId: String, val groupName: String, val memberCount: Int = 0) : AppScreen()
     object Home : AppScreen()
