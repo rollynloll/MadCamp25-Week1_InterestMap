@@ -39,6 +39,7 @@ class SearchGroupsUseCase @Inject constructor(
             memberCount = memberIds.size,
             tags = tags.map { Tag(id = it, name = it) },
             imageUrl = imageUrl,
+            iconType = iconType,
             region = region
         )
     }

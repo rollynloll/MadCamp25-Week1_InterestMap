@@ -16,13 +16,20 @@ class GroupRepositoryImpl @Inject constructor(
         description: String,
         iconType: String,
         tags: List<String>,
+        region: String?,
+        imageUrl: String?,
         isPublic: Boolean,
         userId: String
     ): Group {
         val request = CreateGroupRequest(
             name = name,
             creatorId = userId,
-            description = description.ifBlank { null }
+            description = description.ifBlank { null },
+            tags = tags,
+            region = region,
+            imageUrl = imageUrl,
+            iconType = iconType,
+            isPublic = isPublic
         )
         
         val response = apiService.createGroup(request)
@@ -35,12 +42,13 @@ class GroupRepositoryImpl @Inject constructor(
                 description = groupResponse.description ?: "",
                 memberCount = groupResponse.memberIds.size,
                 activity = "보통",
-                tags = emptyList(),
-                imageUrl = "",
+                tags = groupResponse.tags.map { Tag(id = it, name = it) },
+                imageUrl = groupResponse.imageUrl,
+                iconType = groupResponse.iconType,
                 lastActivityDate = "",
                 messageCount = 0,
                 matchPercentage = 0,
-                region = "",
+                region = groupResponse.region,
                 memberAge = "",
                 isJoined = true
             )

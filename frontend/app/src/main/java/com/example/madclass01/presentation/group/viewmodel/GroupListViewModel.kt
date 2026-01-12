@@ -70,6 +70,7 @@ class GroupListViewModel @Inject constructor(
                             memberCount = groupResponse.memberIds?.size ?: 0,
                             tags = groupResponse.tags?.map { Tag(id = it, name = it) } ?: emptyList(),
                             imageUrl = groupResponse.imageUrl ?: "",
+                            iconType = groupResponse.iconType ?: "",
                             region = groupResponse.region ?: ""
                         )
                     }

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 import logging
 from pathlib import Path
-from sqlalchemy import text, select, func, inspect, delete
+from sqlalchemy import text, select, func, inspect, delete, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import (
@@ -307,6 +307,7 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
     tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
     region = profile.get("region") or ""
     image_url = profile.get("image_url") or ""
+    icon_type = profile.get("icon_type") or ""
     return {
         "id": str(group.id),
         "name": group.name,
@@ -317,6 +318,7 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
         "tags": tags,
         "region": region,
         "image_url": image_url,
+        "icon_type": icon_type,
     }
 
 
@@ -410,7 +412,19 @@ async def _process_photo_captions(
     logger = logging.getLogger("uvicorn.error")
     try:
         async with AsyncSessionLocal() as session:
-            user = await _get_user_by_id(session, user_id)
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                logger.warning("Background captioning invalid user_id=%s", user_id)
+                return
+            result = await session.execute(
+                select(User.id, User.nickname, User.profile_data).where(User.id == user_uuid)
+            )
+            row = result.one_or_none()
+            if not row:
+                logger.warning("Background captioning missing user_id=%s", user_id)
+                return
+            _, user_nickname, user_profile_data = row
             batch_captions: list[str] = []
             suggested_tag_counts: Counter[str] = Counter()
 
@@ -440,9 +454,9 @@ async def _process_photo_captions(
                 return
 
             selected_tags: set[str] = set(str(item) for item in incoming_tags if item)
-            if user.profile_data:
+            if user_profile_data:
                 for key in ("tags", "interests", "photo_interests", "hobbies", "selected_tags"):
-                    value = user.profile_data.get(key)
+                    value = user_profile_data.get(key)
                     if isinstance(value, list):
                         selected_tags.update(str(item) for item in value if item)
 
@@ -450,15 +464,19 @@ async def _process_photo_captions(
                 tag for tag, _count in suggested_tag_counts.most_common()
                 if tag not in selected_tags
             ][:5]
-            profile_data = dict(user.profile_data or {})
+            profile_data = dict(user_profile_data or {})
             profile_data["suggested_tags"] = suggested_tags
-            user.profile_data = profile_data
+            await session.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(profile_data=profile_data)
+            )
             await session.commit()
 
             if batch_captions or selected_tags:
                 user_description = None
-                if user.profile_data:
-                    user_description = user.profile_data.get("bio") or user.profile_data.get("description")
+                if user_profile_data:
+                    user_description = user_profile_data.get("bio") or user_profile_data.get("description")
                 unique_captions: list[str] = []
                 seen: set[str] = set()
                 for caption in batch_captions:
@@ -480,16 +498,16 @@ async def _process_photo_captions(
                         exc,
                     )
                 else:
-                    await deactivate_embeddings(session, user.id)
+                    await deactivate_embeddings(session, user_uuid)
                     await create_embedding(
                         session,
-                        user_id=user.id,
+                        user_id=user_uuid,
                         embedding=embedding,
                     )
                     await session.commit()
                     log_embedding_io(
-                        user_name=user.nickname,
-                        user_id=str(user.id),
+                        user_name=user_nickname,
+                        user_id=str(user_uuid),
                         input_text=final_text,
                         image_captions=image_captions_for_embedding,
                         image_tags=suggested_tags,
@@ -498,11 +516,14 @@ async def _process_photo_captions(
                         model_version=model_version,
                     )
             if compute_embedding:
-                profile_data = dict(user.profile_data or {})
+                profile_data = dict(profile_data)
                 profile_data["captioning_status"] = "done"
-                user.profile_data = profile_data
+                await session.execute(
+                    update(User)
+                    .where(User.id == user_uuid)
+                    .values(profile_data=profile_data)
+                )
                 await session.commit()
-                _cache_user(user)
             logger.info(
                 "Background captioning completed user_id=%s count=%d",
                 user_id,
@@ -518,12 +539,26 @@ async def _set_captioning_status(user_id: str, status: str) -> None:
     logger = logging.getLogger("uvicorn.error")
     try:
         async with AsyncSessionLocal() as session:
-            user = await _get_user_by_id(session, user_id)
-            profile_data = dict(user.profile_data or {})
+            try:
+                user_uuid = uuid.UUID(user_id)
+            except ValueError:
+                logger.warning("Invalid user_id for captioning status: %s", user_id)
+                return
+            result = await session.execute(
+                select(User.profile_data).where(User.id == user_uuid)
+            )
+            row = result.one_or_none()
+            if not row:
+                logger.warning("Missing user for captioning status: %s", user_id)
+                return
+            profile_data = dict(row[0] or {})
             profile_data["captioning_status"] = status
-            user.profile_data = profile_data
+            await session.execute(
+                update(User)
+                .where(User.id == user_uuid)
+                .values(profile_data=profile_data)
+            )
             await session.commit()
-            _cache_user(user)
     except Exception as exc:
         logger.warning(
             "Failed to update captioning status user_id=%s status=%s error=%s",
@@ -857,10 +892,18 @@ async def get_user_photos(
 async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(get_db)):
     """그룹 생성"""
     creator = await _get_user_by_id(db, request.creator_id)
+    group_profile = {
+        "tags": request.tags,
+        "region": request.region or "",
+        "image_url": request.image_url or "",
+        "icon_type": request.icon_type or "",
+        "is_public": request.is_public,
+    }
     group = Group(
         name=request.name,
         description=request.description,
         created_by=creator.id,
+        group_profile=group_profile,
     )
     db.add(group)
     try:

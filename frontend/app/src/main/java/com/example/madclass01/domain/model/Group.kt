@@ -8,6 +8,7 @@ data class Group(
     val activity: String = "", // "활발함", "보통", "조용함"
     val tags: List<Tag> = emptyList(),
     val imageUrl: String = "",
+    val iconType: String = "",
     val lastActivityDate: String = "",
     val messageCount: Int = 0,
     val matchPercentage: Int = 0, // 매칭도 (0-100)

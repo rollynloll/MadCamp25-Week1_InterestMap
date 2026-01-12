@@ -17,6 +17,7 @@ data class CreateGroupUiState(
     val useCustomImage: Boolean = false,  // true: 사진 사용, false: 아이콘 사용
     val selectedIconType: String = "users",
     val profileImageUri: String? = null,
+    val selectedRegion: String = "전체",
     val selectedTags: List<String> = emptyList(),
     val isPublic: Boolean = true,
     val isLoading: Boolean = false,
@@ -43,6 +44,13 @@ class CreateGroupViewModel @Inject constructor(
     fun updateGroupDescription(description: String) {
         _uiState.value = _uiState.value.copy(
             groupDescription = description,
+            errorMessage = ""
+        )
+    }
+
+    fun updateRegion(region: String) {
+        _uiState.value = _uiState.value.copy(
+            selectedRegion = region,
             errorMessage = ""
         )
     }
@@ -115,6 +123,8 @@ class CreateGroupViewModel @Inject constructor(
                 description = currentState.groupDescription,
                 iconType = currentState.selectedIconType,
                 tags = currentState.selectedTags,
+                region = currentState.selectedRegion,
+                imageUrl = if (currentState.useCustomImage) currentState.profileImageUri else null,
                 isPublic = currentState.isPublic,
                 userId = userId
             )

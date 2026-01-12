@@ -20,8 +20,8 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun joinGroup(groupId: String, userId: String): Result<Unit> {
         return try {
-            val res = apiService.joinGroupChat(groupId)
-            if (res.isSuccessful && res.body()?.ok == true) {
+            val res = apiService.joinGroupChat(groupId, com.example.madclass01.data.remote.dto.AddMemberRequest(userId))
+            if (res.isSuccessful && res.body() != null) {
                 Result.success(Unit)
             } else {
                 Result.failure(Exception("join failed ${res.code()}"))

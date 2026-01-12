@@ -125,14 +125,24 @@ data class GroupResponse(
     val tags: List<String> = emptyList(),
     val region: String = "",
     @SerializedName("image_url")
-    val imageUrl: String = ""
+    val imageUrl: String = "",
+    @SerializedName("icon_type")
+    val iconType: String = ""
 )
 
 data class CreateGroupRequest(
     val name: String,
     @SerializedName("creator_id")
     val creatorId: String,
-    val description: String? = null
+    val description: String? = null,
+    val tags: List<String> = emptyList(),
+    val region: String? = null,
+    @SerializedName("image_url")
+    val imageUrl: String? = null,
+    @SerializedName("icon_type")
+    val iconType: String? = null,
+    @SerializedName("is_public")
+    val isPublic: Boolean = true
 )
 
 data class AddMemberRequest(

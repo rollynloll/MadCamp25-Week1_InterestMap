@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +46,15 @@ fun CreateGroupScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var tagInputValue by remember { mutableStateOf("") }
+    var regionExpanded by remember { mutableStateOf(false) }
+    val regions = listOf(
+        "전체",
+        "서울특별시", "부산광역시", "대구광역시", "인천광역시",
+        "광주광역시", "대전광역시", "울산광역시", "세종특별자치시",
+        "경기도", "강원특별자치도", "충청북도", "충청남도",
+        "전북특별자치도", "전라남도", "경상북도", "경상남도",
+        "제주특별자치도"
+    )
 
     // 프로필 사진 선택 런처
     val profileImageLauncher = rememberLauncherForActivityResult(
@@ -382,6 +392,70 @@ fun CreateGroupScreen(
                         )
                     }
 
+                    // Group Region
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "지역",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF111827)
+                        )
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .background(Color(0xFFF9FAFB), RoundedCornerShape(12.dp))
+                                    .border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(12.dp))
+                                    .clickable { regionExpanded = true }
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = uiState.selectedRegion,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF111827)
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "지역 선택",
+                                    tint = Color(0xFF9CA3AF),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = regionExpanded,
+                                onDismissRequest = { regionExpanded = false },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.White)
+                                    .heightIn(max = 300.dp)
+                            ) {
+                                regions.forEach { region ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = region,
+                                                fontSize = 15.sp,
+                                                color = if (region == uiState.selectedRegion) Color(0xFFFF9945) else Color(0xFF111827),
+                                                fontWeight = if (region == uiState.selectedRegion) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            viewModel.updateRegion(region)
+                                            regionExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // Group Tags
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -558,4 +632,3 @@ fun CreateGroupScreen(
                 }
             }
         }
-

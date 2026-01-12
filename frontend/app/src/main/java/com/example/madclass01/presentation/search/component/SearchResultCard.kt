@@ -15,9 +15,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.madclass01.domain.model.Group
 import com.example.madclass01.presentation.common.component.TagChip
 
@@ -48,12 +50,19 @@ fun SearchResultCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = "그룹 아이콘",
-                    tint = Color.White,
-                    modifier = Modifier.size(40.dp)
-                )
+                if (group.imageUrl.isNotBlank()) {
+                    AsyncImage(
+                        model = group.imageUrl,
+                        contentDescription = "그룹 프로필",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = groupIconEmoji(group.iconType),
+                        fontSize = 28.sp
+                    )
+                }
             }
             
             // 그룹 정보
@@ -132,5 +141,19 @@ fun SearchResultCard(
                 }
             }
         }
+    }
+}
+
+private fun groupIconEmoji(iconType: String): String {
+    return when (iconType) {
+        "users" -> "👥"
+        "coffee" -> "☕"
+        "camera" -> "📷"
+        "mountain" -> "⛰️"
+        "music" -> "🎵"
+        "book" -> "📚"
+        "sports" -> "⚽"
+        "food" -> "🍔"
+        else -> "👥"
     }
 }

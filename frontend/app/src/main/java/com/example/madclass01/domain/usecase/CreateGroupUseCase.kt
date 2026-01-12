@@ -12,6 +12,8 @@ class CreateGroupUseCase @Inject constructor(
         description: String,
         iconType: String,
         tags: List<String>,
+        region: String?,
+        imageUrl: String?,
         isPublic: Boolean,
         userId: String
     ): Result<Group> = try {
@@ -20,6 +22,8 @@ class CreateGroupUseCase @Inject constructor(
             description = description,
             iconType = iconType,
             tags = tags,
+            region = region,
+            imageUrl = imageUrl,
             isPublic = isPublic,
             userId = userId
         )

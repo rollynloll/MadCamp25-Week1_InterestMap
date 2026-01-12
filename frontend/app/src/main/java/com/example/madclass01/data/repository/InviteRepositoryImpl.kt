@@ -101,7 +101,10 @@ class InviteRepositoryImpl @Inject constructor(
             ?: return Result.failure(Exception("Invalid invite URL format"))
         
         // 기존 join group API 사용 (인증 헤더 불필요한 버전)
-        val response = apiService.joinGroupChat(groupId)
+        val response = apiService.joinGroupChat(
+            groupId,
+            com.example.madclass01.data.remote.dto.AddMemberRequest(userId)
+        )
         
         if (response.isSuccessful && response.body() != null) {
             Result.success(true)
