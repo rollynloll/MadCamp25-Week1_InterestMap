@@ -163,23 +163,11 @@ fun QRScannerScreen(
             }
             
             // 스캔 가이드
-            Column(
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 120.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(280.dp)
-                        .background(
-                            color = Color.White.copy(alpha = 0.1f),
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
                 Text(
                     text = "QR 코드를 사각형 안에\n맞춰주세요",
                     fontSize = 16.sp,
