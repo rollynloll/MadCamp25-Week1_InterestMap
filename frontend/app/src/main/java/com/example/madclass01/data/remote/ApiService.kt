@@ -255,10 +255,11 @@ interface ApiService {
         @Part("file") file: okhttp3.MultipartBody.Part
     ): Response<GroupMessageItem>
 
-    @POST("/groups/{groupId}/join")
+    @POST("/api/groups/{groupId}/members")
     suspend fun joinGroupChat(
-        @Path("groupId") groupId: String
-    ): Response<OkResponse>
+        @Path("groupId") groupId: String,
+        @Body request: AddMemberRequest
+    ): Response<GroupResponse>
 
     @POST("/groups/{groupId}/leave")
     suspend fun leaveGroupChat(
