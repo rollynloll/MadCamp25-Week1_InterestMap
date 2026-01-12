@@ -129,6 +129,11 @@ class GroupCreateRequest(BaseSchema):
     name: str = Field(..., min_length=1, max_length=100)
     creator_id: str
     description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    region: str | None = None
+    image_url: str | None = None
+    icon_type: str | None = None
+    is_public: bool = True
 
 
 class GroupResponse(BaseSchema):
@@ -141,6 +146,7 @@ class GroupResponse(BaseSchema):
     tags: list[str] = []
     region: str = ""
     image_url: str = ""
+    icon_type: str = ""
 
 
 class GroupDetailResponse(BaseSchema):

@@ -8,6 +8,8 @@ interface GroupRepository {
         description: String,
         iconType: String,
         tags: List<String>,
+        region: String?,
+        imageUrl: String?,
         isPublic: Boolean,
         userId: String
     ): Group

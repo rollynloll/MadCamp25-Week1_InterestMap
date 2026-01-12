@@ -46,9 +46,17 @@ async def create_group(
     그룹 생성 및 creator를 자동으로 멤버로 추가
     """
     # 그룹 생성
+    group_profile = {
+        "tags": payload.tags,
+        "region": payload.region or "",
+        "image_url": payload.image_url or "",
+        "icon_type": payload.icon_type or "",
+        "is_public": payload.is_public,
+    }
     group = Group(
         name=payload.name,
         description=payload.description or "",
+        group_profile=group_profile,
     )
     db.add(group)
     await db.flush()
