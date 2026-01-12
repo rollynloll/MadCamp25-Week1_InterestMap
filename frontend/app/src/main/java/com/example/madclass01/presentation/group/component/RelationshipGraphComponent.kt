@@ -10,16 +10,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.Canvas
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +54,19 @@ fun RelationshipGraphComponent(
             .size(width = 390.dp, height = 520.dp)
             .background(Color(0xFFFAFBFC))
     ) {
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+            val baseRadius = minOf(size.width, size.height) * 0.18f
+            val ringColor = Color(0xFF0E8F6C).copy(alpha = 0.28f)
+            val ringStroke = Stroke(width = 2.6f)
+
+            drawCircle(color = ringColor, radius = baseRadius * 0.35f, center = center, style = ringStroke)
+            drawCircle(color = ringColor, radius = baseRadius, center = center, style = ringStroke)
+            drawCircle(color = ringColor, radius = baseRadius * 0.9f, center = center, style = ringStroke)
+            drawCircle(color = ringColor, radius = baseRadius * 1.9f, center = center, style = ringStroke)
+            drawCircle(color = ringColor, radius = baseRadius * 2.6f, center = center, style = ringStroke)
+        }
+
         // 다른 사용자들의 노드
         relationshipGraph.otherUserNodes.forEach { nodePosition ->
             val embedding = relationshipGraph.embeddings[nodePosition.userId]

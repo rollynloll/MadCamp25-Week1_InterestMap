@@ -209,7 +209,7 @@ fun GroupDetailScreen(
                             .padding(top = 8.dp)
                             .align(Alignment.CenterHorizontally)
                     ) { scale ->
-                        val nodeScale = (1f / scale.pow(1.0f)).coerceIn(0.05f, 2f)
+                        val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
                         MockRelationshipGraphCanvas(
                             currentUserName = "나",
                             currentUserImageModel = "https://picsum.photos/seed/me_star/200/200",
@@ -308,7 +308,7 @@ fun GroupDetailScreen(
 
                     // 관계 그래프
                     ZoomableGraphContainer { scale ->
-                        val nodeScale = (1f / scale.pow(2.5f)).coerceIn(0.2f, 2f)
+                        val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
                         RelationshipGraphComponent(
                             relationshipGraph = uiState.relationshipGraph!!,
                             selectedUserId = uiState.selectedUserId,
@@ -449,7 +449,7 @@ private fun ZoomableGraphContainer(
     var offset by remember { mutableStateOf(Offset.Zero) }
 
     val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        scale = (scale * zoomChange).coerceIn(0.5f, 3f)
+        scale = (scale * zoomChange).coerceIn(0.1f, 8f)
         offset += panChange
     }
 

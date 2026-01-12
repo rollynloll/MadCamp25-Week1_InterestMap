@@ -34,16 +34,17 @@ class SearchGroupsUseCase @Inject constructor(
             }
         }
 
-        val selectedRegion = filters["region"] as? String ?: "전체"
-        val selectedMemberRange = filters["memberRange"] as? String ?: "전체"
+        val selectedRegion = (filters["region"] as? String)?.trim().orEmpty()
+        val selectedMemberRange = (filters["memberRange"] as? String)?.trim().orEmpty()
 
-        val filteredByRegion = if (selectedRegion == "전체") {
+        val filteredByRegion = if (selectedRegion.isBlank() || selectedRegion == "전체") {
             filteredByQuery
         } else {
             filteredByQuery.filter { it.region == selectedRegion }
         }
 
         val filteredByMembers = when (selectedMemberRange) {
+            "", "전체" -> filteredByRegion
             "10명 이하" -> filteredByRegion.filter { it.memberCount <= 10 }
             "10-30명" -> filteredByRegion.filter { it.memberCount in 10..30 }
             "30명 이상" -> filteredByRegion.filter { it.memberCount >= 30 }
