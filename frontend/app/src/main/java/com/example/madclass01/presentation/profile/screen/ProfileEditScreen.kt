@@ -61,6 +61,11 @@ fun ProfileEditScreen(
         tags: List<String>
     ) -> Unit
 ) {
+    LaunchedEffect(initialTags, initialPhotoInterests) {
+        android.util.Log.d("ProfileEditScreen", "Initial Tags: $initialTags")
+        android.util.Log.d("ProfileEditScreen", "Initial Photo Interests: $initialPhotoInterests")
+    }
+
     var profileImage by remember { mutableStateOf(initialProfileImage) }
     var nickname by remember { mutableStateOf(initialNickname) }
     var ageText by remember { mutableStateOf(initialAge?.toString() ?: "") }

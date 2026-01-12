@@ -34,6 +34,8 @@ data class LoginUiState(
     val profileGender: String? = null,  // gender 추가
     val profileRegion: String? = null,
     val profileBio: String? = null,
+    val profileTags: List<String> = emptyList(),
+    val profilePhotoInterests: List<String> = emptyList(),
     val isProfileComplete: Boolean = false,
     val loginSource: LoginSource = LoginSource.None
 )
@@ -137,13 +139,21 @@ class LoginViewModel @Inject constructor(
                 is ApiResult.Success -> {
                     val user = result.data
                     android.util.Log.d("LoginViewModel", "백엔드 유저 생성 성공 - userId: ${user.id}, nickname: ${user.nickname}")
+                    android.util.Log.d("LoginViewModel", "RAW ProfileData: ${user.profileData}")
 
                     val profileAge = user.profileData["age"].toIntOrNull()
                     val profileGender = user.profileData["gender"] as? String
                     val profileRegion = user.profileData["region"] as? String
                     val profileBio = user.profileData["bio"] as? String
+                    @Suppress("UNCHECKED_CAST")
+                    val profileTags = (user.profileData["interests"] as? List<String>) ?: emptyList()
+                    @Suppress("UNCHECKED_CAST")
+                    val profilePhotoInterests = (user.profileData["photo_interests"] as? List<String>) ?: emptyList()
                     val imageCount = user.profileData["image_count"].toIntOrNull() ?: 0
                     val isProfileComplete = profileAge != null && !profileRegion.isNullOrBlank() && imageCount >= 1
+
+                    android.util.Log.d("LoginViewModel", "Extracted Tags (interests): $profileTags")
+                    android.util.Log.d("LoginViewModel", "Extracted Photo Interests: $profilePhotoInterests")
 
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -155,6 +165,8 @@ class LoginViewModel @Inject constructor(
                         profileGender = profileGender,
                         profileRegion = profileRegion,
                         profileBio = profileBio,
+                        profileTags = profileTags,
+                        profilePhotoInterests = profilePhotoInterests,
                         isProfileComplete = isProfileComplete,
                         loginToken = user.id  // userId를 token으로 사용
                     )

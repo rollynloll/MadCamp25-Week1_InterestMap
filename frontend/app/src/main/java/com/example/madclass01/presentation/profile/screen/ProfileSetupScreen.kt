@@ -50,7 +50,7 @@ fun ProfileSetupScreen(
     viewModel: ProfileSetupViewModel = hiltViewModel(),
     isEditMode: Boolean = false,
     onBack: () -> Unit = {},
-    onProfileComplete: (nickname: String, age: Int, region: String, images: List<String>, recommendedTags: List<String>) -> Unit = { _, _, _, _, _ -> }
+    onProfileComplete: (nickname: String, age: Int, region: String, bio: String, images: List<String>, recommendedTags: List<String>, interests: List<String>) -> Unit = { _, _, _, _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -87,8 +87,10 @@ fun ProfileSetupScreen(
                 uiState.nickname,
                 uiState.age,
                 uiState.region,
+                uiState.bio,
                 uiState.images.map { it.uri },
-                uiState.recommendedTags
+                uiState.recommendedTags,
+                uiState.interests.map { it.name }
             )
             viewModel.resetCompleteState()
         }

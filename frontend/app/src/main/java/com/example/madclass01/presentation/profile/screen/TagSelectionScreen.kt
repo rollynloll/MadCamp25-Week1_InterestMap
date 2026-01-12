@@ -27,12 +27,21 @@ fun TagSelectionScreen(
     nickname: String,
     age: Int?,
     region: String?,
+    bio: String? = null,
     recommendedTags: List<String>,
+    initialCustomTags: List<String> = emptyList(),
     viewModel: TagSelectionViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
     onComplete: (selectedTags: List<String>) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    
+    // 초기 커스텀 태그 설정 (Step 1에서 넘어온 값)
+    LaunchedEffect(initialCustomTags) {
+        if (initialCustomTags.isNotEmpty()) {
+            viewModel.setCustomTags(initialCustomTags)
+        }
+    }
     
     // 추천 태그 설정
     LaunchedEffect(recommendedTags) {
@@ -192,22 +201,45 @@ fun TagSelectionScreen(
                 
                 // 완료 버튼
                 Button(
-                    onClick = { viewModel.completeSelection() },
+                    onClick = { 
+                        if (userId != null && !uiState.isLoading) {
+                            viewModel.saveProfile(
+                                userId = userId,
+                                nickname = nickname,
+                                age = age,
+                                region = region,
+                                bio = bio,
+                                photoInterests = recommendedTags // Step 1에서 받은 추천 태그는 photo_interests로 저장
+                            )
+                        } else if (userId == null) {
+                            // userId가 없는 경우 (테스트 등)
+                             viewModel.completeSelection()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(48.dp)
                         .padding(top = 16.dp),
+                    enabled = !uiState.isLoading,
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFFFF9945)
                     )
                 ) {
-                    Text(
-                        text = "완료하고 시작하기",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    if (uiState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            text = "완료하고 시작하기",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
                 }
                 
                 Text(

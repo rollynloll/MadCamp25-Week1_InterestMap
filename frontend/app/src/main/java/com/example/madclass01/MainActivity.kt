@@ -141,7 +141,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
         }
         AppScreen.Login -> {
             LoginScreen(
-                onLoginSuccess = { id, nickname, source, isProfileComplete, age, gender, region, bio ->
+                onLoginSuccess = { id, nickname, source, isProfileComplete, age, gender, region, bio, tags, photoInterests ->
+                    println("MainActivity: Login Success - Tags: $tags, PhotoInterests: $photoInterests")
                     userId = id
                     userNickname = nickname
                     if (source == LoginSource.Test) {
@@ -153,6 +154,7 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                         userImages = emptyList()
                         recommendedTags = emptyList()
                         userTags = emptyList()
+                        userPhotoInterests = emptyList()
                         homeStartTabRoute = "groups"
                         currentScreen = AppScreen.Home
                     } else if (isProfileComplete) {
@@ -161,6 +163,8 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                         userGender = gender
                         userRegion = region
                         userBio = bio ?: ""
+                        userTags = tags
+                        userPhotoInterests = photoInterests
                         homeStartTabRoute = "groups"
                         currentScreen = AppScreen.Home
                     } else {
@@ -182,13 +186,16 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                         currentScreen = AppScreen.Login
                     }
                 },
-                onProfileComplete = { nickname, age, region, images, tags ->
+                onProfileComplete = { nickname, age, region, bio, images, tags, interests ->
                     userNickname = nickname
                     userAge = age
                     userRegion = region
+                    userBio = bio
                     userImages = images
                     recommendedTags = tags
+                    userTags = interests // Step 1에서 선택한 태그를 userTags에 저장
                     println("Step 1 완료: $nickname, $age, $region, ${images.size}개 이미지")
+                    println("Step 1 관심사: $interests")
                     currentScreen = AppScreen.TagSelection
                 }
             )
@@ -212,7 +219,9 @@ fun AppNavigation(initialDeepLink: DeepLinkData? = null) {
                 nickname = userNickname ?: "",
                 age = userAge,
                 region = userRegion,
+                bio = userBio,
                 recommendedTags = recommendedTags,
+                initialCustomTags = userTags,
                 onBack = {
                     currentScreen = AppScreen.ProfileSetup
                 },

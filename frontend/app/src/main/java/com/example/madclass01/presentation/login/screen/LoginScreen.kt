@@ -33,7 +33,7 @@ import com.kakao.sdk.user.UserApiClient
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: (userId: String, nickname: String, source: LoginSource, isProfileComplete: Boolean, age: Int?, gender: String?, region: String?, bio: String?) -> Unit = { _, _, _, _, _, _, _, _ -> }
+    onLoginSuccess: (userId: String, nickname: String, source: LoginSource, isProfileComplete: Boolean, age: Int?, gender: String?, region: String?, bio: String?, tags: List<String>, photoInterests: List<String>) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> }
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -52,7 +52,9 @@ fun LoginScreen(
                 uiState.profileAge,
                 uiState.profileGender,
                 uiState.profileRegion,
-                uiState.profileBio
+                uiState.profileBio,
+                uiState.profileTags,
+                uiState.profilePhotoInterests
             )
             viewModel.resetLoginState()
         }

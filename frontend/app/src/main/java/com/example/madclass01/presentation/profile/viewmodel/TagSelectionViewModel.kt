@@ -21,7 +21,8 @@ data class TagSelectionUiState(
     val customTags: List<Tag> = emptyList(),
     val photoInterests: List<Tag> = emptyList(),  // 사진 임베딩으로 AI가 추천한 관심사
     val errorMessage: String = "",
-    val isSelectionComplete: Boolean = false
+    val isSelectionComplete: Boolean = false,
+    val isLoading: Boolean = false
 )
 
 @HiltViewModel
@@ -29,7 +30,8 @@ class TagSelectionViewModel @Inject constructor(
     private val analyzeImagesUseCase: AnalyzeImagesUseCase,
     private val addTagUseCase: AddTagUseCase,
     private val removeTagUseCase: RemoveTagUseCase,
-    private val toggleTagUseCase: ToggleTagUseCase
+    private val toggleTagUseCase: ToggleTagUseCase,
+    private val backendRepository: com.example.madclass01.data.repository.BackendRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(TagSelectionUiState())
@@ -70,6 +72,21 @@ class TagSelectionViewModel @Inject constructor(
             extractedTags = emptyList(),
             recommendedTags = tagModels
         )
+    }
+
+    fun setCustomTags(tags: List<String>) {
+        // 이미 customTags가 있다면 덮어쓰지 않음 (화면 회전 등 재진입 시)
+        if (_uiState.value.customTags.isNotEmpty()) return
+
+        val tagModels = tags.mapIndexed { index, tagName ->
+            Tag(
+                id = "custom_init_$index",
+                name = tagName,
+                category = "custom",
+                isSelected = true
+            )
+        }
+        _uiState.value = _uiState.value.copy(customTags = tagModels)
     }
     
     fun toggleExtractedTag(tagId: String) {
@@ -188,5 +205,58 @@ class TagSelectionViewModel @Inject constructor(
                 currentState.recommendedTags.filter { it.isSelected } +
                 currentState.customTags +
                 currentState.photoInterests.filter { it.isSelected }
+    }
+
+    fun saveProfile(
+        userId: String,
+        nickname: String,
+        age: Int?,
+        region: String?,
+        bio: String?,
+        photoInterests: List<String> // Step 1에서 온 추천 태그들 (혹은 새로 선택된 것)
+    ) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true)
+
+            // 1. 사용자가 직접 선택한 관심사 (Custom Tags + Recommended Selected)
+            val userInterests = _uiState.value.customTags.map { it.name } +
+                    _uiState.value.recommendedTags.filter { it.isSelected }.map { it.name } +
+                    _uiState.value.extractedTags.filter { it.isSelected }.map { it.name }
+
+            // 2. 사진 기반 관심사 (별도 저장)
+            val finalPhotoInterests = photoInterests + _uiState.value.photoInterests.map { it.name }
+
+            val profileData = mapOf(
+                "age" to (age ?: 0),
+                "region" to (region ?: ""),
+                "bio" to (bio ?: ""),
+                "interests" to userInterests.distinct(),
+                "photo_interests" to finalPhotoInterests.distinct()
+            )
+
+            android.util.Log.d("TagSelectionViewModel", "프로필 저장 시작 - userId: $userId, interests: $userInterests")
+
+            when (val result = backendRepository.updateUser(
+                userId = userId,
+                nickname = nickname,
+                profileData = profileData
+            )) {
+                is com.example.madclass01.data.repository.ApiResult.Success -> {
+                    android.util.Log.d("TagSelectionViewModel", "프로필 저장 성공")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isSelectionComplete = true
+                    )
+                }
+                is com.example.madclass01.data.repository.ApiResult.Error -> {
+                    android.util.Log.e("TagSelectionViewModel", "프로필 저장 실패: ${result.message}")
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = "프로필 저장 실패: ${result.message}"
+                    )
+                }
+                is com.example.madclass01.data.repository.ApiResult.Loading -> {}
+            }
+        }
     }
 }
