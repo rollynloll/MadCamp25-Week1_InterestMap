@@ -192,6 +192,22 @@ class AddMemberRequest(BaseSchema):
     user_id: str
 
 
+class SubgroupClusterRequest(BaseSchema):
+    index: int
+    member_ids: list[str]
+
+
+class SubgroupCreateRequest(BaseSchema):
+    clusters: list[SubgroupClusterRequest]
+
+
+class SubgroupItemResponse(BaseSchema):
+    id: str
+    name: str
+    cluster_index: int
+    member_ids: list[str]
+
+
 class PhotoUploadResponse(BaseSchema):
     id: str
     user_id: str

@@ -187,6 +187,22 @@ class BackendRepository @Inject constructor(
             ApiResult.Error(e.message ?: "Network error")
         }
     }
+
+    suspend fun createSubgroups(
+        groupId: String,
+        clusters: List<SubgroupClusterRequest>
+    ): ApiResult<List<SubgroupItemResponse>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.createSubgroups(groupId, SubgroupCreateRequest(clusters))
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to create subgroups", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
     
     /**
      * 사진과 함께 유저 프로필 업데이트 (사진 배치 업로드 후 프로필 업데이트)

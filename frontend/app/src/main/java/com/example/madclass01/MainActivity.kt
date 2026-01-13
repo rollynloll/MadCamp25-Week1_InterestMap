@@ -395,6 +395,9 @@ fun AppNavigation(
                 onViewGroups = {
                     currentScreen = AppScreen.GroupClusterList(groupCluster.groupId)
                 },
+                onEnterSubgroup = { subgroupId, subgroupName, memberCount ->
+                    currentScreen = AppScreen.Chat(subgroupId, subgroupName, memberCount)
+                },
                 onBackPress = {
                     currentScreen = AppScreen.GroupDetail(groupCluster.groupId)
                 }

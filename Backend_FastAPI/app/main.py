@@ -19,6 +19,7 @@ from app.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
     GroupCreateRequest, GroupResponse, GroupDetailResponse, GroupEmbeddingResponse,
     UserEmbeddingResponse, GraphNodePositionResponse, AddMemberRequest,
+    SubgroupCreateRequest, SubgroupItemResponse,
     PhotoUploadResponse,
     ImageAnalysisRequest, ImageAnalysisResponse, ImageAnalysisResult, ImageKeyword,
     GenerateEmbeddingRequest, GenerateEmbeddingResponse,
@@ -370,6 +371,11 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
         "icon_type": icon_type,
         "is_public": is_public,
     }
+
+
+def _build_subgroup_name(parent: Group, index: int) -> str:
+    short_id = str(parent.id).split("-")[0]
+    return f"{parent.name} · 소그룹 {index + 1} ({short_id})"
 
 
 def _embedding_vector_or_zero(embedding: list[float] | None) -> list[float]:
@@ -1048,7 +1054,7 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
 @app.get("/api/groups", response_model=List[GroupResponse], tags=["groups"])
 async def list_groups(db: AsyncSession = Depends(get_db)):
     """모든 그룹 목록 조회"""
-    result = await db.execute(select(Group))
+    result = await db.execute(select(Group).where(Group.is_subgroup == False))  # noqa: E712
     groups = result.scalars().all()
     responses: list[dict] = []
     for group in groups:
@@ -1060,7 +1066,7 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
 async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자가 속한 그룹 목록 조회"""
     if _is_master_user(user_id):
-        result = await db.execute(select(Group))
+        result = await db.execute(select(Group).where(Group.is_subgroup == False))  # noqa: E712
         groups = result.scalars().all()
         responses: list[dict] = []
         for group in groups:
@@ -1070,7 +1076,7 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
 
     user = await _get_user_by_id(db, user_id)
     if _is_spectator_user(user):
-        result = await db.execute(select(Group))
+        result = await db.execute(select(Group).where(Group.is_subgroup == False))  # noqa: E712
         groups = result.scalars().all()
         responses: list[dict] = []
         for group in groups:
@@ -1080,7 +1086,7 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Group)
         .join(GroupMember, GroupMember.group_id == Group.id)
-        .where(GroupMember.user_id == user.id)
+        .where(GroupMember.user_id == user.id, Group.is_subgroup == False)  # noqa: E712
     )
     group_by_id = {group.id: group for group in result.scalars().all()}
 
@@ -1114,6 +1120,104 @@ async def add_group_member(
         await db.commit()
     member_ids = await _get_all_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
+
+
+@app.post(
+    "/api/groups/{group_id}/subgroups",
+    response_model=List[SubgroupItemResponse],
+    tags=["groups"],
+)
+async def create_subgroups(
+    group_id: str,
+    request: SubgroupCreateRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    group = await _get_group_by_id(db, group_id)
+    if group.is_subgroup:
+        raise HTTPException(status_code=400, detail="Cannot create subgroups from a subgroup")
+    if not request.clusters:
+        raise HTTPException(status_code=400, detail="Clusters are required")
+
+    cluster_member_ids: dict[int, list[uuid.UUID]] = {}
+    all_member_ids: set[uuid.UUID] = set()
+    for cluster in request.clusters:
+        ids: list[uuid.UUID] = []
+        for raw_id in cluster.member_ids:
+            try:
+                member_id = uuid.UUID(raw_id)
+            except ValueError:
+                continue
+            ids.append(member_id)
+            all_member_ids.add(member_id)
+        cluster_member_ids[cluster.index] = ids
+
+    user_ids: set[uuid.UUID] = set()
+    notion_ids: set[uuid.UUID] = set()
+    if all_member_ids:
+        user_result = await db.execute(select(User.id).where(User.id.in_(all_member_ids)))
+        user_ids = {row[0] for row in user_result.all()}
+        notion_result = await db.execute(
+            select(NotionUser.id).where(NotionUser.id.in_(all_member_ids))
+        )
+        notion_ids = {row[0] for row in notion_result.all()}
+
+    responses: list[SubgroupItemResponse] = []
+    for cluster in request.clusters:
+        subgroup_result = await db.execute(
+            select(Group).where(
+                Group.parent_group_id == group.id,
+                Group.subgroup_index == cluster.index,
+                Group.is_subgroup == True,  # noqa: E712
+            )
+        )
+        subgroup = subgroup_result.scalar_one_or_none()
+
+        if subgroup is None:
+            profile = dict(group.group_profile or {})
+            profile["is_public"] = False
+            subgroup = Group(
+                name=_build_subgroup_name(group, cluster.index),
+                description=f"{group.name} 소그룹 {cluster.index + 1}",
+                created_by=group.created_by,
+                group_profile=profile,
+                is_subgroup=True,
+                parent_group_id=group.id,
+                subgroup_index=cluster.index,
+            )
+            db.add(subgroup)
+            await db.flush()
+
+        await db.execute(
+            delete(GroupMember).where(GroupMember.group_id == subgroup.id)
+        )
+        await db.execute(
+            delete(NotionGroupMember).where(NotionGroupMember.group_id == subgroup.id)
+        )
+
+        members = cluster_member_ids.get(cluster.index, [])
+        for member_id in members:
+            if member_id in user_ids:
+                db.add(GroupMember(group_id=subgroup.id, user_id=member_id, role="member"))
+            elif member_id in notion_ids:
+                db.add(
+                    NotionGroupMember(
+                        group_id=subgroup.id,
+                        notion_user_id=member_id,
+                        role="member",
+                    )
+                )
+
+        responses.append(
+            SubgroupItemResponse(
+                id=str(subgroup.id),
+                name=subgroup.name,
+                cluster_index=cluster.index,
+                member_ids=[str(member_id) for member_id in members],
+            )
+        )
+
+    await db.commit()
+    return responses
 
 @app.delete("/api/groups/{group_id}/members/{user_id}", tags=["groups"])
 async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = Depends(get_db)):

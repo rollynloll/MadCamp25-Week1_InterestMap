@@ -5,6 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.madclass01.domain.model.Group
 import com.example.madclass01.domain.model.RelationshipGraph
 import com.example.madclass01.domain.model.UserEmbedding
+import com.example.madclass01.data.remote.dto.SubgroupClusterRequest
+import com.example.madclass01.data.remote.dto.SubgroupItemResponse
+import com.example.madclass01.data.repository.ApiResult
+import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.usecase.GetGroupDetailUseCase
 import com.example.madclass01.domain.usecase.GetRelationshipGraphUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,14 +30,25 @@ data class GroupClusterUiState(
     val relationshipGraph: RelationshipGraph? = null,
     val clusters: List<ClusterGroup> = emptyList(),
     val clusterCount: Int = 3,
+    val subgroupRooms: Map<Int, SubgroupRoom> = emptyMap(),
+    val enterRoom: SubgroupRoom? = null,
+    val isCreatingRoom: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String = ""
+)
+
+data class SubgroupRoom(
+    val id: String,
+    val name: String,
+    val clusterIndex: Int,
+    val memberCount: Int
 )
 
 @HiltViewModel
 class GroupClusterViewModel @Inject constructor(
     private val getGroupDetailUseCase: GetGroupDetailUseCase,
-    private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase
+    private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase,
+    private val backendRepository: BackendRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupClusterUiState())
@@ -88,8 +103,55 @@ class GroupClusterViewModel @Inject constructor(
         }
         _uiState.value = _uiState.value.copy(
             clusterCount = normalized,
-            clusters = clusters
+            clusters = clusters,
+            subgroupRooms = emptyMap()
         )
+    }
+
+    fun enterSubgroupRoom(parentGroupId: String, clusterIndex: Int) {
+        val cached = _uiState.value.subgroupRooms[clusterIndex]
+        if (cached != null) {
+            _uiState.value = _uiState.value.copy(enterRoom = cached)
+            return
+        }
+        val clusters = _uiState.value.clusters
+        if (clusters.isEmpty()) return
+
+        val requestClusters = clusters.map { cluster ->
+            SubgroupClusterRequest(
+                index = cluster.id,
+                memberIds = cluster.members.map { it.userId }
+            )
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isCreatingRoom = true)
+            when (val result = backendRepository.createSubgroups(parentGroupId, requestClusters)) {
+                is ApiResult.Success -> {
+                    val rooms = result.data.associateBy(
+                        { it.clusterIndex },
+                        { it.toRoom() }
+                    )
+                    val target = rooms[clusterIndex]
+                    _uiState.value = _uiState.value.copy(
+                        subgroupRooms = rooms,
+                        enterRoom = target,
+                        isCreatingRoom = false
+                    )
+                }
+                is ApiResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isCreatingRoom = false,
+                        errorMessage = result.message
+                    )
+                }
+                is ApiResult.Loading -> Unit
+            }
+        }
+    }
+
+    fun resetEnterRoom() {
+        _uiState.value = _uiState.value.copy(enterRoom = null)
     }
 
     private data class EmbeddingItem(
@@ -293,5 +355,14 @@ class GroupClusterViewModel @Inject constructor(
         if (denom == 0f) return 1f
         val cosine = dot / denom
         return 1f - cosine
+    }
+
+    private fun SubgroupItemResponse.toRoom(): SubgroupRoom {
+        return SubgroupRoom(
+            id = id,
+            name = name,
+            clusterIndex = clusterIndex,
+            memberCount = memberIds.size
+        )
     }
 }

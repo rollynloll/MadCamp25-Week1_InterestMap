@@ -5,6 +5,9 @@ DB: groups
 - description (VARCHAR(255), NULL)
 - created_by (UUID, FK -> users.id, NULL)   # seed group이면 NULL도 가능
 - group_profile (JSONB, NOT NULL, default={})  # 그룹 취향/성격 데이터
+- is_subgroup (BOOLEAN, NOT NULL, default=false)
+- parent_group_id (UUID, FK -> groups.id, NULL)
+- subgroup_index (INTEGER, NULL)
 - created_at (timestamptz, NOT NULL, default=now())
 
 DB: group_members
@@ -16,7 +19,7 @@ DB: group_members
 
 import uuid
 
-from sqlalchemy import String, DateTime, func, ForeignKey
+from sqlalchemy import String, DateTime, func, ForeignKey, Boolean, Integer
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -36,6 +39,11 @@ class Group(Base):
     )
 
     group_profile: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    is_subgroup: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    parent_group_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("groups.id"), nullable=True
+    )
+    subgroup_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

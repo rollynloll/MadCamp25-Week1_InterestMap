@@ -143,7 +143,7 @@ async def list_groups(
     )
     member_group_ids = {row[0] for row in membership_result.all()}
 
-    result = await db.execute(select(Group))
+    result = await db.execute(select(Group).where(Group.is_subgroup == False))  # noqa: E712
     groups = result.scalars().all()
 
     items = []

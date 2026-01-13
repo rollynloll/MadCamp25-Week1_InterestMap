@@ -153,6 +153,25 @@ data class AddMemberRequest(
     val userId: String
 )
 
+data class SubgroupClusterRequest(
+    val index: Int,
+    @SerializedName("member_ids")
+    val memberIds: List<String>
+)
+
+data class SubgroupCreateRequest(
+    val clusters: List<SubgroupClusterRequest>
+)
+
+data class SubgroupItemResponse(
+    val id: String,
+    val name: String,
+    @SerializedName("cluster_index")
+    val clusterIndex: Int,
+    @SerializedName("member_ids")
+    val memberIds: List<String>
+)
+
 // ==================== Interest Map ====================
 
 data class InterestMapResponse(

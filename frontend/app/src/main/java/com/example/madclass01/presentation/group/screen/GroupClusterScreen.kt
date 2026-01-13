@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -28,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,15 +61,29 @@ fun GroupClusterScreen(
     currentUserId: String,
     onBackPress: () -> Unit = {},
     onViewGroups: () -> Unit = {},
+    onEnterSubgroup: (String, String, Int) -> Unit = { _, _, _ -> },
     viewModel: GroupClusterViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedClusterId by remember { mutableStateOf<Int?>(null) }
     val clusterCount = uiState.clusterCount
 
+    LaunchedEffect(uiState.enterRoom) {
+        val room = uiState.enterRoom
+        if (room != null) {
+            onEnterSubgroup(room.id, room.name, room.memberCount)
+            viewModel.resetEnterRoom()
+        }
+    }
+
     LaunchedEffect(groupId, currentUserId) {
         viewModel.load(groupId, currentUserId)
     }
+
+    val defaultClusterId = uiState.clusters.firstOrNull()?.id
+    val activeClusterId = selectedClusterId ?: defaultClusterId
+    val showSubgroupButton = uiState.relationshipGraph != null
+    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -84,116 +100,148 @@ fun GroupClusterScreen(
                     }
                 }
             )
+        },
+        bottomBar = {
+            Surface(
+                tonalElevation = 4.dp,
+                shadowElevation = 4.dp,
+                color = Color.White
+            ) {
+                Button(
+                    onClick = {
+                        activeClusterId?.let { viewModel.enterSubgroupRoom(groupId, it) }
+                    },
+                    enabled = showSubgroupButton && activeClusterId != null && !uiState.isCreatingRoom,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B7A49)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = if (uiState.isCreatingRoom) "방 준비 중..." else "소그룹 채팅 시작하기",
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
+                    )
+                }
+            }
         }
     ) { paddingValues ->
-        Column(
+        val bottomPadding = 16.dp
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color.White)
-                .padding(horizontal = 16.dp)
         ) {
-            when {
-                uiState.isLoading -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(
-                            color = MaterialTheme.colorScheme.primary,
-                            strokeWidth = 3.dp
-                        )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = bottomPadding + 64.dp)
+                    .background(Color.White)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp)
+            ) {
+                when {
+                    uiState.isLoading -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 3.dp
+                            )
+                        }
                     }
-                }
-                uiState.errorMessage.isNotEmpty() -> {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
+                    uiState.errorMessage.isNotEmpty() -> {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = uiState.errorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                    else -> {
                         Text(
-                            text = uiState.errorMessage,
-                            color = MaterialTheme.colorScheme.error,
-                            fontSize = 14.sp
+                            text = "취향지도 기반 3개 소그룹",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
                         )
-                    }
-                }
-                else -> {
-                    Text(
-                        text = "취향지도 기반 3개 소그룹",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
-                    )
 
                     if (uiState.relationshipGraph != null) {
                         val clusterColors = listOf(
-                            Color(0xFFFF9F45),
-                            Color(0xFF2CB1BC),
-                            Color(0xFF4C6EF5),
-                            Color(0xFF9B59B6),
-                            Color(0xFF27AE60),
-                            Color(0xFFE67E22)
-                        )
-                        val memberColorMap = uiState.clusters.flatMap { cluster ->
-                            val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
-                            cluster.members.map { it.userId to color }
-                        }.toMap()
-                        val memberClusterMap = uiState.clusters.flatMap { cluster ->
-                            cluster.members.map { it.userId to cluster.id }
-                        }.toMap()
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "소그룹 수: $clusterCount",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = Color(0xFFB85A16)
+                                Color(0xFFFF9F45),
+                                Color(0xFF2CB1BC),
+                                Color(0xFF4C6EF5),
+                                Color(0xFF9B59B6),
+                                Color(0xFF27AE60),
+                                Color(0xFFE67E22)
                             )
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = {
-                                        viewModel.updateClusterCount((clusterCount - 1).coerceAtLeast(2))
-                                        selectedClusterId = null
-                                    },
-                                    enabled = clusterCount > 2,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Text(
-                                        text = "-",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = Color(0xFFB85A16)
-                                    )
-                                }
-                                Button(
-                                    onClick = {
-                                        viewModel.updateClusterCount((clusterCount + 1).coerceAtMost(6))
-                                        selectedClusterId = null
-                                    },
-                                    enabled = clusterCount < 6,
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) {
-                                    Text(
-                                        text = "+",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp,
-                                        color = Color(0xFFB85A16)
-                                    )
+                            val memberColorMap = uiState.clusters.flatMap { cluster ->
+                                val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
+                                cluster.members.map { it.userId to color }
+                            }.toMap()
+                            val memberClusterMap = uiState.clusters.flatMap { cluster ->
+                                cluster.members.map { it.userId to cluster.id }
+                            }.toMap()
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "소그룹 수: $clusterCount",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFB85A16)
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateClusterCount((clusterCount - 1).coerceAtLeast(2))
+                                            selectedClusterId = null
+                                        },
+                                        enabled = clusterCount > 2,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = "-",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = Color(0xFFB85A16)
+                                        )
+                                    }
+                                    Button(
+                                        onClick = {
+                                            viewModel.updateClusterCount((clusterCount + 1).coerceAtMost(6))
+                                            selectedClusterId = null
+                                        },
+                                        enabled = clusterCount < 6,
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(32.dp)
+                                    ) {
+                                        Text(
+                                            text = "+",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = Color(0xFFB85A16)
+                                        )
+                                    }
                                 }
                             }
-                        }
 
                         Row(
                             modifier = Modifier
@@ -204,113 +252,141 @@ fun GroupClusterScreen(
                         ) {
                             Button(
                                 onClick = { selectedClusterId = null },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (selectedClusterId == null) Color(0xFFB85A16) else Color(0xFFFFE4D0),
-                                    contentColor = if (selectedClusterId == null) Color.White else Color(0xFFB85A16)
-                                ),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                modifier = Modifier.height(36.dp)
-                            ) {
-                                Text(
-                                    text = "전체 보기",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp
-                                )
-                            }
-                            uiState.clusters.forEach { cluster ->
-                                val isSelected = selectedClusterId == cluster.id
-                                val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
-                                Button(
-                                    onClick = {
-                                        selectedClusterId = if (isSelected) null else cluster.id
-                                    },
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isSelected) color else Color(0xFFFFE4D0),
-                                        contentColor = if (isSelected) Color.White else Color(0xFFB85A16)
+                                        containerColor = if (selectedClusterId == null) Color(0xFFB85A16) else Color(0xFFFFE4D0),
+                                        contentColor = if (selectedClusterId == null) Color.White else Color(0xFFB85A16)
                                     ),
                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     modifier = Modifier.height(36.dp)
                                 ) {
                                     Text(
-                                        text = "그룹 ${cluster.id + 1}",
+                                        text = "전체 보기",
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 12.sp
                                     )
                                 }
+                                uiState.clusters.forEach { cluster ->
+                                    val isSelected = selectedClusterId == cluster.id
+                                    val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
+                                    Button(
+                                        onClick = {
+                                            selectedClusterId = if (isSelected) null else cluster.id
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isSelected) color else Color(0xFFFFE4D0),
+                                            contentColor = if (isSelected) Color.White else Color(0xFFB85A16)
+                                        ),
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        modifier = Modifier.height(36.dp)
+                                    ) {
+                                        Text(
+                                            text = "그룹 ${cluster.id + 1}",
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
                             }
-                        }
 
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(520.dp)
-                                .background(Color(0xFFFAFBFC))
-                        ) {
-                            ZoomableGraphContainer(modifier = Modifier.fillMaxSize()) { scale ->
-                                val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
-                                RelationshipGraphComponent(
-                                    relationshipGraph = uiState.relationshipGraph!!,
-                                    nodeScale = nodeScale,
-                                    nodeColorProvider = { userId ->
-                                        val clusterId = memberClusterMap[userId]
-                                        if (selectedClusterId == null) {
-                                            memberColorMap[userId]
-                                        } else if (clusterId == selectedClusterId) {
-                                            memberColorMap[userId]
-                                        } else {
-                                            Color(0xFFE5E7EB)
-                                        }
-                                    },
-                                    nodeZIndexProvider = { userId ->
-                                        val clusterId = memberClusterMap[userId]
-                                        if (selectedClusterId != null && clusterId == selectedClusterId) 1f else 0f
-                                    },
-                                    onNodeClick = {},
-                                    onNodeLongClick = {}
-                                )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(460.dp)
+                                    .background(Color(0xFFFAFBFC))
+                            ) {
+                                ZoomableGraphContainer(modifier = Modifier.fillMaxSize()) { scale ->
+                                    val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
+                                    RelationshipGraphComponent(
+                                        relationshipGraph = uiState.relationshipGraph!!,
+                                        nodeScale = nodeScale,
+                                        nodeColorProvider = { userId ->
+                                            val clusterId = memberClusterMap[userId]
+                                            when {
+                                                selectedClusterId == null -> memberColorMap[userId]
+                                                clusterId == selectedClusterId -> memberColorMap[userId]
+                                                else -> Color(0xFFE5E7EB)
+                                            }
+                                        },
+                                        nodeZIndexProvider = { userId ->
+                                            val clusterId = memberClusterMap[userId]
+                                            if (selectedClusterId != null && clusterId == selectedClusterId) 1f else 0f
+                                        },
+                                        onNodeClick = {},
+                                        onNodeLongClick = {}
+                                    )
+                                }
                             }
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "그래프 데이터를 불러오지 못했어요.",
-                            color = Color(0xFF777777),
-                            fontSize = 13.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
 
+                        } else {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "그래프 데이터를 불러오지 못했어요.",
+                                color = Color(0xFF777777),
+                                fontSize = 13.sp
+                            )
+                        }
                     Card(
                         onClick = onViewGroups,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4D0)),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(
+                                .padding(bottom = 16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4D0)),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "소그룹 보기",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFFB85A16)
+                                )
+                                Text(
+                                    text = "멤버 리스트 확인",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFB85A16)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Card(
+                            onClick = onViewGroups,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 14.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .padding(bottom = 16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4D0)),
+                            shape = RoundedCornerShape(16.dp)
                         ) {
-                            Text(
-                                text = "소그룹 보기",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                                color = Color(0xFFB85A16)
-                            )
-                            Text(
-                                text = "멤버 리스트 확인",
-                                fontSize = 12.sp,
-                                color = Color(0xFFB85A16)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "소그룹 보기",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFFB85A16)
+                                )
+                                Text(
+                                    text = "멤버 리스트 확인",
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFB85A16)
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
+
     }
+}
 }
 
 @Composable

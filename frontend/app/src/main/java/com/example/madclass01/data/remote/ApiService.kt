@@ -270,6 +270,12 @@ interface ApiService {
         @Body request: AddMemberRequest
     ): Response<GroupResponse>
 
+    @POST("/api/groups/{groupId}/subgroups")
+    suspend fun createSubgroups(
+        @Path("groupId") groupId: String,
+        @Body request: SubgroupCreateRequest
+    ): Response<List<SubgroupItemResponse>>
+
     @POST("/groups/{groupId}/leave")
     suspend fun leaveGroupChat(
         @Path("groupId") groupId: String
