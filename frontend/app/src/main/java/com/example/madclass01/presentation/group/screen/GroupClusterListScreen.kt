@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -382,9 +383,13 @@ fun ClusterDetailDialog(
             color = Color.White,
             modifier = Modifier
                 .fillMaxWidth()
-                .wrapContentHeight()
+                .heightIn(max = 600.dp)
         ) {
-            Column(modifier = Modifier.padding(vertical = 24.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(vertical = 24.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
                 // Header
                 Row(
                     modifier = Modifier
@@ -436,14 +441,17 @@ fun ClusterDetailDialog(
                     text = "설명",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
                 )
                 OutlinedTextField(
                     value = editingDescription,
                     onValueChange = { editingDescription = it },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(120.dp),
+                        .height(100.dp)
+                        .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = color,
@@ -458,13 +466,17 @@ fun ClusterDetailDialog(
                     text = "지역",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
                 )
                 OutlinedTextField(
                     value = region,
                     onValueChange = {},
                     enabled = false,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         disabledBorderColor = Color.LightGray,
@@ -478,11 +490,15 @@ fun ClusterDetailDialog(
                     text = "아이콘",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
                 )
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                 ) {
                     iconOptions.forEach { icon ->
                         AssistChip(
@@ -510,9 +526,9 @@ fun ClusterDetailDialog(
                 
                 Box(
                     modifier = Modifier
-                        .height(200.dp)
+                        .height(150.dp)
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp) // Wider than other elements
+                        .padding(horizontal = 12.dp)
                         .background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
@@ -570,10 +586,10 @@ fun ClusterDetailDialog(
                     ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                        if (isMine && isSavingCluster) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = Color.White,
+                    if (isMine && isSavingCluster) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = Color.White,
                             strokeWidth = 2.dp
                         )
                     } else {
