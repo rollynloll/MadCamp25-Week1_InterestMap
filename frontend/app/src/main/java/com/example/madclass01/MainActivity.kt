@@ -342,6 +342,10 @@ fun AppNavigation(
                 userId = userId ?: "",
                 onBackPress = {
                     currentScreen = AppScreen.Home
+                },
+                onInviteClick = {
+                    val groupId = chat.chatRoomId.removePrefix("group_")
+                    currentScreen = AppScreen.QRInvite(groupId, chat.chatRoomName, chat.memberCount)
                 }
             )
         }

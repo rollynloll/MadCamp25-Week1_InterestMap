@@ -45,6 +45,7 @@ fun ChatScreen(
     memberCount: Int = 0,
     userId: String,
     onBackPress: () -> Unit = {},
+    onInviteClick: () -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -129,7 +130,8 @@ fun ChatScreen(
         ChatHeader(
             groupName = chatRoomName,
             memberCount = memberCount,
-            onBackPress = onBackPress
+            onBackPress = onBackPress,
+            onInviteClick = onInviteClick
         )
 
         if (uiState.isLoading && uiState.messages.isEmpty()) {
@@ -305,7 +307,8 @@ private fun uriToFile(context: android.content.Context, uri: android.net.Uri): j
 fun ChatHeader(
     groupName: String,
     memberCount: Int,
-    onBackPress: () -> Unit
+    onBackPress: () -> Unit,
+    onInviteClick: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -357,7 +360,7 @@ fun ChatHeader(
             
             // Right - Add member button
             IconButton(
-                onClick = { /* TODO: Add member */ },
+                onClick = onInviteClick,
                 modifier = Modifier.size(24.dp)
             ) {
                 Icon(
