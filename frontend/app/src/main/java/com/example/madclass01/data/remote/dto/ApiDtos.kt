@@ -1,5 +1,6 @@
 package com.example.madclass01.data.remote.dto
 
+import com.example.madclass01.core.UrlResolver
 import com.google.gson.annotations.SerializedName
 
 // ==================== Health Check ====================
@@ -347,7 +348,7 @@ fun MessageContent.toDomain(): com.example.madclass01.domain.model.ChatMessage {
             com.example.madclass01.domain.model.ChatMessage.MessageType.TEXT
         },
         content = this.text,
-        imageUrl = this.imageUrl,
+        imageUrl = UrlResolver.resolve(this.imageUrl),
         timestamp = try {
             // ISO 8601 형식의 날짜를 timestamp로 변환
             java.time.Instant.parse(this.sentAt).toEpochMilli()

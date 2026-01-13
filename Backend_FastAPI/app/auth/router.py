@@ -65,8 +65,10 @@ async def _upsert_kakao_user(db: AsyncSession, kakao_user: dict) -> User:
     )
     user = result.scalar_one_or_none()
     if user:
-        user.nickname = nickname
-        user.profile_image_url = profile_image_url
+        if nickname and (not user.nickname or user.nickname.startswith("kakao_")):
+            user.nickname = nickname
+        if profile_image_url:
+            user.profile_image_url = profile_image_url
     else:
         user = User(
             provider="kakao",

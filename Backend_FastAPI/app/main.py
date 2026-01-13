@@ -10,6 +10,7 @@ import uuid
 from datetime import datetime
 import logging
 from pathlib import Path
+from urllib.parse import urlparse
 from sqlalchemy import text, select, func, inspect, delete, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -255,7 +256,7 @@ def _cache_user(user: User, is_new_user: bool = False) -> dict:
         "provider": user.provider,
         "provider_user_id": user.provider_user_id,
         "nickname": user.nickname,
-        "profile_image_url": user.profile_image_url,
+        "profile_image_url": _normalize_upload_url(user.profile_image_url),
         "profile_data": profile_data,
         "is_new_user": is_new_user,
         "created_at": user.created_at.isoformat() if user.created_at else None,
@@ -309,7 +310,7 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
     raw_tags = profile.get("tags") or profile.get("interests") or []
     tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
     region = profile.get("region") or ""
-    image_url = profile.get("image_url") or ""
+    image_url = _normalize_upload_url(profile.get("image_url")) or ""
     icon_type = profile.get("icon_type") or ""
     is_public = bool(profile.get("is_public", True))
     return {
@@ -353,9 +354,21 @@ def _cosine_similarity(a: list[float] | None, b: list[float] | None) -> float:
     return dot / (norm_a**0.5 * norm_b**0.5)
 
 
+def _normalize_upload_url(value: str | None) -> str | None:
+    if not value:
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path if parsed.path.startswith("/uploads/") else value
+    if value.startswith("/uploads/"):
+        return value
+    if value.startswith("uploads/"):
+        return f"/{value}"
+    return value
+
+
 def _build_file_url(request: Request, file_path: str) -> str:
-    base_url = str(request.base_url).rstrip("/")
-    return f"{base_url}{file_path}"
+    return _normalize_upload_url(file_path) or ""
 
 
 def _photo_response(photo: UserPhoto, request: Request) -> dict:
@@ -363,7 +376,7 @@ def _photo_response(photo: UserPhoto, request: Request) -> dict:
     return {
         "id": str(photo.id),
         "user_id": str(photo.user_id),
-        "file_path": file_path,
+        "file_path": _normalize_upload_url(file_path) or "",
         "file_url": _build_file_url(request, file_path),
         "uploaded_at": photo.created_at.isoformat() if photo.created_at else None,
     }
@@ -622,10 +635,10 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if user:
-        if request.nickname is not None:
+        if request.nickname is not None and (not user.nickname or user.nickname.startswith("kakao_")):
             user.nickname = request.nickname
         if request.profile_image_url is not None:
-            user.profile_image_url = request.profile_image_url
+            user.profile_image_url = _normalize_upload_url(request.profile_image_url)
         if request.profile_data is not None:
             merged = dict(user.profile_data or {})
             merged.update(request.profile_data)
@@ -640,7 +653,7 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
         provider=request.provider,
         provider_user_id=request.provider_user_id,
         nickname=request.nickname,
-        profile_image_url=request.profile_image_url,
+        profile_image_url=_normalize_upload_url(request.profile_image_url),
         profile_data=profile_data,
     )
     db.add(user)
@@ -684,7 +697,7 @@ async def update_user(user_id: str, request: UserUpdateRequest, db: AsyncSession
     if request.nickname is not None:
         user.nickname = request.nickname
     if request.profile_image_url is not None:
-        user.profile_image_url = request.profile_image_url
+        user.profile_image_url = _normalize_upload_url(request.profile_image_url)
     if request.profile_data is not None:
         merged = dict(user.profile_data or {})
         merged.update(request.profile_data)
@@ -926,7 +939,7 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
     group_profile = {
         "tags": request.tags,
         "region": request.region or "",
-        "image_url": request.image_url or "",
+        "image_url": _normalize_upload_url(request.image_url) or "",
         "icon_type": request.icon_type or "",
         "is_public": request.is_public,
     }
@@ -1066,9 +1079,9 @@ async def list_group_messages_public(
                 group_id=str(message.group_id),
                 user_id=str(sender.id),
                 nickname=sender.nickname,
-                primary_photo_url=primary_url,
+                primary_photo_url=_normalize_upload_url(primary_url),
                 text=content.get("text"),
-                image_url=content.get("image_url"),
+                image_url=_normalize_upload_url(content.get("image_url")),
                 sent_at=message.created_at,
             )
         )
@@ -1110,7 +1123,7 @@ async def create_group_message_public(
         group_id=str(message.group_id),
         user_id=str(user.id),
         nickname=user.nickname,
-        primary_photo_url=primary_url,
+        primary_photo_url=_normalize_upload_url(primary_url),
         text=payload.text,
         image_url=None,
         sent_at=message.created_at,
@@ -1168,7 +1181,7 @@ async def create_group_image_message_public(
         group_id=str(message.group_id),
         user_id=str(user.id),
         nickname=user.nickname,
-        primary_photo_url=primary_url,
+        primary_photo_url=_normalize_upload_url(primary_url),
         text=None,
         image_url=file_url,
         sent_at=message.created_at,
@@ -1185,7 +1198,7 @@ async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
     created_at = group.created_at.isoformat() if group.created_at else ""
     updated_at = created_at
     profile = group.group_profile or {}
-    image_url = profile.get("image_url") or ""
+    image_url = _normalize_upload_url(profile.get("image_url")) or ""
     icon_type = profile.get("icon_type") or ""
     is_public = bool(profile.get("is_public", True))
     return GroupDetailResponse(
@@ -1244,7 +1257,7 @@ async def get_user_embedding(user_id: str, db: AsyncSession = Depends(get_db)):
     return UserEmbeddingResponse(
         userId=str(user.id),
         userName=user.nickname or "",
-        profileImageUrl=user.profile_image_url,
+        profileImageUrl=_normalize_upload_url(user.profile_image_url),
         embeddingVector=vector,
         activityStatus="활동중",
     )
@@ -1291,7 +1304,7 @@ async def get_group_embeddings(
         return UserEmbeddingResponse(
             userId=str(user.id),
             userName=user.nickname or "",
-            profileImageUrl=user.profile_image_url,
+            profileImageUrl=_normalize_upload_url(user.profile_image_url),
             embeddingVector=vector,
             activityStatus="활동중",
         )

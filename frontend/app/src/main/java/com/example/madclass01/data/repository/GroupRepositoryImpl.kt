@@ -1,5 +1,6 @@
 package com.example.madclass01.data.repository
 
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.data.remote.ApiService
 import com.example.madclass01.data.remote.dto.CreateGroupRequest
 import com.example.madclass01.domain.model.Group
@@ -43,7 +44,7 @@ class GroupRepositoryImpl @Inject constructor(
                 memberCount = groupResponse.memberIds.size,
                 activity = "보통",
                 tags = groupResponse.tags.map { Tag(id = it, name = it) },
-                imageUrl = groupResponse.imageUrl,
+                imageUrl = UrlResolver.resolve(groupResponse.imageUrl) ?: "",
                 iconType = groupResponse.iconType,
                 lastActivityDate = "",
                 messageCount = 0,

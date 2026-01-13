@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import uuid
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, select, update
@@ -32,6 +33,19 @@ from app.schemas import (
 )
 
 router = APIRouter(tags=["me"])
+
+
+def _normalize_upload_url(value: str | None) -> str | None:
+    if not value:
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path if parsed.path.startswith("/uploads/") else value
+    if value.startswith("/uploads/"):
+        return value
+    if value.startswith("uploads/"):
+        return f"/{value}"
+    return value
 
 
 async def _get_primary_photo_url(db: AsyncSession, user_id: uuid.UUID) -> str | None:
@@ -71,13 +85,13 @@ async def get_me(
     return MeResponse(
         id=str(current_user.id),
         nickname=current_user.nickname,
-        profile_image_url=current_user.profile_image_url,
-        primary_photo_url=primary_photo_url,
+        profile_image_url=_normalize_upload_url(current_user.profile_image_url),
+        primary_photo_url=_normalize_upload_url(primary_photo_url),
         profile_data=current_user.profile_data or {},
         photos=[
             MePhoto(
                 id=str(photo.id),
-                url=photo.url,
+                url=_normalize_upload_url(photo.url) or "",
                 sort_order=photo.sort_order,
                 is_primary=photo.is_primary,
                 created_at=photo.created_at,
@@ -127,7 +141,7 @@ async def add_photo(
 
     photo = UserPhoto(
         user_id=current_user.id,
-        url=payload.url,
+        url=_normalize_upload_url(payload.url) or "",
         sort_order=new_sort_order,
         is_primary=payload.make_primary,
     )
@@ -150,7 +164,7 @@ async def add_photo(
     await db.refresh(photo)
     return MePhoto(
         id=str(photo.id),
-        url=photo.url,
+        url=_normalize_upload_url(photo.url) or "",
         sort_order=photo.sort_order,
         is_primary=photo.is_primary,
         created_at=photo.created_at,
@@ -215,7 +229,7 @@ async def set_primary_photo(
     await db.commit()
     primary_photo_url = await _get_primary_photo_url(db, current_user.id)
 
-    return {"ok": True, "primary_photo_url": primary_photo_url}
+    return {"ok": True, "primary_photo_url": _normalize_upload_url(primary_photo_url)}
 
 
 @router.delete("/me/photos/{photo_id}", response_model=OkResponse)

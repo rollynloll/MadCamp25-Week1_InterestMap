@@ -52,22 +52,24 @@ fun ChatScreen(
     val coroutineScope = rememberCoroutineScope()
     var messageText by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val nearBottomThreshold = 2
     val messagesByDate = remember(uiState.messages) {
         uiState.messages.groupBy { message -> formatDateDivider(message.timestamp) }
     }
     val totalItems = messagesByDate.size + uiState.messages.size
-    val isAtBottom by remember {
+    val isNearBottom by remember {
         derivedStateOf {
             val total = listState.layoutInfo.totalItemsCount
             if (total == 0) {
                 true
             } else {
                 val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-                lastVisible >= total - 1
+                lastVisible >= total - 1 - nearBottomThreshold
             }
         }
     }
-    var hasNewMessage by remember { mutableStateOf(false) }
+    var unreadCount by remember { mutableStateOf(0) }
+    var previousMessageCount by remember { mutableStateOf(0) }
     
     // 사진 선택을 위한 이미지 피커
     val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -91,18 +93,20 @@ fun ChatScreen(
     val lastMessageId = uiState.messages.lastOrNull()?.id
     LaunchedEffect(lastMessageId) {
         if (lastMessageId != null && totalItems > 0) {
-            if (isAtBottom) {
+            val newItems = (uiState.messages.size - previousMessageCount).coerceAtLeast(0)
+            if (isNearBottom) {
                 listState.animateScrollToItem(totalItems - 1)
-                hasNewMessage = false
-            } else {
-                hasNewMessage = true
+                unreadCount = 0
+            } else if (newItems > 0) {
+                unreadCount += newItems
             }
+            previousMessageCount = uiState.messages.size
         }
     }
 
-    LaunchedEffect(isAtBottom) {
-        if (isAtBottom) {
-            hasNewMessage = false
+    LaunchedEffect(isNearBottom) {
+        if (isNearBottom) {
+            unreadCount = 0
         }
     }
 
@@ -201,27 +205,53 @@ fun ChatScreen(
                     }
                 }
 
-                if (hasNewMessage) {
-                    FloatingActionButton(
+                if (unreadCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(12.dp)
+                    ) {
+                        ExtendedFloatingActionButton(
                         onClick = {
                             if (totalItems > 0) {
                                 coroutineScope.launch {
                                     listState.animateScrollToItem(totalItems - 1)
                                 }
                             }
+                            unreadCount = 0
                         },
                         containerColor = Color(0xFFFF9945),
                         contentColor = Color.White,
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(12.dp)
-                            .size(44.dp)
+                        modifier = Modifier.height(40.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowDown,
                             contentDescription = "새 메시지",
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "새 메시지",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                        val badgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .offset(x = 6.dp, y = (-6).dp)
+                                .background(color = Color(0xFFE11D48), shape = CircleShape)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = badgeText,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }

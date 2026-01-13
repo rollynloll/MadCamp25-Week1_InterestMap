@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import uuid
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, select
@@ -36,6 +37,19 @@ from app.schemas import (
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 
+def _normalize_upload_url(value: str | None) -> str | None:
+    if not value:
+        return value
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path if parsed.path.startswith("/uploads/") else value
+    if value.startswith("/uploads/"):
+        return value
+    if value.startswith("uploads/"):
+        return f"/{value}"
+    return value
+
+
 @router.post("", status_code=201)
 async def create_group(
     payload: GroupCreateRequest,
@@ -49,7 +63,7 @@ async def create_group(
     group_profile = {
         "tags": payload.tags,
         "region": payload.region or "",
-        "image_url": payload.image_url or "",
+        "image_url": _normalize_upload_url(payload.image_url) or "",
         "icon_type": payload.icon_type or "",
         "is_public": payload.is_public,
     }
@@ -134,7 +148,7 @@ async def list_groups(
         profile = group.group_profile or {}
         tags = profile.get("tags", [])
         region = profile.get("region", "")
-        image_url = profile.get("image_url", "")
+        image_url = _normalize_upload_url(profile.get("image_url")) or ""
         
         items.append(
             GroupListItem(
@@ -190,7 +204,7 @@ async def list_group_members(
         GroupMemberItem(
             user_id=str(user.id),
             nickname=user.nickname,
-            primary_photo_url=primary_photo_map.get(user.id),
+            primary_photo_url=_normalize_upload_url(primary_photo_map.get(user.id)),
         )
         for user in users
     ]
@@ -229,7 +243,7 @@ async def group_interest_map(
             InterestMapNode(
                 user_id=str(user.id),
                 nickname=user.nickname,
-                primary_photo_url=primary_photo_map.get(user.id),
+                primary_photo_url=_normalize_upload_url(primary_photo_map.get(user.id)),
                 x=x,
                 y=y,
                 embedding_status="ready" if user.id in embedding_user_ids else "missing",
@@ -290,7 +304,7 @@ async def list_group_messages(
                 sender=MessageSender(
                     user_id=str(sender.id),
                     nickname=sender.nickname,
-                    primary_photo_url=primary_url,
+                    primary_photo_url=_normalize_upload_url(primary_url),
                 ),
                 content=MessageContent(text=message.content.get("text", "")),
                 created_at=message.created_at,
@@ -329,7 +343,7 @@ async def create_group_message(
         sender=MessageSender(
             user_id=str(current_user.id),
             nickname=current_user.nickname,
-            primary_photo_url=primary_url.get(current_user.id),
+            primary_photo_url=_normalize_upload_url(primary_url.get(current_user.id)),
         ),
         content=MessageContent(text=payload.text),
         created_at=message.created_at,

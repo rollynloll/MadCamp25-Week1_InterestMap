@@ -1,5 +1,6 @@
 package com.example.madclass01.di
 
+import com.example.madclass01.core.ApiConfig
 import com.example.madclass01.core.AuthInterceptor
 import com.example.madclass01.data.remote.ApiService
 import dagger.Module
@@ -22,7 +23,7 @@ object NetworkModule {
     // 실제 기기 (핫스팟): "http://10.26.91.102:8000/"
     // 실제 서버: "https://your-server.com"
     // 실제 서버2 : 10.249.99.27
-    const val BASE_URL = "http://10.249.99.26:8000/"
+    const val BASE_URL = ApiConfig.BASE_URL
     
     @Provides
     @Singleton

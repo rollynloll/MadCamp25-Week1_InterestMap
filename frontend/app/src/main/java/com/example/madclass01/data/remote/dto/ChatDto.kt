@@ -1,5 +1,6 @@
 package com.example.madclass01.data.remote.dto
 
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.domain.model.ChatMessage
 import com.google.gson.annotations.SerializedName
 
@@ -80,7 +81,7 @@ data class ChatMessageResponse(
         userName = userName,
         type = ChatMessage.MessageType.valueOf(type),
         content = content,
-        imageUrl = imageUrl,
+        imageUrl = UrlResolver.resolve(imageUrl),
         timestamp = timestamp,
         readCount = readCount
     )

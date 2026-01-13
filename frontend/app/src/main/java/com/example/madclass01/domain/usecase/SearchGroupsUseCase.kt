@@ -4,6 +4,7 @@ import com.example.madclass01.data.remote.dto.GroupResponse
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.domain.model.Group
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.domain.model.Tag
 import java.text.Collator
 import java.util.Locale
@@ -62,7 +63,7 @@ class SearchGroupsUseCase @Inject constructor(
             description = description ?: "",
             memberCount = memberIds.size,
             tags = tags.map { Tag(id = it, name = it) },
-            imageUrl = imageUrl,
+            imageUrl = UrlResolver.resolve(imageUrl) ?: "",
             iconType = iconType,
             region = region,
             isPublic = isPublic

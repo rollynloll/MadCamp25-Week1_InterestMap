@@ -2,6 +2,7 @@ package com.example.madclass01.presentation.profile.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -70,15 +71,17 @@ class ProfileViewModel @Inject constructor(
 
             val photoUrls: List<String> = when (photosResult) {
                 is ApiResult.Success -> {
-                    // /api/photos/user/{userId} returns absolute fileUrl -> safe for Coil
-                    photosResult.data.map { it.fileUrl }.distinct()
+                    // /api/photos/user/{userId} returns relative fileUrl -> resolve to base URL
+                    photosResult.data.mapNotNull { photo ->
+                        UrlResolver.resolve(photo.fileUrl.ifBlank { photo.filePath })
+                    }.distinct()
                 }
                 else -> emptyList()
             }
 
             val images = buildList {
                 // Prefer profile image first if exists
-                user.profileImageUrl?.takeIf { it.isNotBlank() }?.let { add(it) }
+                UrlResolver.resolve(user.profileImageUrl)?.takeIf { it.isNotBlank() }?.let { add(it) }
                 addAll(photoUrls)
             }.distinct()
 

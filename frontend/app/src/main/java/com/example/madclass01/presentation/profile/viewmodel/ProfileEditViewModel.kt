@@ -5,6 +5,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -93,6 +94,7 @@ class ProfileEditViewModel @Inject constructor(
             when (uploadResult) {
                 is ApiResult.Success -> {
                     val photoUrl = uploadResult.data.fileUrl
+                    val resolvedPhotoUrl = UrlResolver.resolve(photoUrl)
                     android.util.Log.d("ProfileEditViewModel", "Profile image uploaded: $photoUrl")
                     
                     // URL을 프로필 이미지로 업데이트
@@ -107,7 +109,7 @@ class ProfileEditViewModel @Inject constructor(
                         is ApiResult.Success -> {
                             _uiState.value = _uiState.value.copy(
                                 isUploadingImage = false,
-                                uploadedProfileImageUrl = photoUrl
+                                uploadedProfileImageUrl = resolvedPhotoUrl
                             )
                         }
                         is ApiResult.Error -> {

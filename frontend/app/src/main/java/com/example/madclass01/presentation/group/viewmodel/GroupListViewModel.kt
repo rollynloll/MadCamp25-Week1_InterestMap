@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.domain.model.Group
 import com.example.madclass01.domain.model.Tag
 import com.example.madclass01.domain.usecase.GetMyGroupsUseCase
@@ -69,9 +70,7 @@ class GroupListViewModel @Inject constructor(
                             description = groupResponse.description ?: "",
                             memberCount = groupResponse.memberIds?.size ?: 0,
                             tags = groupResponse.tags?.map { Tag(id = it, name = it) } ?: emptyList(),
-                            imageUrl = groupResponse.imageUrl?.let { 
-                                if (it.isNotBlank() && !it.startsWith("http")) "${com.example.madclass01.di.NetworkModule.BASE_URL}${it.removePrefix("/")}" else it 
-                            } ?: "",
+                            imageUrl = UrlResolver.resolve(groupResponse.imageUrl) ?: "",
                             iconType = groupResponse.iconType ?: "",
                             region = groupResponse.region ?: "",
                             isPublic = groupResponse.isPublic

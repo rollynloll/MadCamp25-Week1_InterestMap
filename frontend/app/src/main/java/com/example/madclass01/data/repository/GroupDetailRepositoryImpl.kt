@@ -1,5 +1,6 @@
 package com.example.madclass01.data.repository
 
+import com.example.madclass01.core.UrlResolver
 import com.example.madclass01.data.remote.ApiService
 import com.example.madclass01.data.remote.dto.GroupDetailResponse
 import com.example.madclass01.data.remote.dto.GroupEmbeddingResponse
@@ -164,9 +165,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
             memberCount = this.memberCount,
             activity = "보통",
             tags = emptyList(),
-            imageUrl = this.profileImageUrl?.let { 
-                if (it.isNotBlank() && !it.startsWith("http")) "${com.example.madclass01.di.NetworkModule.BASE_URL}${it.removePrefix("/")}" else it
-            } ?: "",
+            imageUrl = UrlResolver.resolve(this.profileImageUrl) ?: "",
             iconType = this.iconType,
             lastActivityDate = "",
             messageCount = 0,
@@ -182,9 +181,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
         return UserEmbedding(
             userId = this.userId,
             userName = this.userName,
-            profileImageUrl = this.profileImageUrl?.let { 
-                if (it.isNotBlank() && !it.startsWith("http")) "${com.example.madclass01.di.NetworkModule.BASE_URL}${it.removePrefix("/")}" else it
-            },
+            profileImageUrl = UrlResolver.resolve(this.profileImageUrl),
             embeddingVector = this.embeddingVector,
             activityStatus = this.activityStatus
         )
