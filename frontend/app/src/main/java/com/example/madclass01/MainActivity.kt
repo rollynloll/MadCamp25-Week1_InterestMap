@@ -316,6 +316,9 @@ fun AppNavigation(
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
                 },
+                onClusterClick = {
+                    currentScreen = AppScreen.GroupCluster(groupDetail.groupId)
+                },
                 onQRCodeClick = { group ->
                     currentScreen = AppScreen.QRInvite(group.id, group.name, group.memberCount)
                 },
@@ -384,6 +387,29 @@ fun AppNavigation(
                 }
             )
         }
+        is AppScreen.GroupCluster -> {
+            val groupCluster = currentScreen as AppScreen.GroupCluster
+            com.example.madclass01.presentation.group.screen.GroupClusterScreen(
+                groupId = groupCluster.groupId,
+                currentUserId = userId ?: "mock_user",
+                onViewGroups = {
+                    currentScreen = AppScreen.GroupClusterList(groupCluster.groupId)
+                },
+                onBackPress = {
+                    currentScreen = AppScreen.GroupDetail(groupCluster.groupId)
+                }
+            )
+        }
+        is AppScreen.GroupClusterList -> {
+            val groupClusterList = currentScreen as AppScreen.GroupClusterList
+            com.example.madclass01.presentation.group.screen.GroupClusterListScreen(
+                groupId = groupClusterList.groupId,
+                currentUserId = userId ?: "mock_user",
+                onBackPress = {
+                    currentScreen = AppScreen.GroupCluster(groupClusterList.groupId)
+                }
+            )
+        }
         AppScreen.Home -> {
             com.example.madclass01.presentation.main.MainScreen(
                 userId = userId,  // userId 전달
@@ -438,6 +464,8 @@ sealed class AppScreen {
     data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅", val memberCount: Int = 0) : AppScreen()
     object QRScanner : AppScreen()
     data class QRInvite(val groupId: String, val groupName: String, val memberCount: Int = 0) : AppScreen()
+    data class GroupCluster(val groupId: String) : AppScreen()
+    data class GroupClusterList(val groupId: String) : AppScreen()
     object Home : AppScreen()
 }
 

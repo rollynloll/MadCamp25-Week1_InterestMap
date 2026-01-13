@@ -45,6 +45,7 @@ fun GroupDetailScreen(
     isSpectatorEntry: Boolean = false,
     onBackPress: () -> Unit = {},
     onLeaveSuccess: () -> Unit = {},
+    onClusterClick: () -> Unit = {},
     onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
     onChatRoomCreated: (chatRoomId: String, groupName: String, memberCount: Int) -> Unit = { _, _, _ -> },
@@ -91,17 +92,28 @@ fun GroupDetailScreen(
         floatingActionButton = {
             // 로딩 중이 아니고 에러가 없거나(혹은 목업 모드일 때) FAB 표시
             if (!uiState.isLoading && (!hasError || isMockMode) && !uiState.isSpectator) {
-                GradientExtendedFloatingActionButton(
-                    onClick = {
-                        if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
-                            viewModel.startChatWithSelectedUser(currentUserId)
-                        } else {
-                            viewModel.startGroupChat(groupId)
-                        }
-                    },
-                    text = if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) "1:1 채팅하기" else "그룹 채팅방 입장",
-                    icon = Icons.AutoMirrored.Filled.Chat
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    GradientExtendedFloatingActionButton(
+                        onClick = onClusterClick,
+                        text = "2차 가기",
+                        icon = Icons.Default.Person
+                    )
+
+                    GradientExtendedFloatingActionButton(
+                        onClick = {
+                            if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
+                                viewModel.startChatWithSelectedUser(currentUserId)
+                            } else {
+                                viewModel.startGroupChat(groupId)
+                            }
+                        },
+                        text = if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) "1:1 채팅하기" else "그룹 채팅방 입장",
+                        icon = Icons.AutoMirrored.Filled.Chat
+                    )
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.End,

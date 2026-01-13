@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
@@ -46,6 +47,8 @@ fun RelationshipGraphComponent(
     relationshipGraph: RelationshipGraph,
     selectedUserId: String? = null,
     nodeScale: Float = 1f,
+    nodeColorProvider: ((String) -> Color?)? = null,
+    nodeZIndexProvider: ((String) -> Float)? = null,
     onNodeClick: (String) -> Unit = {},
     onNodeLongClick: (String) -> Unit = {}
 ) {
@@ -79,6 +82,9 @@ fun RelationshipGraphComponent(
                     isSelected = selectedUserId == nodePosition.userId,
                     similarity = nodePosition.similarityScore,
                     nodeScale = nodeScale,
+                    overrideColor = nodeColorProvider?.invoke(nodePosition.userId),
+                    dimmed = nodeColorProvider != null && nodeColorProvider.invoke(nodePosition.userId) == null,
+                    zIndex = nodeZIndexProvider?.invoke(nodePosition.userId) ?: 0f,
                     onNodeClick = { onNodeClick(nodePosition.userId) },
                     onNodeLongClick = { onNodeLongClick(nodePosition.userId) }
                 )
@@ -95,6 +101,9 @@ fun RelationshipGraphComponent(
                 isSelected = selectedUserId == relationshipGraph.currentUserId,
                 similarity = relationshipGraph.currentUserNode.similarityScore,
                 nodeScale = nodeScale,
+                overrideColor = nodeColorProvider?.invoke(relationshipGraph.currentUserId),
+                dimmed = nodeColorProvider != null && nodeColorProvider.invoke(relationshipGraph.currentUserId) == null,
+                zIndex = nodeZIndexProvider?.invoke(relationshipGraph.currentUserId) ?: 0f,
                 onNodeClick = { onNodeClick(relationshipGraph.currentUserId) },
                 onNodeLongClick = { onNodeLongClick(relationshipGraph.currentUserId) }
             )
@@ -197,11 +206,15 @@ fun OtherUserNodeComponent(
     isSelected: Boolean = false,
     similarity: Float = 0.5f,
     nodeScale: Float = 1f,
+    overrideColor: Color? = null,
+    dimmed: Boolean = false,
+    zIndex: Float = 0f,
     onNodeClick: () -> Unit = {},
     onNodeLongClick: () -> Unit = {}
 ) {
     val nodeSize = GraphLayoutCalculator.calculateNodeSize(similarity)
     val nodeColor = GraphLayoutCalculator.selectNodeColor(similarity)
+    val resolvedColor = overrideColor ?: Color(android.graphics.Color.parseColor(nodeColor))
 
     val borderWidth = when {
         nodeSize >= 56f -> 3.dp
@@ -213,7 +226,10 @@ fun OtherUserNodeComponent(
         nodeSize >= 48f -> 10.dp
         else -> 8.dp
     }
-    val labelColor = if (nodeColor == "#E5E7EB") Color(0xFF6B7280) else Color.White
+    val labelColor = if (overrideColor != null) Color.White else if (nodeColor == "#E5E7EB") Color(
+        0xFF6B7280
+    ) else Color.White
+    val borderColor = overrideColor ?: Color.White
     
     val xOffset = (nodePosition.x - nodeSize / 2).dp
     val yOffset = (nodePosition.y - nodeSize / 2).dp
@@ -222,6 +238,7 @@ fun OtherUserNodeComponent(
         modifier = Modifier
             .offset(x = xOffset, y = yOffset)
             .size(nodeSize.dp)
+            .zIndex(zIndex)
             .graphicsLayer {
                 scaleX = nodeScale
                 scaleY = nodeScale
@@ -234,10 +251,11 @@ fun OtherUserNodeComponent(
                 .size(nodeSize.dp)
                 .shadow(elevation = elevation, shape = CircleShape, clip = false)
                 .background(
-                    color = Color(android.graphics.Color.parseColor(nodeColor)),
+                    color = resolvedColor,
                     shape = CircleShape
                 )
-                .border(borderWidth, Color.White, CircleShape)
+                .border(borderWidth, borderColor, CircleShape)
+                .alpha(if (dimmed) 0.35f else 1f)
                 .clickable { onNodeClick() },
             contentAlignment = Alignment.Center
         ) {
@@ -249,6 +267,13 @@ fun OtherUserNodeComponent(
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
+            if (overrideColor != null) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(overrideColor.copy(alpha = 0.25f), CircleShape)
+                )
+            }
             Text(
                 text = userName.take(3),
                 color = labelColor,
