@@ -21,6 +21,7 @@ data class ProfileUiState(
     val gender: String? = null,
     val region: String? = null,
     val bio: String? = null,
+    val birthdate: String? = null,
     val images: List<String> = emptyList(),
     val tags: List<String> = emptyList(),
     val interests: List<String> = emptyList(),
@@ -67,6 +68,7 @@ class ProfileViewModel @Inject constructor(
             }
             val gender = profileData["gender"]?.toString()
             val region = profileData["region"]?.toString()
+            val birthdate = profileData["birthdate"]?.toString()
             val bio = profileData["bio"]?.let { value ->
                 when (value) {
                     is List<*> -> value.mapNotNull { it?.toString()?.takeIf { it.isNotBlank() } }.joinToString("\n")
@@ -104,6 +106,7 @@ class ProfileViewModel @Inject constructor(
                 gender = gender,
                 region = region,
                 bio = bio,
+                birthdate = birthdate,
                 images = images,
                 tags = tags,
                 interests = interests,

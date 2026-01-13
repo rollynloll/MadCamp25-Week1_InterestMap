@@ -1,6 +1,6 @@
 # Scripts
 
-`MadCamp_Profiles/update_notion_profiles.py` synchronizes the `interests` and `bio` fields for every Notion user whose name is listed under `MadCamp_Profiles/Profile_json`.
+`MadCamp_Profiles/update_notion_profiles.py` synchronizes the `interests`, `bio`, `descriptions`, `birthdate`, `tmi`, `mbti`, `tags`, `region`, and `age` fields for every Notion user whose name is listed under `MadCamp_Profiles/Profile_json`.
 
 ```bash
 cd Backend_FastAPI

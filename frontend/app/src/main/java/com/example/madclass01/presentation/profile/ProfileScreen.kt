@@ -77,6 +77,7 @@ fun ProfileScreen(
     gender: String? = null,
     region: String? = null,
     bio: String? = null,
+    birthdate: String? = null,
     images: List<String> = emptyList(),
     tags: List<String> = emptyList(),
     onEditClick: (() -> Unit)? = null,
@@ -86,11 +87,12 @@ fun ProfileScreen(
         age: Int?,
         gender: String?,
         region: String?,
+        birthdate: String?,
         bio: String?,
         images: List<String>,
         interests: List<String>,
         photoInterests: List<String>
-    ) -> Unit = { _, _, _, _, _, _, _, _ -> },
+    ) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -123,6 +125,7 @@ fun ProfileScreen(
                 uiState.age ?: age,
                 uiState.gender ?: gender,
                 uiState.region ?: region,
+                uiState.birthdate ?: birthdate,
                 uiState.bio ?: bio,
                 if (uiState.images.isNotEmpty()) uiState.images else images,
                 uiState.interests,
@@ -147,6 +150,7 @@ fun ProfileScreen(
                 age = uiState.age ?: age,
                 gender = uiState.gender ?: gender,
                 region = uiState.region ?: region,
+                birthdate = uiState.birthdate ?: birthdate,
                 bio = uiState.bio ?: bio,
                 images = currentImages,
                 tags = if (uiState.tags.isNotEmpty()) uiState.tags else tags,
@@ -173,6 +177,7 @@ fun ProfileContent(
     age: Int? = null,
     gender: String? = null,
     region: String? = null,
+    birthdate: String? = null,
     bio: String? = null,
     images: List<String> = emptyList(),
     tags: List<String> = emptyList(),
@@ -334,21 +339,29 @@ fun ProfileContent(
                             )
                         }
                     }
-                    if (region != null) {
-                        Icon(
-                            imageVector = Icons.Rounded.LocationOn,
-                            contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Text(
-                            text = region,
-                            fontSize = 13.sp,
-                            color = Color.White.copy(alpha = 0.9f)
-                        )
-                    }
+                if (region != null) {
+                    Icon(
+                        imageVector = Icons.Rounded.LocationOn,
+                        contentDescription = null,
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(2.dp))
+                    Text(
+                        text = region,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
                 }
+                if (birthdate != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "생일: $birthdate",
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+            }
 
                 Spacer(modifier = Modifier.height(10.dp))
 

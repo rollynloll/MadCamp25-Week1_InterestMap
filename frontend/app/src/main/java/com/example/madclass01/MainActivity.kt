@@ -125,6 +125,7 @@ fun AppNavigation(
     var profileRefreshTrigger by remember { mutableStateOf(0) }  // 프로필 새로고침 트리거  // 백엔드에서 받아옴
     var userRegion by remember { mutableStateOf<String?>(null) }
     var userBio by remember { mutableStateOf<String>("") }
+    var userBirthdate by remember { mutableStateOf<String?>(null) }
     var userImages by remember { mutableStateOf<List<String>>(emptyList()) }
     var recommendedTags by remember { mutableStateOf<List<String>>(emptyList()) }
     var userTags by remember { mutableStateOf<List<String>>(emptyList()) }  // 사용자가 선택한 관심사
@@ -434,6 +435,7 @@ fun AppNavigation(
                 profileAge = userAge,
                 profileGender = userGender,
                 profileRegion = userRegion,
+                profileBirthdate = userBirthdate,
                 profileBio = userBio,
                 profileImages = userImages,
                 profileTags = userTags,
@@ -452,11 +454,12 @@ fun AppNavigation(
                 onNavigateToQRScanner = {
                     currentScreen = AppScreen.QRScanner
                 },
-                onProfileLoaded = { nickname, age, gender, region, bio, images, interests, photoInterests ->
+                onProfileLoaded = { nickname, age, gender, region, birthdate, bio, images, interests, photoInterests ->
                     userNickname = nickname
                     userAge = age
                     userGender = gender
                     userRegion = region
+                    userBirthdate = birthdate
                     userBio = bio ?: ""
                     userImages = images
                     userTags = interests

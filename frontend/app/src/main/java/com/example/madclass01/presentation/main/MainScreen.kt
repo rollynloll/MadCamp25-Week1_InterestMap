@@ -60,6 +60,7 @@ fun MainScreen(
     profileGender: String? = null,
     profileRegion: String? = null,
     profileBio: String? = null,
+    profileBirthdate: String? = null,
     profileImages: List<String> = emptyList(),
     profileTags: List<String> = emptyList(),
     profileRefreshTrigger: Int = 0,  // 프로필 새로고침 트리거
@@ -73,11 +74,12 @@ fun MainScreen(
         age: Int?,
         gender: String?,
         region: String?,
+        birthdate: String?,
         bio: String?,
         images: List<String>,
         interests: List<String>,
         photoInterests: List<String>
-    ) -> Unit = { _, _, _, _, _, _, _, _ -> }
+    ) -> Unit = { _, _, _, _, _, _, _, _, _ -> }
 ) {
     val navController = rememberNavController()
     val tabs = listOf(MainTab.Groups, MainTab.Search, MainTab.Profile)
@@ -162,6 +164,7 @@ fun MainScreen(
                         age = profileAge,
                         gender = profileGender,
                         region = profileRegion,
+                        birthdate = profileBirthdate,
                         bio = profileBio,
                         images = profileImages,
                         tags = profileTags,
