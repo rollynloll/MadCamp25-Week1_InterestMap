@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Male
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -43,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -187,6 +189,7 @@ fun ProfileContent(
     )
     
     var showAllTags by remember { mutableStateOf(false) }
+    var showBioDialog by remember { mutableStateOf(false) }
 
     if (showAllTags) {
         AllTagsDialog(tags = tags, onDismiss = { showAllTags = false })
@@ -361,6 +364,38 @@ fun ProfileContent(
                             .fillMaxWidth(0.8f)
                             .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                             .padding(vertical = 6.dp, horizontal = 16.dp)
+                    )
+                    val needsMore = bio.lines().size > 2 || bio.length > 120
+                    if (needsMore) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "자세히 보기",
+                            color = Color.White.copy(alpha = 0.8f),
+                            fontSize = 11.sp,
+                            modifier = Modifier
+                                .clickable { showBioDialog = true }
+                                .padding(vertical = 2.dp),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+                if (showBioDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showBioDialog = false },
+                        title = { Text(text = "자기소개", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Text(
+                                text = bio ?: "",
+                                fontSize = 14.sp,
+                                color = Color.Black
+                            )
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { showBioDialog = false }) {
+                                Text(text = "닫기")
+                            }
+                        },
+                        modifier = Modifier.padding(16.dp)
                     )
                 }
 

@@ -830,8 +830,26 @@ async def create_user(request: UserCreateRequest, db: AsyncSession = Depends(get
 @app.get("/api/users/{user_id}", response_model=UserResponse, tags=["users"])
 async def get_user(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자 정보 조회"""
-    user = await _get_user_by_id(db, user_id)
-    return _cache_user(user)
+    try:
+        user = await _get_user_by_id(db, user_id)
+        return _cache_user(user)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            notion_user = await _get_notion_user_by_id(db, user_id)
+            profile_data = notion_user.profile_data or {}
+            response = UserResponse(
+                id=str(notion_user.id),
+                provider=notion_user.provider,
+                provider_user_id=notion_user.provider_user_id,
+                nickname=notion_user.nickname,
+                profile_image_url=_normalize_upload_url(notion_user.profile_image_url),
+                profile_data=profile_data,
+                is_new_user=False,
+                created_at=notion_user.created_at.isoformat() if notion_user.created_at else None,
+                updated_at=notion_user.updated_at.isoformat() if notion_user.updated_at else None,
+            )
+            return response
+        raise
 
 @app.put("/api/users/{user_id}", response_model=UserResponse, tags=["users"])
 async def update_user(user_id: str, request: UserUpdateRequest, db: AsyncSession = Depends(get_db)):
@@ -1117,7 +1135,14 @@ async def get_user_photos(
     db: AsyncSession = Depends(get_db),
 ):
     """사용자의 사진 목록 조회"""
-    user = await _get_user_by_id(db, user_id)
+    try:
+        user = await _get_user_by_id(db, user_id)
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            await _get_notion_user_by_id(db, user_id)
+            return []
+        raise
+
     result = await db.execute(
         select(UserPhoto).where(UserPhoto.user_id == user.id).order_by(UserPhoto.sort_order)
     )

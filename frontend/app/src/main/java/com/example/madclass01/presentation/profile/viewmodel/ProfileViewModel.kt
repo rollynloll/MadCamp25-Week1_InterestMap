@@ -67,7 +67,13 @@ class ProfileViewModel @Inject constructor(
             }
             val gender = profileData["gender"]?.toString()
             val region = profileData["region"]?.toString()
-            val bio = profileData["bio"]?.toString()
+            val bio = profileData["bio"]?.let { value ->
+                when (value) {
+                    is List<*> -> value.mapNotNull { it?.toString()?.takeIf { it.isNotBlank() } }.joinToString("\n")
+                    is String -> value
+                    else -> value.toString()
+                }
+            }
             
             // interests와 photo_interests를 모두 합쳐서 tags로 반환
             val interests = profileData.stringListValue("interests")
