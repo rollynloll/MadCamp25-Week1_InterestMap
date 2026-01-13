@@ -308,7 +308,7 @@ fun AppNavigation(
                 currentUserId = resolvedUserId ?: "mock_user",
                 isSpectatorEntry = groupDetail.fromSearch,
                 onBackPress = {
-                    homeStartTabRoute = "groups"
+                    homeStartTabRoute = if (groupDetail.fromSearch) "search" else "groups"
                     currentScreen = AppScreen.Home
                 },
                 onLeaveSuccess = {

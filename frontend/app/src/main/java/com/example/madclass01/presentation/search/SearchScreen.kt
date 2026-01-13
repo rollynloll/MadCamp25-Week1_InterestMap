@@ -37,11 +37,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.search.component.SearchResultCard
 import com.example.madclass01.presentation.search.viewmodel.SearchViewModel
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.ComponentActivity
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun SearchScreen(
     userId: String? = null,
-    viewModel: SearchViewModel = hiltViewModel(),
+    viewModel: SearchViewModel = hiltViewModel(LocalContext.current as ComponentActivity),
     onGroupClick: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
