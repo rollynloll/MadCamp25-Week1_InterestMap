@@ -22,9 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Female
 import androidx.compose.material.icons.filled.Male
@@ -90,6 +93,9 @@ fun ProfileScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var lastEmitted by remember { mutableStateOf<ProfileUiState?>(null) }
+    
+    // State for Full Screen Image Viewer
+    var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(userId) {
         if (userId != null) {
@@ -113,25 +119,39 @@ fun ProfileScreen(
         }
     }
 
-    if (uiState.isLoading) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            }
+        } else {
+            val currentImages = if (uiState.images.isNotEmpty()) uiState.images else images
+            
+            ProfileContent(
+                nickname = uiState.nickname ?: nickname,
+                age = uiState.age ?: age,
+                gender = uiState.gender ?: gender,
+                region = uiState.region ?: region,
+                bio = uiState.bio ?: bio,
+                images = currentImages,
+                tags = if (uiState.tags.isNotEmpty()) uiState.tags else tags,
+                onEditClick = onEditClick,
+                onBack = onBack,
+                onImageClick = { index -> selectedImageIndex = index }
+            )
+            
+            // Full Screen Image Viewer Overlay
+            if (selectedImageIndex != null) {
+                com.example.madclass01.presentation.common.screen.FullScreenImageViewer(
+                    imageUrls = currentImages,
+                    initialPage = selectedImageIndex!!,
+                    onDismiss = { selectedImageIndex = null }
+                )
+            }
         }
-    } else {
-        ProfileContent(
-            nickname = uiState.nickname ?: nickname,
-            age = uiState.age ?: age,
-            gender = uiState.gender ?: gender,
-            region = uiState.region ?: region,
-            bio = uiState.bio ?: bio,
-            images = if (uiState.images.isNotEmpty()) uiState.images else images,
-            tags = if (uiState.tags.isNotEmpty()) uiState.tags else tags,
-            onEditClick = onEditClick,
-            onBack = onBack
-        )
     }
 }
 
@@ -145,7 +165,8 @@ fun ProfileContent(
     images: List<String> = emptyList(),
     tags: List<String> = emptyList(),
     onEditClick: (() -> Unit)? = null,
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
+    onImageClick: (Int) -> Unit = {}
 ) {
     // Defines a modern gradient for the header
     val headerBrush = Brush.verticalGradient(
@@ -154,20 +175,26 @@ fun ProfileContent(
             Color(0xFFFFB775)  // Lighter Orange
         )
     )
+    
+    var showAllTags by remember { mutableStateOf(false) }
+
+    if (showAllTags) {
+        AllTagsDialog(tags = tags, onDismiss = { showAllTags = false })
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF9F9F9)) // Slightly off-white background for depth
     ) {
-        // --- Header Section ---
+        // --- Header Section (Compacted) ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(elevation = 8.dp, shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                .background(headerBrush, shape = RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                .shadow(elevation = 4.dp, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                .background(headerBrush, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                 .statusBarsPadding()
-                .padding(bottom = 24.dp)
+                .padding(bottom = 16.dp)
         ) {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -177,7 +204,7 @@ fun ProfileContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -186,7 +213,7 @@ fun ProfileContent(
                         IconButton(
                             onClick = onBack,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
                             Icon(
@@ -196,7 +223,7 @@ fun ProfileContent(
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(40.dp))
+                        Spacer(modifier = Modifier.size(36.dp))
                     }
 
                     // Edit Button
@@ -204,27 +231,28 @@ fun ProfileContent(
                         IconButton(
                             onClick = onEditClick,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit Profile",
-                                tint = Color.White
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     } else {
-                        Spacer(modifier = Modifier.size(40.dp))
+                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
 
-                // Profile Image with Border
+                // Profile Image with Border (Smaller)
                 Box(
                     contentAlignment = Alignment.Center,
                     modifier = Modifier
-                        .size(120.dp)
-                        .border(4.dp, Color.White, CircleShape)
-                        .padding(4.dp)
+                        .size(100.dp) // Reduced from 120.dp
+                        .border(3.dp, Color.White, CircleShape)
+                        .padding(3.dp)
                         .clip(CircleShape)
                         .background(Color.White)
                 ) {
@@ -238,14 +266,14 @@ fun ProfileContent(
                     } else {
                         Text(
                             text = nickname?.take(2) ?: "MY",
-                            fontSize = 36.sp,
+                            fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFFFF9945)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 // Name and Gender
                 Row(
@@ -255,7 +283,7 @@ fun ProfileContent(
                 ) {
                     Text(
                         text = nickname ?: "Anonymous",
-                        fontSize = 26.sp,
+                        fontSize = 22.sp, // Reduced from 26.sp
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -265,13 +293,13 @@ fun ProfileContent(
                             imageVector = Icons.Default.Male,
                             contentDescription = "Male",
                             tint = Color(0xFFE3F2FD),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                         "female", "여성" -> Icon(
                             imageVector = Icons.Default.Female,
                             contentDescription = "Female",
                             tint = Color(0xFFFCE4EC),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -285,13 +313,13 @@ fun ProfileContent(
                     if (age != null) {
                         Text(
                             text = "${age}세",
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                             color = Color.White.copy(alpha = 0.9f)
                         )
                         if (region != null) {
                             Text(
                                 text = "  |  ",
-                                fontSize = 15.sp,
+                                fontSize = 13.sp,
                                 color = Color.White.copy(alpha = 0.6f)
                             )
                         }
@@ -301,37 +329,37 @@ fun ProfileContent(
                             imageVector = Icons.Rounded.LocationOn,
                             contentDescription = null,
                             tint = Color.White.copy(alpha = 0.9f),
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(12.dp)
                         )
                         Spacer(modifier = Modifier.width(2.dp))
                         Text(
                             text = region,
-                            fontSize = 15.sp,
+                            fontSize = 13.sp,
                             color = Color.White.copy(alpha = 0.9f)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Bio
                 if (!bio.isNullOrBlank()) {
                     Text(
                         text = bio,
-                        fontSize = 15.sp,
+                        fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.95f),
                         textAlign = TextAlign.Center,
-                        maxLines = 3,
+                        maxLines = 2, // Reduced lines
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
-                            .padding(vertical = 8.dp, horizontal = 16.dp)
+                            .padding(vertical = 6.dp, horizontal = 16.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Tags (FlowRow)
+                // Tags (FlowRow) - Compact & "More" button
                 if (tags.isNotEmpty()) {
                     @OptIn(ExperimentalLayoutApi::class)
                     FlowRow(
@@ -339,7 +367,10 @@ fun ProfileContent(
                         horizontalArrangement = Arrangement.Center,
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        tags.take(5).forEach { tag ->
+                        val maxTagsToShow = 5
+                        val displayTags = if (tags.size > maxTagsToShow) tags.take(maxTagsToShow - 1) else tags
+                        
+                        displayTags.forEach { tag ->
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = Color.White,
@@ -347,12 +378,41 @@ fun ProfileContent(
                             ) {
                                 Text(
                                     text = tag,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = Color(0xFFFF9945),
-                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                 )
                             }
+                        }
+                        
+                        // "More" Button
+                        if (tags.size > maxTagsToShow) {
+                           Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color.White.copy(alpha = 0.3f), // Slightly distinct
+                                modifier = Modifier
+                                    .padding(horizontal = 3.dp)
+                                    .clickable { showAllTags = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp)
+                                    )
+                                    Text(
+                                        text = "${tags.size - (maxTagsToShow - 1)}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                }
+                            } 
                         }
                     }
                 }
@@ -362,10 +422,11 @@ fun ProfileContent(
         // --- Gallery Section ---
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxSize() // Takes remaining space
+                .weight(1f) // Ensure it pushes down if needed, but in standard Column fillMaxSize works if children don't overflow
                 .padding(horizontal = 16.dp)
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
             
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -399,16 +460,20 @@ fun ProfileContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(200.dp)
+                        .weight(1f) // Fill remaining space in this column
                         .background(Color(0xFFEEEEEE), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "No photos yet \uD83D\uDCF8",
-                        color = Color.Gray,
-                        fontSize = 16.sp
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                         Text(
+                            text = "No photos yet \uD83D\uDCF8",
+                            color = Color.Gray,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
+                Spacer(modifier = Modifier.height(24.dp))
             } else {
                 LazyVerticalStaggeredGrid(
                     columns = StaggeredGridCells.Fixed(2),
@@ -417,15 +482,11 @@ fun ProfileContent(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(images) { imageUri ->
-                        // Calculate a random aspect ratio for demo if we don't have real intrinsic sizes,
-                        // OR just respect the content mostly. 
-                        // Since we are loading from URL, we often just fit width. 
-                        // To simulate Pinterest "staggered" feel even with same-size images, 
-                        // we can change aspect ratio slightly or just rely on the content.
-                        // Here, we'll let AsyncImage handle it but wrap in a card.
-                        
-                        GalleryItem(imageUri = imageUri)
+                    itemsIndexed(images) { index, imageUri ->
+                        GalleryItem(
+                            imageUri = imageUri,
+                            onClick = { onImageClick(index) }
+                        )
                     }
                 }
             }
@@ -434,14 +495,73 @@ fun ProfileContent(
 }
 
 @Composable
-fun GalleryItem(imageUri: String) {
+fun AllTagsDialog(
+    tags: List<String>,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "All Interests",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF9945)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                @OptIn(ExperimentalLayoutApi::class)
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    tags.forEach { tag ->
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = Color(0xFFFF9945).copy(alpha = 0.1f),
+                            border = BorderStroke(1.dp, Color(0xFFFF9945).copy(alpha = 0.5f)),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        ) {
+                            Text(
+                                text = tag,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFFE65100),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Close", color = Color(0xFF333333), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun GalleryItem(
+    imageUri: String,
+    onClick: () -> Unit
+) {
     // Generate a pseudo-random aspect ratio based on the string hash to keep it consistent but staggered-looking
-    // If the image itself has varying dimensions, `ContentScale.Crop` with a fixed ratio is common, 
-    // OR `ContentScale.FillWidth` with `wrapContentHeight`.
-    // For a requested "Pinterest" look, we usually want variable heights.
-    // Since Coil needs to load first to know size, simple staggered grid often needs a hint or we just random-size the placeholder.
-    // For now, I will use a randomized height factor to simulated the "Pinterest" look visually.
-    
     val randomHeightRatio = remember(imageUri) { 
         Random(imageUri.hashCode()).nextDouble(0.8, 1.4).toFloat() 
     }
@@ -450,7 +570,9 @@ fun GalleryItem(imageUri: String) {
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
     ) {
         AsyncImage(
             model = imageUri,
