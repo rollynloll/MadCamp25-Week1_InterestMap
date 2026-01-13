@@ -72,7 +72,7 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun sendTextMessage(groupId: String, userId: String, content: String): Result<ChatMessage> {
         return try {
-            val res = apiService.sendGroupMessage(groupId, MessageCreateRequest(text = content), "")
+            val res = apiService.sendGroupMessage(groupId, MessageCreateRequest(userId = userId, text = content), "")
             if (res.isSuccessful && res.body() != null) {
                 Result.success(res.body()!!.toDomain())
             } else {

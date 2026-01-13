@@ -501,10 +501,11 @@ class BackendRepository @Inject constructor(
      */
     suspend fun sendGroupMessage(
         groupId: String,
+        userId: String,
         text: String
     ): ApiResult<MessageContent> = withContext(Dispatchers.IO) {
         try {
-            val request = MessageCreateRequest(text = text)
+            val request = MessageCreateRequest(userId = userId, text = text)
             val response = apiService.sendGroupMessage(groupId, request, "")
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
@@ -523,7 +524,7 @@ class BackendRepository @Inject constructor(
         groupId: String,
         userId: String,
         imageFile: File
-    ): ApiResult<GroupMessageItem> = withContext(Dispatchers.IO) {
+    ): ApiResult<MessageContent> = withContext(Dispatchers.IO) {
         try {
             val requestBody = imageFile.asRequestBody("image/*".toMediaTypeOrNull())
             val multipartBody = MultipartBody.Part.createFormData("file", imageFile.name, requestBody)

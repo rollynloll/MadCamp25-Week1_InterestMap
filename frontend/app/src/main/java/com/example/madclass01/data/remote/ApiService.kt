@@ -140,9 +140,9 @@ interface ApiService {
     
     /**
      * 그룹 메시지 조회
-     * GET /groups/{group_id}/messages
+     * GET /api/groups/{group_id}/messages
      */
-    @GET("/groups/{group_id}/messages")
+    @GET("/api/groups/{group_id}/messages")
     suspend fun getGroupMessages(
         @Path("group_id") groupId: String,
         @Query("limit") limit: Int = 50,
@@ -151,9 +151,9 @@ interface ApiService {
     
     /**
      * 그룹 텍스트 메시지 전송
-     * POST /groups/{group_id}/messages
+     * POST /api/groups/{group_id}/messages
      */
-    @POST("/groups/{group_id}/messages")
+    @POST("/api/groups/{group_id}/messages")
     suspend fun sendGroupMessage(
         @Path("group_id") groupId: String,
         @Body request: MessageCreateRequest,
@@ -162,15 +162,15 @@ interface ApiService {
     
     /**
      * 그룹 이미지 메시지 전송
-     * POST /groups/{groupId}/photos
+     * POST /api/groups/{groupId}/photos
      */
     @Multipart
-    @POST("/groups/{groupId}/photos")
+    @POST("/api/groups/{groupId}/photos")
     suspend fun sendGroupImageMessage(
         @Path("groupId") groupId: String,
         @Part("user_id") userId: String,
         @Part file: MultipartBody.Part
-    ): Response<GroupMessageItem>
+    ): Response<MessageContent>
     
     // ==================== 임베딩 (Embedding) ====================
     

@@ -196,6 +196,8 @@ data class InterestMapEdge(
 // ==================== 그룹 메시지 (Messages) ====================
 
 data class MessageCreateRequest(
+    @SerializedName("user_id")
+    val userId: String,
     val text: String
 )
 
