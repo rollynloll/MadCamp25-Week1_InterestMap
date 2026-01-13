@@ -115,7 +115,18 @@ fun GroupDetailScreen(
                 val groupName = uiState.group?.name ?: if (isMockMode) "몰입캠프 분반4" else "그룹 상세"
                 val memberCount = uiState.group?.memberCount ?: if (isMockMode) 21 else 0
                 val activityStatus = if (isMockMode) "테스트 모드" else "오늘 활동"
-                val groupIcon = uiState.group?.iconType?.ifBlank { "👥" } ?: "👥"
+                val iconType = uiState.group?.iconType ?: "users"
+                val groupIcon = when (iconType) {
+                    "users" -> "👥"
+                    "coffee" -> "☕"
+                    "camera" -> "📷"
+                    "mountain" -> "⛰️"
+                    "music" -> "🎵"
+                    "book" -> "📚"
+                    "sports" -> "⚽"
+                    "food" -> "🍔"
+                    else -> "👥"
+                }
                 val profileImageUrl = uiState.group?.imageUrl
 
                 Column(modifier = Modifier.fillMaxSize()) {

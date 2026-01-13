@@ -52,13 +52,30 @@ fun GroupCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (group.imageUrl.isNotBlank()) {
-                    AsyncImage(
+                    coil.compose.SubcomposeAsyncImage(
                         model = group.imageUrl,
                         contentDescription = "Group Profile",
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(16.dp)),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        loading = {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.size(24.dp),
+                                    strokeWidth = 2.dp,
+                                    color = androidx.compose.material3.MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        error = {
+                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = groupIconEmoji(group.iconType),
+                                    fontSize = 32.sp
+                                )
+                             }
+                        }
                     )
                 } else {
                     Text(
