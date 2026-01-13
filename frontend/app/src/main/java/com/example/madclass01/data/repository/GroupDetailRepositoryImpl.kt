@@ -72,7 +72,8 @@ class GroupDetailRepositoryImpl @Inject constructor(
     ): Result<RelationshipGraph> {
         return try {
             // 1. 그룹 임베딩 데이터 조회
-            val embeddingsResponse = apiService.getGroupUserEmbeddings(groupId, currentUserId)
+            val requestUserId = currentUserId.takeIf { it.isNotBlank() }
+            val embeddingsResponse = apiService.getGroupUserEmbeddings(groupId, requestUserId)
             if (!embeddingsResponse.isSuccessful || embeddingsResponse.body() == null) {
                 return Result.failure(Exception("Failed to get embeddings"))
             }
@@ -117,7 +118,7 @@ class GroupDetailRepositoryImpl @Inject constructor(
                 val centerY = 260f  // 520 / 2
 
                 val currentNode = GraphNodePosition(
-                    userId = currentUserId,
+                    userId = responseCurrentUserId,
                     x = centerX,
                     y = centerY,
                     distance = 0f,

@@ -35,11 +35,16 @@ class ChatRepositoryImpl @Inject constructor(
 
     override suspend fun leaveGroup(groupId: String, userId: String): Result<Unit> {
         return try {
-            val res = apiService.leaveGroupChat(groupId)
-            if (res.isSuccessful && res.body()?.ok == true) {
+            val res = apiService.removeGroupMember(groupId, userId)
+            if (res.isSuccessful) {
                 Result.success(Unit)
             } else {
-                Result.failure(Exception("leave failed ${res.code()}"))
+                val fallback = apiService.leaveGroupChat(groupId)
+                if (fallback.isSuccessful && fallback.body()?.ok == true) {
+                    Result.success(Unit)
+                } else {
+                    Result.failure(Exception("leave failed ${res.code()}"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)

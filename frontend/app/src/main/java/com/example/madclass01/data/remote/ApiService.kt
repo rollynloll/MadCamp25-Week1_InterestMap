@@ -268,6 +268,12 @@ interface ApiService {
         @Path("groupId") groupId: String
     ): Response<OkResponse>
 
+    @DELETE("/api/groups/{group_id}/members/{user_id}")
+    suspend fun removeGroupMember(
+        @Path("group_id") groupId: String,
+        @Path("user_id") userId: String
+    ): Response<OkResponse>
+
     // Invite APIs
     @POST("/api/invites/generate")
     suspend fun generateInviteLink(@Body request: GenerateInviteLinkRequest): Response<InviteLinkResponse>

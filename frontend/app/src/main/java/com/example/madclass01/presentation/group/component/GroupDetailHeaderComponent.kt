@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,7 +44,8 @@ fun GroupDetailHeaderComponent(
     groupIcon: String = "👥",
     profileImageUrl: String? = null,
     onBackClick: () -> Unit = {},
-    onQRCodeClick: () -> Unit = {}
+    onQRCodeClick: () -> Unit = {},
+    onLeaveClick: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
@@ -73,20 +75,41 @@ fun GroupDetailHeaderComponent(
             )
         }
 
-        // Action Button (Invite)
-        Box(
+        Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .size(32.dp)
-                .clickable { onQRCodeClick() },
-            contentAlignment = Alignment.Center
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.PersonAdd,
-                contentDescription = "Invite",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clickable { onQRCodeClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PersonAdd,
+                    contentDescription = "Invite",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(Color.White.copy(alpha = 0.2f))
+                    .clickable { onLeaveClick() }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "탈퇴하기",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+            }
         }
 
         // Center Content

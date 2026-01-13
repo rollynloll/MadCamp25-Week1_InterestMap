@@ -7,6 +7,7 @@ import com.example.madclass01.domain.model.RelationshipGraph
 import com.example.madclass01.domain.usecase.GetGroupDetailUseCase
 import com.example.madclass01.domain.usecase.GetRelationshipGraphUseCase
 import com.example.madclass01.domain.usecase.JoinGroupChatUseCase
+import com.example.madclass01.domain.usecase.LeaveGroupChatUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,8 @@ data class GroupDetailUiState(
     val selectedUserId: String? = null,  // 선택된 사용자 (채팅 등)
     val chatRoomId: String? = null,  // 생성된 채팅 룸
     val isTestUser: Boolean = false,  // 테스트 사용자 여부
-    val isSpectator: Boolean = false  // 관전자 모드
+    val isSpectator: Boolean = false,  // 관전자 모드
+    val leaveSuccess: Boolean = false
 )
 
 /**
@@ -38,7 +40,8 @@ data class GroupDetailUiState(
 class GroupDetailViewModel @Inject constructor(
     private val getGroupDetailUseCase: GetGroupDetailUseCase,
     private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase,
-    private val joinGroupChatUseCase: JoinGroupChatUseCase
+    private val joinGroupChatUseCase: JoinGroupChatUseCase,
+    private val leaveGroupChatUseCase: LeaveGroupChatUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupDetailUiState())
@@ -83,7 +86,8 @@ class GroupDetailViewModel @Inject constructor(
                 }
 
                 // 2. 관계 그래프 조회
-                val graphResult = getRelationshipGraphUseCase(groupId, currentUserId)
+                val graphUserId = if (isSpectator) "" else currentUserId
+                val graphResult = getRelationshipGraphUseCase(groupId, graphUserId)
                 graphResult.onSuccess { graph ->
                     _uiState.value = _uiState.value.copy(
                         group = group,
@@ -122,6 +126,29 @@ class GroupDetailViewModel @Inject constructor(
                     )
                 }
         }
+    }
+
+    fun leaveGroup(groupId: String, currentUserId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+            leaveGroupChatUseCase(groupId, currentUserId)
+                .onSuccess {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        leaveSuccess = true
+                    )
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = error.message ?: "그룹 나가기 실패"
+                    )
+                }
+        }
+    }
+
+    fun resetLeaveSuccess() {
+        _uiState.value = _uiState.value.copy(leaveSuccess = false)
     }
 
     /**

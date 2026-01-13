@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from urllib.parse import urlparse
 from sqlalchemy import text, select, func, inspect, delete, update
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import (
@@ -1048,24 +1049,6 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     )
     group_by_id = {group.id: group for group in result.scalars().all()}
 
-    creator_result = await db.execute(
-        select(Group).where(Group.created_by == user.id)
-    )
-    for group in creator_result.scalars().all():
-        group_by_id.setdefault(group.id, group)
-
-    existing_membership = await db.execute(
-        select(GroupMember.group_id).where(GroupMember.user_id == user.id)
-    )
-    membership_ids = {row[0] for row in existing_membership.all()}
-    missing_memberships = [
-        group_id for group_id in group_by_id.keys() if group_id not in membership_ids
-    ]
-    if missing_memberships:
-        for group_id in missing_memberships:
-            db.add(GroupMember(group_id=group_id, user_id=user.id, role="owner"))
-        await db.commit()
-
     responses: list[dict] = []
     for group in group_by_id.values():
         member_ids = await _get_all_group_member_ids(db, group.id)
@@ -1102,6 +1085,11 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
     """그룹에서 멤버 제거"""
     group = await _get_group_by_id(db, group_id)
     user = await _get_user_by_id(db, user_id)
+    logging.getLogger("uvicorn.error").info(
+        "Remove group member requested user_id=%s group_id=%s",
+        user.id,
+        group.id,
+    )
     await db.execute(
         delete(GroupMember).where(
             GroupMember.group_id == group.id,
@@ -1109,6 +1097,11 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
         )
     )
     await db.commit()
+    logging.getLogger("uvicorn.error").info(
+        "Remove group member completed user_id=%s group_id=%s",
+        user.id,
+        group.id,
+    )
     return {"message": "Member removed successfully"}
 
 
@@ -1402,7 +1395,40 @@ async def get_group_embeddings(
     member_ids = await _get_group_member_ids(db, group.id)
     notion_member_ids = await _get_notion_member_ids(db, group.id)
     if not member_ids and not notion_member_ids:
-        raise HTTPException(status_code=404, detail="Group has no members")
+        if not current_user_id:
+            raise HTTPException(status_code=404, detail="Group has no members")
+        try:
+            current_uuid = uuid.UUID(current_user_id)
+        except ValueError:
+            current_uuid = None
+        if current_uuid is None:
+            raise HTTPException(status_code=404, detail="Group has no members")
+        current_user = await _get_user_by_id(db, str(current_uuid))
+        current_embedding = UserEmbeddingResponse(
+            userId=str(current_user.id),
+            userName=current_user.nickname or "",
+            profileImageUrl=_normalize_upload_url(current_user.profile_image_url),
+            embeddingVector=_embedding_vector_or_zero(
+                current_user.embedding if current_user.embedding else None
+            ),
+            activityStatus="활동중",
+        )
+        node_positions = [
+            GraphNodePositionResponse(
+                userId=str(current_user.id),
+                x=195.0,
+                y=260.0,
+                distance=0.0,
+                similarityScore=1.0,
+            )
+        ]
+        return GroupEmbeddingResponse(
+            groupId=str(group.id),
+            currentUserId=str(current_user.id),
+            currentUserEmbedding=current_embedding,
+            otherUserEmbeddings=[],
+            nodePositions=node_positions,
+        )
 
     current_uuid: uuid.UUID | None = None
     if current_user_id:
@@ -1410,13 +1436,17 @@ async def get_group_embeddings(
             candidate = uuid.UUID(current_user_id)
         except ValueError:
             candidate = None
-        if candidate and candidate in member_ids:
+        if candidate and (candidate in member_ids or candidate in notion_member_ids):
+            current_uuid = candidate
+        elif candidate:
             current_uuid = candidate
     if current_uuid is None:
         if group.created_by and group.created_by in member_ids:
             current_uuid = group.created_by
         else:
             current_uuid = member_ids[0] if member_ids else None
+    if current_uuid is None and notion_member_ids:
+        current_uuid = notion_member_ids[0]
 
     if current_uuid is None:
         raise HTTPException(status_code=404, detail="Group has no user members")
@@ -1449,6 +1479,41 @@ async def get_group_embeddings(
             activityStatus="활동중",
         )
 
+    async def _build_current_embedding(user_id: uuid.UUID) -> UserEmbeddingResponse:
+        user = users.get(user_id)
+        if user:
+            vector = _embedding_vector_or_zero(user.embedding if user.embedding else None)
+            return UserEmbeddingResponse(
+                userId=str(user.id),
+                userName=user.nickname or "",
+                profileImageUrl=_normalize_upload_url(user.profile_image_url),
+                embeddingVector=vector,
+                activityStatus="활동중",
+            )
+        notion_user = notion_users.get(user_id)
+        if notion_user:
+            vector = _embedding_vector_or_zero(
+                notion_user.embedding if notion_user.embedding else None
+            )
+            return UserEmbeddingResponse(
+                userId=str(notion_user.id),
+                userName=notion_user.nickname or "",
+                profileImageUrl=_normalize_upload_url(notion_user.profile_image_url),
+                embeddingVector=vector,
+                activityStatus="활동중",
+            )
+        fetched_user = await _get_user_by_id(db, str(user_id))
+        vector = _embedding_vector_or_zero(
+            fetched_user.embedding if fetched_user.embedding else None
+        )
+        return UserEmbeddingResponse(
+            userId=str(fetched_user.id),
+            userName=fetched_user.nickname or "",
+            profileImageUrl=_normalize_upload_url(fetched_user.profile_image_url),
+            embeddingVector=vector,
+            activityStatus="활동중",
+        )
+
     member_inputs = []
     for member_id in member_ids:
         user = users.get(member_id)
@@ -1471,13 +1536,15 @@ async def get_group_embeddings(
 
     positions = build_group_map_positions(str(group.id), member_inputs)
 
-    current_embedding = _build_embedding(current_uuid)
+    current_embedding = await _build_current_embedding(current_uuid)
     other_embeddings = []
     for member_id in member_ids:
         if member_id == current_uuid:
             continue
         other_embeddings.append(_build_embedding(member_id))
     for member_id in notion_member_ids:
+        if member_id == current_uuid:
+            continue
         user = notion_users.get(member_id)
         if not user:
             continue
@@ -1493,7 +1560,13 @@ async def get_group_embeddings(
         )
 
     current_user = users.get(current_uuid)
-    current_vector = list(current_user.embedding) if current_user and current_user.embedding else None
+    current_notion_user = notion_users.get(current_uuid)
+    current_vector_source = None
+    if current_user:
+        current_vector_source = current_user.embedding
+    elif current_notion_user:
+        current_vector_source = current_notion_user.embedding
+    current_vector = list(current_vector_source) if current_vector_source else None
 
     node_positions = []
     for member_id in member_ids + notion_member_ids:
@@ -1513,6 +1586,16 @@ async def get_group_embeddings(
                 y=pos[1],
                 distance=distance,
                 similarityScore=similarity,
+            )
+        )
+    if current_uuid not in member_ids and current_uuid not in notion_member_ids:
+        node_positions.append(
+            GraphNodePositionResponse(
+                userId=str(current_uuid),
+                x=195.0,
+                y=260.0,
+                distance=0.0,
+                similarityScore=1.0,
             )
         )
 

@@ -44,6 +44,7 @@ fun GroupDetailScreen(
     currentUserId: String,
     isSpectatorEntry: Boolean = false,
     onBackPress: () -> Unit = {},
+    onLeaveSuccess: () -> Unit = {},
     onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
     onChatRoomCreated: (chatRoomId: String, groupName: String, memberCount: Int) -> Unit = { _, _, _ -> },
@@ -67,6 +68,13 @@ fun GroupDetailScreen(
             val memberCount = uiState.group?.memberCount ?: 0
             onChatRoomCreated(uiState.chatRoomId!!, groupName, memberCount)
             viewModel.resetChatState()
+        }
+    }
+
+    LaunchedEffect(uiState.leaveSuccess) {
+        if (uiState.leaveSuccess) {
+            viewModel.resetLeaveSuccess()
+            onLeaveSuccess()
         }
     }
 
@@ -137,7 +145,7 @@ fun GroupDetailScreen(
             } else if (hasError) {
                 ErrorView(
                     errorMessage = uiState.errorMessage,
-                    onRetry = { viewModel.initializeWithGroup(groupId, currentUserId) },
+                    onRetry = { viewModel.initializeWithGroup(groupId, currentUserId, isSpectatorEntry) },
                     onBack = onBackPress
                 )
             } else {
@@ -176,6 +184,11 @@ fun GroupDetailScreen(
                                 memberCount = memberCount
                             )
                             onQRCodeClick(targetGroup)
+                        },
+                        onLeaveClick = {
+                            if (!uiState.isSpectator) {
+                                viewModel.leaveGroup(groupId, currentUserId)
+                            }
                         }
                     )
 

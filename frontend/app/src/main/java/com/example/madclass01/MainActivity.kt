@@ -131,6 +131,7 @@ fun AppNavigation(
     var userPhotoInterests by remember { mutableStateOf<List<String>>(emptyList()) }  // 사진에서 추출한 관심사
     var profileFlowEntry by remember { mutableStateOf(ProfileFlowEntry.Login) }
     var homeStartTabRoute by remember { mutableStateOf("groups") }
+    var groupRefreshTrigger by remember { mutableStateOf(0) }
     
     // Deep Link 처리
     LaunchedEffect(initialDeepLink) {
@@ -310,6 +311,11 @@ fun AppNavigation(
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
                 },
+                onLeaveSuccess = {
+                    groupRefreshTrigger++
+                    homeStartTabRoute = "groups"
+                    currentScreen = AppScreen.Home
+                },
                 onQRCodeClick = { group ->
                     currentScreen = AppScreen.QRInvite(group.id, group.name, group.memberCount)
                 },
@@ -390,6 +396,7 @@ fun AppNavigation(
                 profileImages = userImages,
                 profileTags = userTags,
                 profileRefreshTrigger = profileRefreshTrigger,  // 새로고침 트리거 전달
+                groupRefreshTrigger = groupRefreshTrigger,
                 onNavigateToGroupDetail = { groupId, fromSearch ->
                     currentScreen = AppScreen.GroupDetail(groupId, fromSearch)
                 },

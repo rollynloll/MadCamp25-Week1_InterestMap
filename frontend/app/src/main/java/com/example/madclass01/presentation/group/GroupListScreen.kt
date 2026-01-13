@@ -31,6 +31,7 @@ import com.example.madclass01.presentation.group.viewmodel.GroupListViewModel
 fun GroupListScreen(
     userId: String? = null,
     viewModel: GroupListViewModel = hiltViewModel(),
+    refreshTrigger: Int = 0,
     onGroupClick: (String) -> Unit,
     onCreateGroupClick: () -> Unit = {},
     onQRScanClick: () -> Unit = {}
@@ -41,6 +42,10 @@ fun GroupListScreen(
         if (userId != null) {
             viewModel.setUserId(userId)
         }
+    }
+
+    LaunchedEffect(refreshTrigger) {
+        viewModel.loadMyGroups()
     }
     
     // Gradient Brush

@@ -4,9 +4,10 @@ from datetime import datetime
 import hashlib
 import uuid
 from urllib.parse import urlparse
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -193,6 +194,40 @@ async def join_group(
         db.add(member)
         await db.commit()
 
+    return OkResponse(ok=True)
+
+
+@router.post("/{group_id}/leave", response_model=OkResponse)
+async def leave_group(
+    group_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    await _ensure_group(db, group_id)
+    if _is_spectator_user(current_user):
+        logging.getLogger("uvicorn.error").info(
+            "Leave group skipped for spectator user_id=%s group_id=%s",
+            current_user.id,
+            group_id,
+        )
+        return OkResponse(ok=True)
+    logging.getLogger("uvicorn.error").info(
+        "Leave group requested user_id=%s group_id=%s",
+        current_user.id,
+        group_id,
+    )
+    await db.execute(
+        delete(GroupMember).where(
+            GroupMember.group_id == group_id,
+            GroupMember.user_id == current_user.id,
+        )
+    )
+    await db.commit()
+    logging.getLogger("uvicorn.error").info(
+        "Leave group completed user_id=%s group_id=%s",
+        current_user.id,
+        group_id,
+    )
     return OkResponse(ok=True)
 
 
