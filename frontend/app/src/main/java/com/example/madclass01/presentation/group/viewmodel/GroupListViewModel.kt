@@ -69,7 +69,9 @@ class GroupListViewModel @Inject constructor(
                             description = groupResponse.description ?: "",
                             memberCount = groupResponse.memberIds?.size ?: 0,
                             tags = groupResponse.tags?.map { Tag(id = it, name = it) } ?: emptyList(),
-                            imageUrl = groupResponse.imageUrl ?: "",
+                            imageUrl = groupResponse.imageUrl?.let { 
+                                if (it.isNotBlank() && !it.startsWith("http")) "${com.example.madclass01.di.NetworkModule.BASE_URL}${it.removePrefix("/")}" else it 
+                            } ?: "",
                             iconType = groupResponse.iconType ?: "",
                             region = groupResponse.region ?: "",
                             isPublic = groupResponse.isPublic
