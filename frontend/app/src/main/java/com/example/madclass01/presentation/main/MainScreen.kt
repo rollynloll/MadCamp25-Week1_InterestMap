@@ -63,7 +63,7 @@ fun MainScreen(
     profileImages: List<String> = emptyList(),
     profileTags: List<String> = emptyList(),
     profileRefreshTrigger: Int = 0,  // 프로필 새로고침 트리거
-    onNavigateToGroupDetail: (String) -> Unit = {},
+    onNavigateToGroupDetail: (String, Boolean) -> Unit = { _, _ -> },
     onNavigateToCreateGroup: () -> Unit = {},
     onNavigateToEditProfile: () -> Unit = {},
     onNavigateToQRScanner: () -> Unit = {},
@@ -138,7 +138,7 @@ fun MainScreen(
             composable(MainTab.Groups.route) {
                 GroupListScreen(
                     userId = userId,  // userId 전달
-                    onGroupClick = onNavigateToGroupDetail,
+                    onGroupClick = { groupId -> onNavigateToGroupDetail(groupId, false) },
                     onCreateGroupClick = onNavigateToCreateGroup,
                     onQRScanClick = onNavigateToQRScanner
                 )
@@ -146,7 +146,7 @@ fun MainScreen(
             
             composable(MainTab.Search.route) {
                 SearchScreen(
-                    onGroupClick = onNavigateToGroupDetail
+                    onGroupClick = { groupId -> onNavigateToGroupDetail(groupId, true) }
                 )
             }
             

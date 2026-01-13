@@ -2,7 +2,8 @@
 DB: group_messages
 - id (UUID, PK)
 - group_id (UUID, FK -> groups.id)
-- sender_id (UUID, FK -> users.id)
+- sender_id (UUID, FK -> users.id, NULLABLE)
+- notion_user_id (UUID, FK -> notion_users.id, NULLABLE)
 - content (JSONB, NOT NULL)
 - created_at (timestamptz, NOT NULL, default=now())
 """
@@ -27,8 +28,11 @@ class GroupMessage(Base):
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("groups.id"), nullable=False
     )
-    sender_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    sender_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    notion_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("notion_users.id"), nullable=True
     )
 
     content: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

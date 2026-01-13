@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     OPENAI_EMBED_MODEL: str = "text-embedding-3-small"
     OPENAI_EMBED_MODEL_VERSION: str | None = None
 
+    # Admin / Master users (comma-separated UUIDs)
+    MASTER_USER_IDS: str | None = None
+
     def _build_database_url(self) -> str | None:
         if not (self.POSTGRES_DB and self.POSTGRES_USER and self.POSTGRES_PASSWORD):
             return None

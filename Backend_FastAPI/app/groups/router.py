@@ -12,9 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models.group import Group, GroupMember
+from app.models.notion_group_member import NotionGroupMember
 from app.models.message import GroupMessage
 from app.models.photo import UserPhoto
 from app.models.user import User
+from app.models.notion_user import NotionUser
 from app.schemas import (
     GroupCreateRequest,
     GroupListItem,
@@ -35,6 +37,10 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/groups", tags=["groups"])
+
+
+def _is_spectator_user(user: User) -> bool:
+    return user.provider == "test"
 
 
 def _normalize_upload_url(value: str | None) -> str | None:
@@ -136,14 +142,21 @@ async def list_groups(
     )
     member_group_ids = {row[0] for row in membership_result.all()}
 
-    result = await db.execute(
-        select(Group, func.count(GroupMember.user_id))
-        .outerjoin(GroupMember, GroupMember.group_id == Group.id)
-        .group_by(Group.id)
-    )
+    result = await db.execute(select(Group))
+    groups = result.scalars().all()
 
     items = []
-    for group, member_count in result.all():
+    for group in groups:
+        member_count_result = await db.execute(
+            select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group.id)
+        )
+        member_count = member_count_result.scalar() or 0
+        notion_count_result = await db.execute(
+            select(func.count())
+            .select_from(NotionGroupMember)
+            .where(NotionGroupMember.group_id == group.id)
+        )
+        member_count += notion_count_result.scalar() or 0
         # group_profile에서 tags, region, image_url 추출
         profile = group.group_profile or {}
         tags = profile.get("tags", [])
@@ -198,6 +211,13 @@ async def list_group_members(
     )
     users = result.scalars().all()
 
+    notion_result = await db.execute(
+        select(NotionUser)
+        .join(NotionGroupMember, NotionGroupMember.notion_user_id == NotionUser.id)
+        .where(NotionGroupMember.group_id == group_id)
+    )
+    notion_users = notion_result.scalars().all()
+
     primary_photo_map = await _get_primary_photo_map(db, [user.id for user in users])
 
     items = [
@@ -208,6 +228,17 @@ async def list_group_members(
         )
         for user in users
     ]
+
+    items.extend(
+        [
+            GroupMemberItem(
+                user_id=str(user.id),
+                nickname=user.nickname,
+                primary_photo_url=_normalize_upload_url(user.profile_image_url),
+            )
+            for user in notion_users
+        ]
+    )
 
     return GroupMembersResponse(items=items)
 
@@ -228,6 +259,13 @@ async def group_interest_map(
     users = result.scalars().all()
     user_ids = [user.id for user in users]
 
+    notion_result = await db.execute(
+        select(NotionUser)
+        .join(NotionGroupMember, NotionGroupMember.notion_user_id == NotionUser.id)
+        .where(NotionGroupMember.group_id == group_id)
+    )
+    notion_users = notion_result.scalars().all()
+
     embedding_user_ids = {
         user.id
         for user in users
@@ -247,6 +285,19 @@ async def group_interest_map(
                 x=x,
                 y=y,
                 embedding_status="ready" if user.id in embedding_user_ids else "missing",
+            )
+        )
+
+    for user in notion_users:
+        x, y = _coords_from_uuid(user.id)
+        nodes.append(
+            InterestMapNode(
+                user_id=str(user.id),
+                nickname=user.nickname,
+                primary_photo_url=_normalize_upload_url(user.profile_image_url),
+                x=x,
+                y=y,
+                embedding_status="ready" if user.embedding is not None and len(user.embedding) > 0 else "missing",
             )
         )
 
@@ -323,6 +374,8 @@ async def create_group_message(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if _is_spectator_user(current_user):
+        raise HTTPException(status_code=403, detail="Spectator users cannot send messages")
     await _ensure_group(db, group_id)
     await _ensure_member(db, group_id, current_user.id)
 
