@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Image
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.domain.model.ChatMessage as DomainChatMessage
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -47,8 +49,25 @@ fun ChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     var messageText by remember { mutableStateOf("") }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val messagesByDate = remember(uiState.messages) {
+        uiState.messages.groupBy { message -> formatDateDivider(message.timestamp) }
+    }
+    val totalItems = messagesByDate.size + uiState.messages.size
+    val isAtBottom by remember {
+        derivedStateOf {
+            val total = listState.layoutInfo.totalItemsCount
+            if (total == 0) {
+                true
+            } else {
+                val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                lastVisible >= total - 1
+            }
+        }
+    }
+    var hasNewMessage by remember { mutableStateOf(false) }
     
     // 사진 선택을 위한 이미지 피커
     val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -69,9 +88,21 @@ fun ChatScreen(
     }
 
     // 새 메시지 수신 시 스크롤
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    val lastMessageId = uiState.messages.lastOrNull()?.id
+    LaunchedEffect(lastMessageId) {
+        if (lastMessageId != null && totalItems > 0) {
+            if (isAtBottom) {
+                listState.animateScrollToItem(totalItems - 1)
+                hasNewMessage = false
+            } else {
+                hasNewMessage = true
+            }
+        }
+    }
+
+    LaunchedEffect(isAtBottom) {
+        if (isAtBottom) {
+            hasNewMessage = false
         }
     }
 
@@ -108,65 +139,89 @@ fun ChatScreen(
             }
         } else {
             // Messages Area
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .background(Color(0xFFF9FAFB))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(16.dp)
             ) {
-                // 날짜별로 그룹화하여 표시
-                val messagesByDate = uiState.messages.groupBy { message ->
-                    formatDateDivider(message.timestamp)
-                }
-                
-                messagesByDate.forEach { (date, messagesForDate) ->
-                    // 날짜 구분선
-                    item(key = "date_$date") {
-                        DateDivider(date = date)
-                    }
-                    
-                    // 해당 날짜의 메시지들
-                    items(
-                        items = messagesForDate,
-                        key = { it.id }
-                    ) { message ->
-                        val isMe = message.userId == userId
-                        val timestamp = formatTimestamp(message.timestamp)
-                        val isImageMessage =
-                            message.type == DomainChatMessage.MessageType.IMAGE &&
-                                !message.imageUrl.isNullOrBlank()
-                        if (isMe) {
-                            if (isImageMessage) {
-                                MyImageMessageItem(
-                                    imageUrl = message.imageUrl ?: "",
-                                    timestamp = timestamp
-                                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    // 날짜별로 그룹화하여 표시
+                    messagesByDate.forEach { (date, messagesForDate) ->
+                        // 날짜 구분선
+                        item(key = "date_$date") {
+                            DateDivider(date = date)
+                        }
+
+                        // 해당 날짜의 메시지들
+                        items(
+                            items = messagesForDate,
+                            key = { it.id }
+                        ) { message ->
+                            val isMe = message.userId == userId
+                            val timestamp = formatTimestamp(message.timestamp)
+                            val isImageMessage =
+                                message.type == DomainChatMessage.MessageType.IMAGE &&
+                                    !message.imageUrl.isNullOrBlank()
+                            if (isMe) {
+                                if (isImageMessage) {
+                                    MyImageMessageItem(
+                                        imageUrl = message.imageUrl ?: "",
+                                        timestamp = timestamp
+                                    )
+                                } else {
+                                    MyMessageItem(
+                                        message = message.content ?: "",
+                                        timestamp = timestamp
+                                    )
+                                }
                             } else {
-                                MyMessageItem(
-                                    message = message.content ?: "",
-                                    timestamp = timestamp
-                                )
-                            }
-                        } else {
-                            if (isImageMessage) {
-                                OtherImageMessageItem(
-                                    userName = message.userName ?: "알 수 없음",
-                                    imageUrl = message.imageUrl ?: "",
-                                    timestamp = timestamp,
-                                    avatarUrl = null
-                                )
-                            } else {
-                                OtherMessageItem(
-                                    userName = message.userName ?: "알 수 없음",
-                                    message = message.content ?: "",
-                                    timestamp = timestamp,
-                                    avatarUrl = null // TODO: 프로필 사진 URL
-                                )
+                                if (isImageMessage) {
+                                    OtherImageMessageItem(
+                                        userName = message.userName ?: "알 수 없음",
+                                        imageUrl = message.imageUrl ?: "",
+                                        timestamp = timestamp,
+                                        avatarUrl = null
+                                    )
+                                } else {
+                                    OtherMessageItem(
+                                        userName = message.userName ?: "알 수 없음",
+                                        message = message.content ?: "",
+                                        timestamp = timestamp,
+                                        avatarUrl = null // TODO: 프로필 사진 URL
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+
+                if (hasNewMessage) {
+                    FloatingActionButton(
+                        onClick = {
+                            if (totalItems > 0) {
+                                coroutineScope.launch {
+                                    listState.animateScrollToItem(totalItems - 1)
+                                }
+                            }
+                        },
+                        containerColor = Color(0xFFFF9945),
+                        contentColor = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(12.dp)
+                            .size(44.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = "새 메시지",
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
             }
