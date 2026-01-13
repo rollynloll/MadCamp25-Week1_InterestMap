@@ -291,7 +291,7 @@ fun AppNavigation(
                 userId = userProfile.userId,
                 onBack = {
                     if (userProfile.fromGroupId != null) {
-                        currentScreen = AppScreen.GroupDetail(userProfile.fromGroupId)
+                    currentScreen = AppScreen.GroupDetail(userProfile.fromGroupId)
                     } else {
                         currentScreen = AppScreen.Home
                     }
@@ -305,6 +305,7 @@ fun AppNavigation(
             GroupDetailScreen(
                 groupId = groupDetail.groupId,
                 currentUserId = resolvedUserId ?: "mock_user",
+                isSpectatorEntry = groupDetail.fromSearch,
                 onBackPress = {
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
@@ -389,8 +390,8 @@ fun AppNavigation(
                 profileImages = userImages,
                 profileTags = userTags,
                 profileRefreshTrigger = profileRefreshTrigger,  // 새로고침 트리거 전달
-                onNavigateToGroupDetail = { groupId ->
-                    currentScreen = AppScreen.GroupDetail(groupId)
+                onNavigateToGroupDetail = { groupId, fromSearch ->
+                    currentScreen = AppScreen.GroupDetail(groupId, fromSearch)
                 },
                 onNavigateToCreateGroup = {
                     currentScreen = AppScreen.CreateGroup
@@ -424,7 +425,7 @@ sealed class AppScreen {
     object ProfileEdit : AppScreen()
     object Loading : AppScreen()
     object TagSelection : AppScreen()
-    data class GroupDetail(val groupId: String) : AppScreen()
+    data class GroupDetail(val groupId: String, val fromSearch: Boolean = false) : AppScreen()
     data class UserProfile(val userId: String, val fromGroupId: String? = null) : AppScreen()
     object CreateGroup : AppScreen()
     data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅", val memberCount: Int = 0) : AppScreen()

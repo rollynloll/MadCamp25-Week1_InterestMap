@@ -29,10 +29,13 @@ from app.groups.router import router as groups_router
 from app.me.router import router as me_router
 from app.db.session import engine, get_db, AsyncSessionLocal
 from app.db.base import Base
+from app.core.config import settings
 import app.models  # ensure models are registered for metadata
 from app.models.user import User
+from app.models.notion_user import NotionUser
 from app.models.photo import UserPhoto
 from app.models.group import Group, GroupMember
+from app.models.notion_group_member import NotionGroupMember
 from app.models.message import GroupMessage
 from app.services.embedding.captioning import caption_image, is_blip_ready
 from app.services.embedding.composer import build_final_text
@@ -51,6 +54,19 @@ from app.services.embedding.translation import translate_to_korean
 
 LOG_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def _master_user_ids() -> set[str]:
+    raw = settings.MASTER_USER_IDS or ""
+    return {value.strip() for value in raw.split(",") if value.strip()}
+
+
+def _is_master_user(user_id: str) -> bool:
+    return user_id in _master_user_ids()
+
+
+def _is_spectator_user(user: User) -> bool:
+    return user.provider == "test"
 
 
 def _configure_logging() -> None:
@@ -279,6 +295,18 @@ async def _get_user_by_id(db: AsyncSession, user_id: str) -> User:
     return user
 
 
+async def _get_notion_user_by_id(db: AsyncSession, user_id: str) -> NotionUser:
+    try:
+        user_uuid = uuid.UUID(user_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Notion user not found") from exc
+    result = await db.execute(select(NotionUser).where(NotionUser.id == user_uuid))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Notion user not found")
+    return user
+
+
 async def _ensure_user_cached(db: AsyncSession, user_id: str) -> dict:
     if user_id in users_db:
         return users_db[user_id]
@@ -303,6 +331,21 @@ async def _get_group_member_ids(db: AsyncSession, group_id: uuid.UUID) -> list[u
         select(GroupMember.user_id).where(GroupMember.group_id == group_id)
     )
     return [row[0] for row in result.all()]
+
+
+async def _get_notion_member_ids(db: AsyncSession, group_id: uuid.UUID) -> list[uuid.UUID]:
+    result = await db.execute(
+        select(NotionGroupMember.notion_user_id).where(
+            NotionGroupMember.group_id == group_id
+        )
+    )
+    return [row[0] for row in result.all()]
+
+
+async def _get_all_group_member_ids(db: AsyncSession, group_id: uuid.UUID) -> list[uuid.UUID]:
+    user_ids = await _get_group_member_ids(db, group_id)
+    notion_ids = await _get_notion_member_ids(db, group_id)
+    return user_ids + notion_ids
 
 
 def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
@@ -973,14 +1016,31 @@ async def list_groups(db: AsyncSession = Depends(get_db)):
     groups = result.scalars().all()
     responses: list[dict] = []
     for group in groups:
-        member_ids = await _get_group_member_ids(db, group.id)
+        member_ids = await _get_all_group_member_ids(db, group.id)
         responses.append(_group_response(group, member_ids))
     return responses
 
 @app.get("/api/groups/user/{user_id}", response_model=List[GroupResponse], tags=["groups"])
 async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
     """사용자가 속한 그룹 목록 조회"""
+    if _is_master_user(user_id):
+        result = await db.execute(select(Group))
+        groups = result.scalars().all()
+        responses: list[dict] = []
+        for group in groups:
+            member_ids = await _get_all_group_member_ids(db, group.id)
+            responses.append(_group_response(group, member_ids))
+        return responses
+
     user = await _get_user_by_id(db, user_id)
+    if _is_spectator_user(user):
+        result = await db.execute(select(Group))
+        groups = result.scalars().all()
+        responses: list[dict] = []
+        for group in groups:
+            member_ids = await _get_all_group_member_ids(db, group.id)
+            responses.append(_group_response(group, member_ids))
+        return responses
     result = await db.execute(
         select(Group)
         .join(GroupMember, GroupMember.group_id == Group.id)
@@ -1008,7 +1068,7 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
 
     responses: list[dict] = []
     for group in group_by_id.values():
-        member_ids = await _get_group_member_ids(db, group.id)
+        member_ids = await _get_all_group_member_ids(db, group.id)
         responses.append(_group_response(group, member_ids))
     return responses
 
@@ -1021,6 +1081,9 @@ async def add_group_member(
     """그룹에 멤버 추가"""
     group = await _get_group_by_id(db, group_id)
     user = await _get_user_by_id(db, request.user_id)
+    if _is_spectator_user(user):
+        member_ids = await _get_all_group_member_ids(db, group.id)
+        return _group_response(group, member_ids)
     result = await db.execute(
         select(GroupMember).where(
             GroupMember.group_id == group.id,
@@ -1031,7 +1094,7 @@ async def add_group_member(
     if not existing:
         db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
         await db.commit()
-    member_ids = await _get_group_member_ids(db, group.id)
+    member_ids = await _get_all_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
 
 @app.delete("/api/groups/{group_id}/members/{user_id}", tags=["groups"])
@@ -1058,8 +1121,9 @@ async def list_group_messages_public(
     group = await _get_group_by_id(db, group_id)
 
     query = (
-        select(GroupMessage, User, UserPhoto.url)
-        .join(User, GroupMessage.sender_id == User.id)
+        select(GroupMessage, User, NotionUser, UserPhoto.url)
+        .outerjoin(User, GroupMessage.sender_id == User.id)
+        .outerjoin(NotionUser, GroupMessage.notion_user_id == NotionUser.id)
         .outerjoin(
             UserPhoto,
             (UserPhoto.user_id == User.id) & (UserPhoto.is_primary == True),  # noqa: E712
@@ -1071,15 +1135,18 @@ async def list_group_messages_public(
     rows = (await db.execute(query)).all()
 
     items: list[PublicMessageItem] = []
-    for message, sender, primary_url in rows:
+    for message, sender, notion_sender, primary_url in rows:
         content = message.content or {}
+        sender_id = sender.id if sender else (notion_sender.id if notion_sender else None)
+        sender_name = sender.nickname if sender else (notion_sender.nickname if notion_sender else "알 수 없음")
+        sender_photo = primary_url if sender else (notion_sender.profile_image_url if notion_sender else None)
         items.append(
             PublicMessageItem(
                 id=str(message.id),
                 group_id=str(message.group_id),
-                user_id=str(sender.id),
-                nickname=sender.nickname,
-                primary_photo_url=_normalize_upload_url(primary_url),
+                user_id=str(sender_id) if sender_id else "",
+                nickname=sender_name,
+                primary_photo_url=_normalize_upload_url(sender_photo),
                 text=content.get("text"),
                 image_url=_normalize_upload_url(content.get("image_url")),
                 sent_at=message.created_at,
@@ -1096,34 +1163,62 @@ async def create_group_message_public(
     db: AsyncSession = Depends(get_db),
 ):
     group = await _get_group_by_id(db, group_id)
-    user = await _get_user_by_id(db, payload.user_id)
+    user: User | None = None
+    notion_user: NotionUser | None = None
+    try:
+        user = await _get_user_by_id(db, payload.user_id)
+    except HTTPException:
+        notion_user = await _get_notion_user_by_id(db, payload.user_id)
 
-    existing = await db.execute(
-        select(GroupMember).where(
-            GroupMember.group_id == group.id,
-            GroupMember.user_id == user.id,
+    if user:
+        if _is_spectator_user(user):
+            raise HTTPException(status_code=403, detail="Spectator users cannot send messages")
+        existing = await db.execute(
+            select(GroupMember).where(
+                GroupMember.group_id == group.id,
+                GroupMember.user_id == user.id,
+            )
         )
-    )
-    if existing.scalar_one_or_none() is None:
-        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
-        await db.commit()
+        if existing.scalar_one_or_none() is None:
+            db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+            await db.commit()
+    else:
+        existing = await db.execute(
+            select(NotionGroupMember).where(
+                NotionGroupMember.group_id == group.id,
+                NotionGroupMember.notion_user_id == notion_user.id,
+            )
+        )
+        if existing.scalar_one_or_none() is None:
+            db.add(
+                NotionGroupMember(
+                    group_id=group.id,
+                    notion_user_id=notion_user.id,
+                    role="member",
+                )
+            )
+            await db.commit()
 
     message = GroupMessage(
         group_id=group.id,
-        sender_id=user.id,
+        sender_id=user.id if user else None,
+        notion_user_id=notion_user.id if notion_user else None,
         content={"text": payload.text},
     )
     db.add(message)
     await db.commit()
     await db.refresh(message)
 
-    primary_url = await _get_primary_photo_url(db, user.id)
+    primary_url = await _get_primary_photo_url(db, user.id) if user else None
+    sender_id = user.id if user else notion_user.id
+    sender_name = user.nickname if user else notion_user.nickname
+    sender_photo = primary_url if user else notion_user.profile_image_url
     return PublicMessageItem(
         id=str(message.id),
         group_id=str(message.group_id),
-        user_id=str(user.id),
-        nickname=user.nickname,
-        primary_photo_url=_normalize_upload_url(primary_url),
+        user_id=str(sender_id),
+        nickname=sender_name,
+        primary_photo_url=_normalize_upload_url(sender_photo),
         text=payload.text,
         image_url=None,
         sent_at=message.created_at,
@@ -1139,17 +1234,41 @@ async def create_group_image_message_public(
     db: AsyncSession = Depends(get_db),
 ):
     group = await _get_group_by_id(db, group_id)
-    user = await _get_user_by_id(db, user_id)
+    user: User | None = None
+    notion_user: NotionUser | None = None
+    try:
+        user = await _get_user_by_id(db, user_id)
+    except HTTPException:
+        notion_user = await _get_notion_user_by_id(db, user_id)
 
-    existing = await db.execute(
-        select(GroupMember).where(
-            GroupMember.group_id == group.id,
-            GroupMember.user_id == user.id,
+    if user:
+        if _is_spectator_user(user):
+            raise HTTPException(status_code=403, detail="Spectator users cannot send messages")
+        existing = await db.execute(
+            select(GroupMember).where(
+                GroupMember.group_id == group.id,
+                GroupMember.user_id == user.id,
+            )
         )
-    )
-    if existing.scalar_one_or_none() is None:
-        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
-        await db.commit()
+        if existing.scalar_one_or_none() is None:
+            db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+            await db.commit()
+    else:
+        existing = await db.execute(
+            select(NotionGroupMember).where(
+                NotionGroupMember.group_id == group.id,
+                NotionGroupMember.notion_user_id == notion_user.id,
+            )
+        )
+        if existing.scalar_one_or_none() is None:
+            db.add(
+                NotionGroupMember(
+                    group_id=group.id,
+                    notion_user_id=notion_user.id,
+                    role="member",
+                )
+            )
+            await db.commit()
 
     safe_name = Path(file.filename or "group_message").name
     group_dir = UPLOAD_ROOT / "groups" / group_id / "messages"
@@ -1168,20 +1287,24 @@ async def create_group_image_message_public(
 
     message = GroupMessage(
         group_id=group.id,
-        sender_id=user.id,
+        sender_id=user.id if user else None,
+        notion_user_id=notion_user.id if notion_user else None,
         content={"image_url": file_url},
     )
     db.add(message)
     await db.commit()
     await db.refresh(message)
 
-    primary_url = await _get_primary_photo_url(db, user.id)
+    primary_url = await _get_primary_photo_url(db, user.id) if user else None
+    sender_id = user.id if user else notion_user.id
+    sender_name = user.nickname if user else notion_user.nickname
+    sender_photo = primary_url if user else notion_user.profile_image_url
     return PublicMessageItem(
         id=str(message.id),
         group_id=str(message.group_id),
-        user_id=str(user.id),
-        nickname=user.nickname,
-        primary_photo_url=_normalize_upload_url(primary_url),
+        user_id=str(sender_id),
+        nickname=sender_name,
+        primary_photo_url=_normalize_upload_url(sender_photo),
         text=None,
         image_url=file_url,
         sent_at=message.created_at,
@@ -1195,6 +1318,12 @@ async def get_group_detail(group_id: str, db: AsyncSession = Depends(get_db)):
         select(func.count()).select_from(GroupMember).where(GroupMember.group_id == group.id)
     )
     member_count = result.scalar() or 0
+    notion_result = await db.execute(
+        select(func.count())
+        .select_from(NotionGroupMember)
+        .where(NotionGroupMember.group_id == group.id)
+    )
+    member_count += notion_result.scalar() or 0
     created_at = group.created_at.isoformat() if group.created_at else ""
     updated_at = created_at
     profile = group.group_profile or {}
@@ -1245,7 +1374,7 @@ async def upload_group_profile_image(
     await db.commit()
     await db.refresh(group)
 
-    member_ids = await _get_group_member_ids(db, group.id)
+    member_ids = await _get_all_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
 
 
@@ -1271,7 +1400,8 @@ async def get_group_embeddings(
 ):
     group = await _get_group_by_id(db, group_id)
     member_ids = await _get_group_member_ids(db, group.id)
-    if not member_ids:
+    notion_member_ids = await _get_notion_member_ids(db, group.id)
+    if not member_ids and not notion_member_ids:
         raise HTTPException(status_code=404, detail="Group has no members")
 
     current_uuid: uuid.UUID | None = None
@@ -1286,10 +1416,20 @@ async def get_group_embeddings(
         if group.created_by and group.created_by in member_ids:
             current_uuid = group.created_by
         else:
-            current_uuid = member_ids[0]
+            current_uuid = member_ids[0] if member_ids else None
+
+    if current_uuid is None:
+        raise HTTPException(status_code=404, detail="Group has no user members")
 
     result = await db.execute(select(User).where(User.id.in_(member_ids)))
     users = {user.id: user for user in result.scalars().all()}
+
+    notion_users: dict[uuid.UUID, NotionUser] = {}
+    if notion_member_ids:
+        notion_result = await db.execute(
+            select(NotionUser).where(NotionUser.id.in_(notion_member_ids))
+        )
+        notion_users = {user.id: user for user in notion_result.scalars().all()}
 
     def _build_embedding(user_id: uuid.UUID) -> UserEmbeddingResponse:
         user = users.get(user_id)
@@ -1319,6 +1459,15 @@ async def get_group_embeddings(
                 updated_at=user.embedding_updated_at if user else None,
             )
         )
+    for member_id in notion_member_ids:
+        user = notion_users.get(member_id)
+        member_inputs.append(
+            GroupMapInput(
+                user_id=str(member_id),
+                embedding=list(user.embedding) if user and user.embedding else None,
+                updated_at=user.embedding_updated_at if user else None,
+            )
+        )
 
     positions = build_group_map_positions(str(group.id), member_inputs)
 
@@ -1328,14 +1477,30 @@ async def get_group_embeddings(
         if member_id == current_uuid:
             continue
         other_embeddings.append(_build_embedding(member_id))
+    for member_id in notion_member_ids:
+        user = notion_users.get(member_id)
+        if not user:
+            continue
+        vector = _embedding_vector_or_zero(user.embedding if user.embedding else None)
+        other_embeddings.append(
+            UserEmbeddingResponse(
+                userId=str(user.id),
+                userName=user.nickname or "",
+                profileImageUrl=_normalize_upload_url(user.profile_image_url),
+                embeddingVector=vector,
+                activityStatus="활동중",
+            )
+        )
 
     current_user = users.get(current_uuid)
     current_vector = list(current_user.embedding) if current_user and current_user.embedding else None
 
     node_positions = []
-    for member_id in member_ids:
+    for member_id in member_ids + notion_member_ids:
         user = users.get(member_id)
-        vector = list(user.embedding) if user and user.embedding else None
+        notion_user = notion_users.get(member_id)
+        vector_source = user.embedding if user else (notion_user.embedding if notion_user else None)
+        vector = list(vector_source) if vector_source else None
         similarity = _cosine_similarity(current_vector, vector)
         distance = 1.0 - similarity
         pos = positions.get(str(member_id))

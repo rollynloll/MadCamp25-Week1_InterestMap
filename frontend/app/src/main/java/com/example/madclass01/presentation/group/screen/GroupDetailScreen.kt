@@ -42,6 +42,7 @@ import kotlin.math.pow
 fun GroupDetailScreen(
     groupId: String,
     currentUserId: String,
+    isSpectatorEntry: Boolean = false,
     onBackPress: () -> Unit = {},
     onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
     onProfileClick: (String) -> Unit = {},
@@ -51,8 +52,8 @@ fun GroupDetailScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     // 화면 초기화
-    LaunchedEffect(groupId, currentUserId) {
-        viewModel.initializeWithGroup(groupId, currentUserId)
+    LaunchedEffect(groupId, currentUserId, isSpectatorEntry) {
+        viewModel.initializeWithGroup(groupId, currentUserId, isSpectatorEntry)
     }
 
     // 채팅방 생성 감시
@@ -81,7 +82,7 @@ fun GroupDetailScreen(
         containerColor = Color.White,
         floatingActionButton = {
             // 로딩 중이 아니고 에러가 없거나(혹은 목업 모드일 때) FAB 표시
-            if (!uiState.isLoading && (!hasError || isMockMode)) {
+            if (!uiState.isLoading && (!hasError || isMockMode) && !uiState.isSpectator) {
                 GradientExtendedFloatingActionButton(
                     onClick = {
                         if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
@@ -95,7 +96,36 @@ fun GroupDetailScreen(
                 )
             }
         },
-        floatingActionButtonPosition = FabPosition.End
+        floatingActionButtonPosition = FabPosition.End,
+        bottomBar = {
+            if (uiState.isSpectator && !uiState.isLoading && !hasError) {
+                Surface(
+                    color = Color.White,
+                    shadowElevation = 8.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Button(
+                            onClick = { viewModel.joinGroupAsMember(groupId, currentUserId) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9945)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text(
+                                text = "그룹 참여하기",
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        }
     ) { paddingValues ->
         Box(
             modifier = Modifier

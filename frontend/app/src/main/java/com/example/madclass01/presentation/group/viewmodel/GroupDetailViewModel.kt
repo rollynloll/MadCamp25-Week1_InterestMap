@@ -24,7 +24,8 @@ data class GroupDetailUiState(
     val errorMessage: String = "",
     val selectedUserId: String? = null,  // 선택된 사용자 (채팅 등)
     val chatRoomId: String? = null,  // 생성된 채팅 룸
-    val isTestUser: Boolean = false  // 테스트 사용자 여부
+    val isTestUser: Boolean = false,  // 테스트 사용자 여부
+    val isSpectator: Boolean = false  // 관전자 모드
 )
 
 /**
@@ -46,7 +47,7 @@ class GroupDetailViewModel @Inject constructor(
     /**
      * 그룹 상세 정보와 관계 그래프 조회
      */
-    fun initializeWithGroup(groupId: String, currentUserId: String) {
+    fun initializeWithGroup(groupId: String, currentUserId: String, isSpectator: Boolean = false) {
         val isTest = isTestUser(currentUserId)
         
         // 테스트/목업 사용자인 경우 API 호출 없이 바로 목업 데이터 사용
@@ -56,7 +57,12 @@ class GroupDetailViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "", isTestUser = false)
+            _uiState.value = _uiState.value.copy(
+                isLoading = true,
+                errorMessage = "",
+                isTestUser = false,
+                isSpectator = isSpectator
+            )
 
             try {
                 // 1. 그룹 상세 정보 조회
@@ -72,7 +78,9 @@ class GroupDetailViewModel @Inject constructor(
                 val group = groupResult.getOrNull() ?: return@launch
 
                 // Ensure current user is a member so embeddings center on the correct profile.
-                joinGroupChatUseCase(groupId, currentUserId)
+                if (!isSpectator) {
+                    joinGroupChatUseCase(groupId, currentUserId)
+                }
 
                 // 2. 관계 그래프 조회
                 val graphResult = getRelationshipGraphUseCase(groupId, currentUserId)
@@ -97,6 +105,22 @@ class GroupDetailViewModel @Inject constructor(
                     errorMessage = e.message ?: "알 수 없는 오류"
                 )
             }
+        }
+    }
+
+    fun joinGroupAsMember(groupId: String, currentUserId: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
+            joinGroupChatUseCase(groupId, currentUserId)
+                .onSuccess {
+                    initializeWithGroup(groupId, currentUserId, isSpectator = false)
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        errorMessage = error.message ?: "그룹 참여 실패"
+                    )
+                }
         }
     }
 
