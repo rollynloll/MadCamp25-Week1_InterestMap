@@ -59,7 +59,12 @@ class ProfileViewModel @Inject constructor(
             val user = (userResult as ApiResult.Success).data
             val profileData = user.profileData
 
-            val age = profileData["age"]?.toString()?.toIntOrNull()
+            val ageObj = profileData["age"]
+            val age = when (ageObj) {
+                is Number -> ageObj.toInt()
+                is String -> ageObj.toDoubleOrNull()?.toInt()
+                else -> null
+            }
             val gender = profileData["gender"]?.toString()
             val region = profileData["region"]?.toString()
             val bio = profileData["bio"]?.toString()

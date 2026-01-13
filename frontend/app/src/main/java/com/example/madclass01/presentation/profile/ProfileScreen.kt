@@ -447,7 +447,7 @@ fun ProfileContent(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "My Gallery",
+                    text = "Mood & Interest",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF333333)
