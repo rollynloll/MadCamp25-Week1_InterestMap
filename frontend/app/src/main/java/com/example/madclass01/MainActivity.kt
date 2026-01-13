@@ -115,7 +115,10 @@ fun AppNavigation(
     var currentScreen by remember { mutableStateOf<AppScreen>(
         if (isTestMode) AppScreen.ApiTest else AppScreen.Login
     ) }
-    var userId by remember { mutableStateOf<String?>(null) }
+    val initialUserId = remember {
+        tokenManager.getUserId()?.trim().takeUnless { it.isNullOrBlank() }
+    }
+    var userId by remember { mutableStateOf<String?>(initialUserId) }
     var userNickname by remember { mutableStateOf<String?>(null) }
     var userAge by remember { mutableStateOf<Int?>(null) }
     var userGender by remember { mutableStateOf<String?>(null) }
@@ -298,9 +301,10 @@ fun AppNavigation(
         }
         is AppScreen.GroupDetail -> {
             val groupDetail = currentScreen as AppScreen.GroupDetail
+            val resolvedUserId = userId ?: tokenManager.getUserId()?.trim().takeUnless { it.isNullOrBlank() }
             GroupDetailScreen(
                 groupId = groupDetail.groupId,
-                currentUserId = userId ?: "mock_user",
+                currentUserId = resolvedUserId ?: "mock_user",
                 onBackPress = {
                     homeStartTabRoute = "groups"
                     currentScreen = AppScreen.Home
@@ -338,6 +342,10 @@ fun AppNavigation(
                 userId = userId ?: "",
                 onBackPress = {
                     currentScreen = AppScreen.Home
+                },
+                onInviteClick = {
+                    val groupId = chat.chatRoomId.removePrefix("group_")
+                    currentScreen = AppScreen.QRInvite(groupId, chat.chatRoomName, chat.memberCount)
                 }
             )
         }
