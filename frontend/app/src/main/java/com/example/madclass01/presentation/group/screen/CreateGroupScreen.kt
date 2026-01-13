@@ -56,7 +56,7 @@ fun CreateGroupScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     // Handle system back press
-    BackHandler(onBack = (if (!uiState.isLoading) onBackPress else { }) as () -> Unit)
+    BackHandler(enabled = !uiState.isLoading, onBack = onBackPress)
     
     var tagInputValue by remember { mutableStateOf("") }
     var regionExpanded by remember { mutableStateOf(false) }
