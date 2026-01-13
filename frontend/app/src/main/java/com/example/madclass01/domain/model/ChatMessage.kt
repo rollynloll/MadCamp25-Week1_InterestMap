@@ -11,6 +11,7 @@ data class ChatMessage(
     val type: MessageType,
     val content: String?,
     val imageUrl: String?,
+    val userProfileImage: String? = null,
     val timestamp: Long,
     val readCount: Int = 0
 ) {

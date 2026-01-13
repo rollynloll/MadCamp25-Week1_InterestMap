@@ -390,6 +390,7 @@ fun MessageContent.toDomain(): com.example.madclass01.domain.model.ChatMessage {
         },
         content = this.text,
         imageUrl = UrlResolver.resolve(this.imageUrl),
+        userProfileImage = UrlResolver.resolve(this.primaryPhotoUrl),
         timestamp = try {
             // ISO 8601 형식의 날짜를 timestamp로 변환
             java.time.Instant.parse(this.sentAt).toEpochMilli()

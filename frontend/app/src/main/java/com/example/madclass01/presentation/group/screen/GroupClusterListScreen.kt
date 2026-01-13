@@ -355,10 +355,12 @@ fun ClusterDetailDialog(
                 .fillMaxWidth()
                 .wrapContentHeight()
         ) {
-            Column(modifier = Modifier.padding(24.dp)) {
+            Column(modifier = Modifier.padding(vertical = 24.dp)) {
                 // Header
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -378,13 +380,17 @@ fun ClusterDetailDialog(
                     text = "그룹 이름",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
                 )
                 OutlinedTextField(
                     value = editingName,
                     onValueChange = { editingName = it },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = color,
@@ -402,13 +408,16 @@ fun ClusterDetailDialog(
                     text = "멤버 (${cluster.members.size})",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color.Gray,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
                 )
                 
                 Box(
                     modifier = Modifier
                         .height(200.dp)
                         .fillMaxWidth()
+                        .padding(horizontal = 12.dp) // Wider than other elements
                         .background(Color(0xFFF8F9FA), RoundedCornerShape(12.dp))
                         .padding(12.dp)
                 ) {
@@ -455,6 +464,7 @@ fun ClusterDetailDialog(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
                         .height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = color),
                     shape = RoundedCornerShape(12.dp)
