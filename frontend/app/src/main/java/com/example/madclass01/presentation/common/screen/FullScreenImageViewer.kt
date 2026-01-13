@@ -14,16 +14,23 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -90,126 +97,138 @@ fun FullScreenImageViewer(
     // System Back Handler
     BackHandler(onBack = onDismiss)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
+    // Use Dialog with full screen properties
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
-        // Image Carousel
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            userScrollEnabled = isScrollEnabled
-        ) { page ->
-            ZoomableImage(
-                imageUrl = imageUrls[page],
-                onTap = { isControlsVisible = !isControlsVisible },
-                scrollEnabled = { enabled -> 
-                    isScrollEnabled = enabled
-                }
-            )
-        }
-
-        // Top Bar
-        AnimatedVisibility(
-            visible = isControlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
+        Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
+                .fillMaxSize()
+                .background(Color.Black)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .systemBarsPadding() // Handled by Box usually, but good to add safety
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        tint = Color.White
-                    )
-                }
-
-                Text(
-                    text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+            // Image Carousel
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = isScrollEnabled
+            ) { page ->
+                ZoomableImage(
+                    imageUrl = imageUrls[page],
+                    isVisible = page == pagerState.currentPage,
+                    onTap = { isControlsVisible = !isControlsVisible },
+                    scrollEnabled = { enabled -> 
+                        isScrollEnabled = enabled
+                    }
                 )
-                
-                // Empty box to balance layout if needed, or just let spacer do it
-                Spacer(modifier = Modifier.size(48.dp)) 
             }
-        }
 
-        // Bottom Bar
-        AnimatedVisibility(
-            visible = isControlsVisible,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-        ) {
-            Row(
+            // Top Bar
+            AnimatedVisibility(
+                visible = isControlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
                 modifier = Modifier
+                    .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .systemBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Share Button
-                IconButton(
-                    onClick = {
-                        val currentUrl = imageUrls[pagerState.currentPage]
-                        shareImage(context, currentUrl)
-                    },
-                     modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = Color.White
-                    )
-                }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color.White
+                        )
+                    }
 
-                // Save Button
-                IconButton(
-                    onClick = {
-                        val currentUrl = imageUrls[pagerState.currentPage]
-                        scope.launch {
-                            saveImageToGallery(context, currentUrl)
-                        }
-                    },
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Save",
-                        tint = Color.White
+                    Text(
+                        text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
+                    
+                    // Empty box to balance layout if needed, or just let spacer do it
+                    Spacer(modifier = Modifier.size(48.dp)) 
+                }
+            }
+
+            // Bottom Bar
+            AnimatedVisibility(
+                visible = isControlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 32.dp), // Increased bottom padding
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Share Button
+                    IconButton(
+                        onClick = {
+                            val currentUrl = imageUrls[pagerState.currentPage]
+                            shareImage(context, currentUrl)
+                        },
+                         modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = Color.White
+                        )
+                    }
+
+                    // Save Button
+                    IconButton(
+                        onClick = {
+                            val currentUrl = imageUrls[pagerState.currentPage]
+                            scope.launch {
+                                saveImageToGallery(context, currentUrl)
+                            }
+                        },
+                        modifier = Modifier.background(Color.Black.copy(alpha = 0.4f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = "Save",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ZoomableImage(
     imageUrl: String,
+    isVisible: Boolean,
     onTap: () -> Unit,
     scrollEnabled: (Boolean) -> Unit
 ) {
@@ -221,25 +240,9 @@ fun ZoomableImage(
     val isZoomed = scale > 1.01f
 
     // Notify parent to enable/disable pager scroll
-    LaunchedEffect(isZoomed) {
-        scrollEnabled(!isZoomed)
-    }
-
-    val transformableState = rememberTransformableState { zoomChange, offsetChange, _ ->
-        val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-        scale = newScale
-        
-        // Handle 2-finger pan
-        if (newScale > 1.01f) {
-             val maxX = (size.width * (newScale - 1)) / 2f
-             val maxY = (size.height * (newScale - 1)) / 2f
-             val newOffset = offset + offsetChange
-             offset = Offset(
-                x = newOffset.x.coerceIn(-maxX, maxX),
-                y = newOffset.y.coerceIn(-maxY, maxY)
-            )
-        } else {
-            offset = Offset.Zero
+    LaunchedEffect(isZoomed, isVisible) {
+        if (isVisible) {
+            scrollEnabled(!isZoomed)
         }
     }
 
@@ -247,52 +250,115 @@ fun ZoomableImage(
         modifier = Modifier
             .fillMaxSize()
             .onSizeChanged { size = it }
-            // Tap Gestures (Double tap to smart zoom, Single tap to toggle controls)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onDoubleTap = {
-                        if (scale > 1.01f) {
-                            scale = 1f
-                            offset = Offset.Zero
-                        } else {
-                            scale = 2.5f
-                        }
-                    },
-                    onTap = { onTap() }
-                )
-            }
-            // 1-Finger Pan Gesture (Only when zoomed)
-            .then(
-                if (isZoomed) {
-                    Modifier.pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            val maxX = (size.width * (scale - 1)) / 2f
-                            val maxY = (size.height * (scale - 1)) / 2f
-                            val newOffset = offset + dragAmount
-                            offset = Offset(
-                                x = newOffset.x.coerceIn(-maxX, maxX),
-                                y = newOffset.y.coerceIn(-maxY, maxY)
-                            )
-                        }
-                    }
-                } else Modifier
-            )
-            // 2-Finger Zoom/Pan
+            // Visual transformation
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
                 translationX = offset.x
                 translationY = offset.y
             }
-            .transformable(state = transformableState)
+            // Tap handling - does NOT block 1-finger swipe
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onTap() },
+                onDoubleClick = {
+                    if (scale > 1.01f) {
+                        scale = 1f
+                        offset = Offset.Zero
+                    } else {
+                        scale = 2.5f
+                    }
+                }
+            )
+            // Custom 2-finger zoom gesture - does NOT consume 1-finger events
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    // Wait for first finger down
+                    val firstDown = awaitFirstDown(requireUnconsumed = false)
+                    
+                    // Wait to see if a second finger comes down
+                    var secondPointer: androidx.compose.ui.input.pointer.PointerId? = null
+                    var event = awaitPointerEvent()
+                    
+                    // Check if we have 2+ fingers within a small window
+                    while (event.changes.size < 2) {
+                        val change = event.changes.firstOrNull { it.id != firstDown.id && it.pressed }
+                        if (change != null) {
+                            secondPointer = change.id
+                            break
+                        }
+                        
+                        // If the first finger is released before second touches, exit
+                        if (event.changes.none { it.id == firstDown.id && it.pressed }) {
+                            return@awaitEachGesture // Let other handlers process this
+                        }
+                        
+                        // If movement exceeds threshold with 1 finger, it's a swipe - let pager handle it
+                        val dragDistance = (event.changes.first().position - firstDown.position).getDistance()
+                        if (dragDistance > 20f) {
+                            return@awaitEachGesture // Exit without consuming - allow pager swipe
+                        }
+                        
+                        event = awaitPointerEvent()
+                    }
+                    
+                    // We have 2+ fingers - now handle pinch zoom
+                    if (event.changes.size >= 2) {
+                        var previousCentroid = event.calculateCentroid()
+                        var previousSpan = calculateSpan(event)
+                        
+                        do {
+                            event = awaitPointerEvent()
+                            val currentCentroid = event.calculateCentroid()
+                            val currentSpan = calculateSpan(event)
+                            
+                            if (previousSpan > 0f && currentSpan > 0f) {
+                                val zoomChange = currentSpan / previousSpan
+                                val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+                                scale = newScale
+                                
+                                if (newScale > 1.01f) {
+                                    val panChange = currentCentroid - previousCentroid
+                                    val maxX = (size.width * (newScale - 1)) / 2f
+                                    val maxY = (size.height * (newScale - 1)) / 2f
+                                    val newOffset = offset + panChange
+                                    offset = Offset(
+                                        x = newOffset.x.coerceIn(-maxX, maxX),
+                                        y = newOffset.y.coerceIn(-maxY, maxY)
+                                    )
+                                } else {
+                                    offset = Offset.Zero
+                                }
+                            }
+                            
+                            previousCentroid = currentCentroid
+                            previousSpan = currentSpan
+                            
+                            // Consume events to prevent other handlers
+                            event.changes.forEach { it.consume() }
+                        } while (event.changes.any { it.pressed })
+                    }
+                }
+            }
     ) {
         AsyncImage(
             model = imageUrl,
             contentDescription = null,
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding() // Ensure image fits within safe area (excludes status/nav bars)
         )
     }
+}
+
+private fun calculateSpan(event: androidx.compose.ui.input.pointer.PointerEvent): Float {
+    val pointers = event.changes.filter { it.pressed }
+    if (pointers.size < 2) return 0f
+    val dx = pointers[0].position.x - pointers[1].position.x
+    val dy = pointers[0].position.y - pointers[1].position.y
+    return kotlin.math.sqrt(dx * dx + dy * dy)
 }
 
 private fun shareImage(context: Context, imageUrl: String) {

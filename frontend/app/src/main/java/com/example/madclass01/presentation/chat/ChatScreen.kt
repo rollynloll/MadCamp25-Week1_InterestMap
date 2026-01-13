@@ -2,6 +2,7 @@ package com.example.madclass01.presentation.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -57,6 +58,19 @@ fun ChatScreen(
     val messagesByDate = remember(uiState.messages) {
         uiState.messages.groupBy { message -> formatDateDivider(message.timestamp) }
     }
+
+    // State for Full Screen Image Viewer
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+
+    // Handle system back press
+    androidx.activity.compose.BackHandler {
+        if (selectedImageUrl != null) {
+            selectedImageUrl = null
+        } else {
+            onBackPress()
+        }
+    }
+
     val totalItems = messagesByDate.size + uiState.messages.size
     val isNearBottom by remember {
         derivedStateOf {
@@ -71,6 +85,8 @@ fun ChatScreen(
     }
     var unreadCount by remember { mutableStateOf(0) }
     var previousMessageCount by remember { mutableStateOf(0) }
+    
+
     
     // 사진 선택을 위한 이미지 피커
     val imagePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -119,161 +135,174 @@ fun ChatScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .imePadding()
-            .background(Color.White)
-    ) {
-        // Chat Header
-        ChatHeader(
-            groupName = chatRoomName,
-            memberCount = memberCount,
-            onBackPress = onBackPress,
-            onInviteClick = onInviteClick
-        )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .systemBarsPadding()
+                .imePadding()
+                .background(Color.White)
+        ) {
+            // Chat Header
+            ChatHeader(
+                groupName = chatRoomName,
+                memberCount = memberCount,
+                onBackPress = onBackPress,
+                onInviteClick = onInviteClick
+            )
 
-        if (uiState.isLoading && uiState.messages.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = Color(0xFFFF9945))
-            }
-        } else {
-            // Messages Area
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .background(Color(0xFFF9FAFB))
-                    .padding(16.dp)
-            ) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+            if (uiState.isLoading && uiState.messages.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    // 날짜별로 그룹화하여 표시
-                    messagesByDate.forEach { (date, messagesForDate) ->
-                        // 날짜 구분선
-                        item(key = "date_$date") {
-                            DateDivider(date = date)
-                        }
-
-                        // 해당 날짜의 메시지들
-                        items(
-                            items = messagesForDate,
-                            key = { it.id }
-                        ) { message ->
-                            val isMe = message.userId == userId
-                            val timestamp = formatTimestamp(message.timestamp)
-                            val isImageMessage =
-                                message.type == DomainChatMessage.MessageType.IMAGE &&
-                                    !message.imageUrl.isNullOrBlank()
-                            if (isMe) {
-                                if (isImageMessage) {
-                                    MyImageMessageItem(
-                                        imageUrl = message.imageUrl ?: "",
-                                        timestamp = timestamp
-                                    )
-                                } else {
-                                    MyMessageItem(
-                                        message = message.content ?: "",
-                                        timestamp = timestamp
-                                    )
-                                }
-                            } else {
-                                if (isImageMessage) {
-                                    OtherImageMessageItem(
-                                        userName = message.userName ?: "알 수 없음",
-                                        imageUrl = message.imageUrl ?: "",
-                                        timestamp = timestamp,
-                                        avatarUrl = null
-                                    )
-                                } else {
-                                    OtherMessageItem(
-                                        userName = message.userName ?: "알 수 없음",
-                                        message = message.content ?: "",
-                                        timestamp = timestamp,
-                                        avatarUrl = null // TODO: 프로필 사진 URL
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    CircularProgressIndicator(color = Color(0xFFFF9945))
                 }
-
-                if (unreadCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(12.dp)
+            } else {
+                // Messages Area
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color(0xFFF9FAFB))
+                        .padding(16.dp)
+                ) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        ExtendedFloatingActionButton(
-                        onClick = {
-                            if (totalItems > 0) {
-                                coroutineScope.launch {
-                                    listState.animateScrollToItem(totalItems - 1)
+                        // 날짜별로 그룹화하여 표시
+                        messagesByDate.forEach { (date, messagesForDate) ->
+                            // 날짜 구분선
+                            item(key = "date_$date") {
+                                DateDivider(date = date)
+                            }
+
+                            // 해당 날짜의 메시지들
+                            items(
+                                items = messagesForDate,
+                                key = { it.id }
+                            ) { message ->
+                                val isMe = message.userId == userId
+                                val timestamp = formatTimestamp(message.timestamp)
+                                val isImageMessage =
+                                    message.type == DomainChatMessage.MessageType.IMAGE &&
+                                        !message.imageUrl.isNullOrBlank()
+                                if (isMe) {
+                                    if (isImageMessage) {
+                                        MyImageMessageItem(
+                                            imageUrl = message.imageUrl ?: "",
+                                            timestamp = timestamp,
+                                            onImageClick = { selectedImageUrl = message.imageUrl }
+                                        )
+                                    } else {
+                                        MyMessageItem(
+                                            message = message.content ?: "",
+                                            timestamp = timestamp
+                                        )
+                                    }
+                                } else {
+                                    if (isImageMessage) {
+                                        OtherImageMessageItem(
+                                            userName = message.userName ?: "알 수 없음",
+                                            imageUrl = message.imageUrl ?: "",
+                                            timestamp = timestamp,
+                                            avatarUrl = null,
+                                            onImageClick = { selectedImageUrl = message.imageUrl }
+                                        )
+                                    } else {
+                                        OtherMessageItem(
+                                            userName = message.userName ?: "알 수 없음",
+                                            message = message.content ?: "",
+                                            timestamp = timestamp,
+                                            avatarUrl = null // TODO: 프로필 사진 URL
+                                        )
+                                    }
                                 }
                             }
-                            unreadCount = 0
-                        },
-                        containerColor = Color(0xFFFF9945),
-                        contentColor = Color.White,
-                        modifier = Modifier.height(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "새 메시지",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "새 메시지",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        }
                     }
-                        val badgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+
+                    if (unreadCount > 0) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .offset(x = 6.dp, y = (-6).dp)
-                                .background(color = Color(0xFFE11D48), shape = CircleShape)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .align(Alignment.BottomEnd)
+                                .padding(12.dp)
                         ) {
-                            Text(
-                                text = badgeText,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                textAlign = TextAlign.Center
+                            ExtendedFloatingActionButton(
+                            onClick = {
+                                if (totalItems > 0) {
+                                    coroutineScope.launch {
+                                        listState.animateScrollToItem(totalItems - 1)
+                                    }
+                                }
+                                unreadCount = 0
+                            },
+                            containerColor = Color(0xFFFF9945),
+                            contentColor = Color.White,
+                            modifier = Modifier.height(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "새 메시지",
+                                modifier = Modifier.size(20.dp)
                             )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "새 메시지",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                            val badgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .offset(x = 6.dp, y = (-6).dp)
+                                    .background(color = Color(0xFFE11D48), shape = CircleShape)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = badgeText,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Input Area
-        ChatInputArea(
-            messageText = messageText,
-            onMessageTextChange = { messageText = it },
-            onSendClick = {
-                if (messageText.isNotBlank()) {
-                    viewModel.sendMessage(chatRoomId, userId, messageText)
-                    messageText = ""
-                }
-            },
-            onImageClick = {
-                imagePickerLauncher.launch("image/*")
-            },
-            enabled = !uiState.isSending
-        )
+            // Input Area
+            ChatInputArea(
+                messageText = messageText,
+                onMessageTextChange = { messageText = it },
+                onSendClick = {
+                    if (messageText.isNotBlank()) {
+                        viewModel.sendMessage(chatRoomId, userId, messageText)
+                        messageText = ""
+                    }
+                },
+                onImageClick = {
+                    imagePickerLauncher.launch("image/*")
+                },
+                enabled = !uiState.isSending
+            )
+        }
+        
+        // Full Screen Image Viewer Overlay
+        if (selectedImageUrl != null) {
+            com.example.madclass01.presentation.common.screen.FullScreenImageViewer(
+                imageUrls = listOf(selectedImageUrl!!),
+                initialPage = 0,
+                onDismiss = { selectedImageUrl = null }
+            )
+        }
     }
 }
 
@@ -529,7 +558,8 @@ fun OtherImageMessageItem(
     userName: String,
     imageUrl: String,
     timestamp: String,
-    avatarUrl: String? = null
+    avatarUrl: String? = null,
+    onImageClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -591,7 +621,9 @@ fun OtherImageMessageItem(
                     AsyncImage(
                         model = imageUrl,
                         contentDescription = "이미지 메시지",
-                        modifier = Modifier.size(180.dp),
+                        modifier = Modifier
+                            .size(180.dp)
+                            .clickable { onImageClick() },
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -609,7 +641,8 @@ fun OtherImageMessageItem(
 @Composable
 fun MyImageMessageItem(
     imageUrl: String,
-    timestamp: String
+    timestamp: String,
+    onImageClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -637,7 +670,9 @@ fun MyImageMessageItem(
             AsyncImage(
                 model = imageUrl,
                 contentDescription = "이미지 메시지",
-                modifier = Modifier.size(180.dp),
+                modifier = Modifier
+                    .size(180.dp)
+                    .clickable { onImageClick() },
                 contentScale = ContentScale.Crop
             )
         }

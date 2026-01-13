@@ -97,6 +97,16 @@ fun ProfileScreen(
     // State for Full Screen Image Viewer
     var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Handle system back press
+    // If viewing an image OR if onBack is provided (e.g. from GroupDetail), intercept back press
+    androidx.activity.compose.BackHandler(enabled = selectedImageIndex != null || onBack != null) {
+        if (selectedImageIndex != null) {
+            selectedImageIndex = null
+        } else {
+            onBack?.invoke()
+        }
+    }
+
     LaunchedEffect(userId) {
         if (userId != null) {
             viewModel.loadProfile(userId)

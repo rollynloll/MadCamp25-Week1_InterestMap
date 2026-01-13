@@ -50,6 +50,9 @@ fun GroupDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    // Handle system back press
+    BackHandler(onBack = onBackPress)
+
     // 화면 초기화
     LaunchedEffect(groupId, currentUserId) {
         viewModel.initializeWithGroup(groupId, currentUserId)
