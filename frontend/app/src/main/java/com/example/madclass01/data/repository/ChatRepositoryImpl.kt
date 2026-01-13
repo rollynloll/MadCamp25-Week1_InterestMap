@@ -13,6 +13,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
 class ChatRepositoryImpl @Inject constructor(
@@ -89,8 +90,9 @@ class ChatRepositoryImpl @Inject constructor(
             val tmpFile = File.createTempFile("upload_", fileName)
             tmpFile.writeBytes(imageBytes)
             val reqFile: RequestBody = tmpFile.asRequestBody("image/*".toMediaTypeOrNull())
+            val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
             val part = MultipartBody.Part.createFormData("file", fileName, reqFile)
-            val res = apiService.sendGroupImageMessage(groupId, userId, part)
+            val res = apiService.sendGroupImageMessage(groupId, userIdBody, part)
             tmpFile.delete()
             if (res.isSuccessful && res.body() != null) {
                 Result.success(res.body()!!.toDomain())

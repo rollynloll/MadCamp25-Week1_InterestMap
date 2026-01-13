@@ -80,6 +80,14 @@ class QRInviteViewModel @Inject constructor(
     }
     fun joinGroupByLink(inviteUrl: String, userId: String) {
         viewModelScope.launch {
+            val parsedGroupId = extractGroupIdFromInviteUrl(inviteUrl)
+            if (parsedGroupId == null) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    errorMessage = "초대 링크 형식이 올바르지 않습니다"
+                )
+                return@launch
+            }
             _uiState.value = _uiState.value.copy(
                 isLoading = true,
                 errorMessage = ""
@@ -95,7 +103,8 @@ class QRInviteViewModel @Inject constructor(
                     // 그룹 정보 다시 로드
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        joinSuccess = true
+                        joinSuccess = true,
+                        joinGroupId = parsedGroupId
                     )
                 } else {
                     _uiState.value = _uiState.value.copy(
@@ -120,5 +129,19 @@ class QRInviteViewModel @Inject constructor(
     
     fun resetJoinSuccess() {
         _uiState.value = _uiState.value.copy(joinSuccess = false)
+    }
+
+    private fun extractGroupIdFromInviteUrl(inviteUrl: String): String? {
+        return try {
+            if (inviteUrl.startsWith("madcamp://invite/")) {
+                inviteUrl.substringAfter("madcamp://invite/").takeIf { it.isNotBlank() }
+            } else if (inviteUrl.contains("/invite/")) {
+                inviteUrl.substringAfter("/invite/").takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 }

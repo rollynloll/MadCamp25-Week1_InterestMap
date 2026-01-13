@@ -6,6 +6,7 @@ import com.example.madclass01.domain.model.Group
 import com.example.madclass01.domain.model.RelationshipGraph
 import com.example.madclass01.domain.usecase.GetGroupDetailUseCase
 import com.example.madclass01.domain.usecase.GetRelationshipGraphUseCase
+import com.example.madclass01.domain.usecase.JoinGroupChatUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,7 +36,8 @@ data class GroupDetailUiState(
 @HiltViewModel
 class GroupDetailViewModel @Inject constructor(
     private val getGroupDetailUseCase: GetGroupDetailUseCase,
-    private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase
+    private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase,
+    private val joinGroupChatUseCase: JoinGroupChatUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GroupDetailUiState())
@@ -68,6 +70,9 @@ class GroupDetailViewModel @Inject constructor(
                 }
 
                 val group = groupResult.getOrNull() ?: return@launch
+
+                // Ensure current user is a member so embeddings center on the correct profile.
+                joinGroupChatUseCase(groupId, currentUserId)
 
                 // 2. 관계 그래프 조회
                 val graphResult = getRelationshipGraphUseCase(groupId, currentUserId)

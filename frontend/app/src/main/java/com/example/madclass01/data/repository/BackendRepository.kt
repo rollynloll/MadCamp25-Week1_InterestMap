@@ -10,6 +10,7 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -527,9 +528,10 @@ class BackendRepository @Inject constructor(
     ): ApiResult<MessageContent> = withContext(Dispatchers.IO) {
         try {
             val requestBody = imageFile.asRequestBody("image/*".toMediaTypeOrNull())
+            val userIdBody = userId.toRequestBody("text/plain".toMediaTypeOrNull())
             val multipartBody = MultipartBody.Part.createFormData("file", imageFile.name, requestBody)
             
-            val response = apiService.sendGroupImageMessage(groupId, userId, multipartBody)
+            val response = apiService.sendGroupImageMessage(groupId, userIdBody, multipartBody)
             if (response.isSuccessful && response.body() != null) {
                 ApiResult.Success(response.body()!!)
             } else {

@@ -168,7 +168,7 @@ interface ApiService {
     @POST("/api/groups/{groupId}/photos")
     suspend fun sendGroupImageMessage(
         @Path("groupId") groupId: String,
-        @Part("user_id") userId: String,
+        @Part("user_id") userId: RequestBody,
         @Part file: MultipartBody.Part
     ): Response<MessageContent>
     
