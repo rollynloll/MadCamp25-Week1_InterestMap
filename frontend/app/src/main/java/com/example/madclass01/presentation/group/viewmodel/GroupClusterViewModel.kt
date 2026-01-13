@@ -34,7 +34,8 @@ data class GroupClusterUiState(
     val enterRoom: SubgroupRoom? = null,
     val isCreatingRoom: Boolean = false,
     val isLoading: Boolean = false,
-    val errorMessage: String = ""
+    val errorMessage: String = "",
+    val customClusterNames: Map<Int, String> = emptyMap() // Key: Cluster ID (Index), Value: Custom Name
 )
 
 data class SubgroupRoom(
@@ -89,6 +90,12 @@ class GroupClusterViewModel @Inject constructor(
                 isLoading = false
             )
         }
+    }
+
+    fun updateClusterName(id: Int, name: String) {
+        val currentNames = _uiState.value.customClusterNames.toMutableMap()
+        currentNames[id] = name
+        _uiState.value = _uiState.value.copy(customClusterNames = currentNames)
     }
 
     fun updateClusterCount(count: Int) {
