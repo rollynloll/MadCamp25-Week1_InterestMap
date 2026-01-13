@@ -91,6 +91,9 @@ fun ProfileEditScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
 
+    // Handle system back press
+    androidx.activity.compose.BackHandler(onBack = onBack)
+
     var profileImage by remember { mutableStateOf(initialProfileImage) }
     var nickname by remember { mutableStateOf(initialNickname) }
     var ageText by remember { mutableStateOf(initialAge?.toString() ?: "") }

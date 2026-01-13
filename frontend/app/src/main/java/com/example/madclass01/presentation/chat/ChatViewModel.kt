@@ -6,6 +6,7 @@ import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
 import com.example.madclass01.data.remote.dto.toDomain
 import com.example.madclass01.domain.model.ChatMessage
+import com.example.madclass01.domain.usecase.GetRelationshipGraphUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,12 +21,14 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
-    val isSending: Boolean = false
+    val isSending: Boolean = false,
+    val similarityMap: Map<String, Float> = emptyMap()
 )
 
 @HiltViewModel
 class ChatViewModel @Inject constructor(
-    private val backendRepository: BackendRepository
+    private val backendRepository: BackendRepository,
+    private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -41,7 +44,24 @@ class ChatViewModel @Inject constructor(
         val normalizedGroupId = normalizeGroupId(groupId)
         currentGroupId = normalizedGroupId
         loadMessages(normalizedGroupId, userId)
+        loadMessages(normalizedGroupId, userId)
         startPolling(normalizedGroupId, userId)
+        loadSimilarity(normalizedGroupId, userId)
+    }
+
+    private fun loadSimilarity(groupId: String, userId: String) {
+        viewModelScope.launch {
+            val result = getRelationshipGraphUseCase(groupId, userId)
+            result.onSuccess { graph ->
+                val map = graph.otherUserNodes.associate { node ->
+                    node.userId to node.similarityScore
+                }
+                _uiState.value = _uiState.value.copy(similarityMap = map)
+            }.onFailure {
+                // Log error but don't disrupt chat
+                android.util.Log.e("ChatViewModel", "Failed to load similarity: ${it.message}")
+            }
+        }
     }
 
     /**

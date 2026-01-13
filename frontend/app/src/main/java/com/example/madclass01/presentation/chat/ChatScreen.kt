@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -37,6 +38,7 @@ import com.example.madclass01.domain.model.ChatMessage as DomainChatMessage
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import com.example.madclass01.presentation.group.screen.SelectedUserProfileBottomSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +49,7 @@ fun ChatScreen(
     userId: String,
     onBackPress: () -> Unit = {},
     onInviteClick: () -> Unit = {},
+    onUserProfileClick: (String) -> Unit = {},
     viewModel: ChatViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -61,6 +64,7 @@ fun ChatScreen(
 
     // State for Full Screen Image Viewer
     var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+    var selectedUserForProfile by remember { mutableStateOf<DomainChatMessage?>(null) }
 
     // Handle system back press
     androidx.activity.compose.BackHandler {
@@ -106,13 +110,15 @@ fun ChatScreen(
         viewModel.initializeChatRoom(chatRoomId, userId)
     }
 
-    // 새 메시지 수신 시 스크롤
+    // 새 메시지 수신 시 스크롤 & 초기 진입 시 스크롤
     val lastMessageId = uiState.messages.lastOrNull()?.id
-    LaunchedEffect(lastMessageId) {
-        if (lastMessageId != null && totalItems > 0) {
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
             val newItems = (uiState.messages.size - previousMessageCount).coerceAtLeast(0)
-            if (isNearBottom) {
-                listState.animateScrollToItem(totalItems - 1)
+            // 첫 로드(previousMessageCount == 0)거나, 유저가 하단에 있거나, 내가 보낸 메시지인 경우 스크롤
+            if (previousMessageCount == 0 || isNearBottom) {
+                 // 약간의 딜레이를 주어 UI가 그려진 후 스크롤되도록 함
+                listState.scrollToItem(totalItems - 1)
                 unreadCount = 0
             } else if (newItems > 0) {
                 unreadCount += newItems
@@ -210,15 +216,17 @@ fun ChatScreen(
                                             userName = message.userName ?: "알 수 없음",
                                             imageUrl = message.imageUrl ?: "",
                                             timestamp = timestamp,
-                                            avatarUrl = null,
-                                            onImageClick = { selectedImageUrl = message.imageUrl }
+                                            avatarUrl = message.userProfileImage,
+                                            onImageClick = { selectedImageUrl = message.imageUrl },
+                                            onProfileClick = { selectedUserForProfile = message }
                                         )
                                     } else {
                                         OtherMessageItem(
                                             userName = message.userName ?: "알 수 없음",
                                             message = message.content ?: "",
                                             timestamp = timestamp,
-                                            avatarUrl = null // TODO: 프로필 사진 URL
+                                            avatarUrl = message.userProfileImage,
+                                            onProfileClick = { selectedUserForProfile = message }
                                         )
                                     }
                                 }
@@ -302,6 +310,19 @@ fun ChatScreen(
                 initialPage = 0,
                 onDismiss = { selectedImageUrl = null }
             )
+        }
+
+        if (selectedUserForProfile != null) {
+            val user = selectedUserForProfile!!
+            if (user.userId != null) {
+                SelectedUserProfileBottomSheet(
+                    userName = user.userName ?: "알 수 없음",
+                    profileImageUrl = user.userProfileImage,
+                    similarity = uiState.similarityMap[user.userId] ?: 0.0f,
+                    onProfileClick = { onUserProfileClick(user.userId) },
+                    onDismiss = { selectedUserForProfile = null }
+                )
+            }
         }
     }
 }
@@ -431,7 +452,8 @@ fun OtherMessageItem(
     userName: String,
     message: String,
     timestamp: String,
-    avatarUrl: String? = null
+    avatarUrl: String? = null,
+    onProfileClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -442,6 +464,7 @@ fun OtherMessageItem(
         Box(
             modifier = Modifier
                 .size(36.dp)
+                .clickable { onProfileClick() }
                 .background(
                     color = Color(0xFFFF9945),
                     shape = CircleShape
@@ -452,7 +475,7 @@ fun OtherMessageItem(
                 AsyncImage(
                     model = avatarUrl,
                     contentDescription = "프로필 사진",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
             } else {
@@ -475,7 +498,8 @@ fun OtherMessageItem(
                 text = userName,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF6B7280)
+                color = Color(0xFF6B7280),
+                modifier = Modifier.clickable { onProfileClick() }
             )
             
             Row(
@@ -559,7 +583,8 @@ fun OtherImageMessageItem(
     imageUrl: String,
     timestamp: String,
     avatarUrl: String? = null,
-    onImageClick: () -> Unit = {}
+    onImageClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -569,6 +594,7 @@ fun OtherImageMessageItem(
         Box(
             modifier = Modifier
                 .size(36.dp)
+                .clickable { onProfileClick() }
                 .background(
                     color = Color(0xFFFF9945),
                     shape = CircleShape
@@ -579,7 +605,7 @@ fun OtherImageMessageItem(
                 AsyncImage(
                     model = avatarUrl,
                     contentDescription = "프로필 사진",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
                     contentScale = ContentScale.Crop
                 )
             } else {
@@ -601,7 +627,8 @@ fun OtherImageMessageItem(
                 text = userName,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color(0xFF6B7280)
+                color = Color(0xFF6B7280),
+                modifier = Modifier.clickable { onProfileClick() }
             )
 
             Row(

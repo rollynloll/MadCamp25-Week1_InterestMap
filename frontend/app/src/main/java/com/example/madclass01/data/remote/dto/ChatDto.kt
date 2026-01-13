@@ -46,6 +46,7 @@ data class GroupMessageItem(
             type = if (content.text != null) ChatMessage.MessageType.TEXT else ChatMessage.MessageType.SYSTEM,
             content = content.text ?: "",
             imageUrl = null,
+            userProfileImage = UrlResolver.resolve(sender.primaryPhotoUrl),
             timestamp = timestamp,
             readCount = 0
         )
@@ -82,6 +83,7 @@ data class ChatMessageResponse(
         type = ChatMessage.MessageType.valueOf(type),
         content = content,
         imageUrl = UrlResolver.resolve(imageUrl),
+        userProfileImage = null,
         timestamp = timestamp,
         readCount = readCount
     )

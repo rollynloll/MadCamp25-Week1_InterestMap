@@ -291,8 +291,10 @@ fun AppNavigation(
             ProfileScreen(
                 userId = userProfile.userId,
                 onBack = {
-                    if (userProfile.fromGroupId != null) {
-                    currentScreen = AppScreen.GroupDetail(userProfile.fromGroupId)
+                    if (userProfile.returnScreen != null) {
+                        currentScreen = userProfile.returnScreen
+                    } else if (userProfile.fromGroupId != null) {
+                        currentScreen = AppScreen.GroupDetail(userProfile.fromGroupId)
                     } else {
                         currentScreen = AppScreen.Home
                     }
@@ -326,7 +328,7 @@ fun AppNavigation(
                     currentScreen = AppScreen.UserProfile(targetUserId, fromGroupId = groupDetail.groupId)
                 },
                 onChatRoomCreated = { chatRoomId, groupName, memberCount ->
-                    currentScreen = AppScreen.Chat(chatRoomId, groupName, memberCount)
+                    currentScreen = AppScreen.Chat(chatRoomId, groupName, memberCount, returnScreen = groupDetail)
                 }
             )
         }
@@ -351,11 +353,19 @@ fun AppNavigation(
                 memberCount = chat.memberCount,
                 userId = userId ?: "",
                 onBackPress = {
-                    currentScreen = AppScreen.Home
+                    currentScreen = chat.returnScreen ?: AppScreen.Home
                 },
                 onInviteClick = {
                     val groupId = chat.chatRoomId.removePrefix("group_")
                     currentScreen = AppScreen.QRInvite(groupId, chat.chatRoomName, chat.memberCount)
+                },
+                onUserProfileClick = { userId ->
+                    // 현재 Chat 화면을 returnScreen으로 전달하여 뒤로가기 시 돌아오도록 함
+                    currentScreen = AppScreen.UserProfile(
+                        userId = userId,
+                        fromGroupId = chat.chatRoomId.removePrefix("group_"),
+                        returnScreen = currentScreen
+                    )
                 }
             )
         }
@@ -396,7 +406,7 @@ fun AppNavigation(
                     currentScreen = AppScreen.GroupClusterList(groupCluster.groupId)
                 },
                 onEnterSubgroup = { subgroupId, subgroupName, memberCount ->
-                    currentScreen = AppScreen.Chat(subgroupId, subgroupName, memberCount)
+                    currentScreen = AppScreen.Chat(subgroupId, subgroupName, memberCount, returnScreen = groupCluster)
                 },
                 onBackPress = {
                     currentScreen = AppScreen.GroupDetail(groupCluster.groupId)
@@ -465,9 +475,14 @@ sealed class AppScreen {
     object Loading : AppScreen()
     object TagSelection : AppScreen()
     data class GroupDetail(val groupId: String, val fromSearch: Boolean = false) : AppScreen()
-    data class UserProfile(val userId: String, val fromGroupId: String? = null) : AppScreen()
+    data class UserProfile(val userId: String, val fromGroupId: String? = null, val returnScreen: AppScreen? = null) : AppScreen()
     object CreateGroup : AppScreen()
-    data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅", val memberCount: Int = 0) : AppScreen()
+    data class Chat(
+        val chatRoomId: String,
+        val chatRoomName: String = "채팅",
+        val memberCount: Int = 0,
+        val returnScreen: AppScreen? = null
+    ) : AppScreen()
     object QRScanner : AppScreen()
     data class QRInvite(val groupId: String, val groupName: String, val memberCount: Int = 0) : AppScreen()
     data class GroupCluster(val groupId: String) : AppScreen()
