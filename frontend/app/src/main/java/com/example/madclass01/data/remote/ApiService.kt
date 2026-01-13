@@ -238,6 +238,12 @@ interface ApiService {
     @GET("/api/groups/user/{userId}")
     suspend fun getUserGroups(@Path("userId") userId: String): Response<List<GroupResponse>>
 
+    @GET("/api/groups/search")
+    suspend fun searchGroups(
+        @Query("current_user_id") userId: String? = null,
+        @Query("limit") limit: Int = 40
+    ): Response<GroupSearchResponse>
+
     @POST("/api/groups/{groupId}/members")
     suspend fun addGroupMember(
         @Path("groupId") groupId: String,

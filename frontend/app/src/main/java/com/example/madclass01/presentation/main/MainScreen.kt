@@ -148,6 +148,7 @@ fun MainScreen(
             
             composable(MainTab.Search.route) {
                 SearchScreen(
+                    userId = userId,
                     onGroupClick = { groupId -> onNavigateToGroupDetail(groupId, true) }
                 )
             }

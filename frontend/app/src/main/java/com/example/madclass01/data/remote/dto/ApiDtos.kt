@@ -133,6 +133,28 @@ data class GroupResponse(
     val isPublic: Boolean = true
 )
 
+data class GroupSearchItem(
+    val id: String,
+    val name: String,
+    val description: String? = null,
+    @SerializedName("memberCount")
+    val memberCount: Int,
+    val tags: List<String> = emptyList(),
+    val region: String = "",
+    @SerializedName("imageUrl")
+    val imageUrl: String = "",
+    @SerializedName("iconType")
+    val iconType: String = "",
+    @SerializedName("isPublic")
+    val isPublic: Boolean = true,
+    @SerializedName("matchScore")
+    val matchScore: Double = 0.0
+)
+
+data class GroupSearchResponse(
+    val items: List<GroupSearchItem>
+)
+
 data class CreateGroupRequest(
     val name: String,
     @SerializedName("creator_id")

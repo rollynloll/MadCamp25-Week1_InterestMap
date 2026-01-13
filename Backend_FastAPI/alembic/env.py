@@ -69,13 +69,16 @@ async def run_migrations_online() -> None: # Changed to async
     )
 
     async with connectable.connect() as connection: # Changed to async with
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        def do_run_migrations(sync_conn) -> None:
+            context.configure(
+                connection=sync_conn,
+                target_metadata=target_metadata,
+            )
+            with context.begin_transaction():
+                context.run_migrations()
 
-        async with context.begin_transaction(): # Changed to async with
-            context.run_migrations()
-    
+        await connection.run_sync(do_run_migrations)
+
     await connectable.dispose() # Dispose of the engine resources
 
 

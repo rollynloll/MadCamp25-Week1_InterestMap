@@ -150,6 +150,23 @@ class GroupResponse(BaseSchema):
     is_public: bool = True
 
 
+class GroupSearchItem(BaseSchema):
+    id: str
+    name: str
+    description: str | None = None
+    memberCount: int = 0
+    tags: list[str] = []
+    region: str = ""
+    imageUrl: str = ""
+    iconType: str = ""
+    isPublic: bool = True
+    matchScore: float = 0.0
+
+
+class GroupSearchResponse(BaseSchema):
+    items: list[GroupSearchItem]
+
+
 class GroupDetailResponse(BaseSchema):
     id: str
     name: str

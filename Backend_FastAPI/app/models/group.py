@@ -1,10 +1,11 @@
 """
-DB: groups
 - id (UUID, PK)
 - name (VARCHAR(80), NOT NULL, UNIQUE)
 - description (VARCHAR(255), NULL)
 - created_by (UUID, FK -> users.id, NULL)   # seed group이면 NULL도 가능
 - group_profile (JSONB, NOT NULL, default={})  # 그룹 취향/성격 데이터
+- embedding (JSONB, NULL)  # 평균화된 그룹 임베딩
+- embedding_updated_at (timestamptz, NULL)  # 마지막 갱신 시각
 - is_subgroup (BOOLEAN, NOT NULL, default=false)
 - parent_group_id (UUID, FK -> groups.id, NULL)
 - subgroup_index (INTEGER, NULL)
@@ -39,6 +40,10 @@ class Group(Base):
     )
 
     group_profile: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    embedding: Mapped[list[float] | None] = mapped_column(JSONB, nullable=True)
+    embedding_updated_at: Mapped[DateTime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     is_subgroup: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     parent_group_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("groups.id"), nullable=True

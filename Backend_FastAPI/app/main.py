@@ -7,7 +7,7 @@ from typing import List, Optional, Dict, Any
 import asyncio
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas import (
     UserCreateRequest, UserUpdateRequest, UserResponse,
     GroupCreateRequest, GroupResponse, GroupDetailResponse, GroupEmbeddingResponse,
+    GroupSearchItem, GroupSearchResponse,
     UserEmbeddingResponse, GraphNodePositionResponse, AddMemberRequest,
     SubgroupCreateRequest, SubgroupItemResponse,
     PhotoUploadResponse,
@@ -371,6 +372,74 @@ def _group_response(group: Group, member_ids: list[uuid.UUID]) -> dict:
         "icon_type": icon_type,
         "is_public": is_public,
     }
+
+
+def _to_float_vector(embedding: list[float] | None) -> list[float] | None:
+    if not embedding:
+        return None
+    try:
+        return [float(value) for value in embedding]
+    except (TypeError, ValueError):
+        return None
+
+
+async def _collect_group_member_embeddings(
+    db: AsyncSession,
+    user_ids: list[uuid.UUID],
+    notion_ids: list[uuid.UUID],
+) -> list[list[float]]:
+    vectors: list[list[float]] = []
+    if user_ids:
+        result = await db.execute(select(User.embedding).where(User.id.in_(user_ids)))
+        for raw in result.scalars().all():
+            vector = _to_float_vector(raw)
+            if vector:
+                vectors.append(vector)
+    if notion_ids:
+        result = await db.execute(select(NotionUser.embedding).where(NotionUser.id.in_(notion_ids)))
+        for raw in result.scalars().all():
+            vector = _to_float_vector(raw)
+            if vector:
+                vectors.append(vector)
+    return vectors
+
+
+def _average_vectors(vectors: list[list[float]]) -> list[float] | None:
+    if not vectors:
+        return None
+    dim = len(vectors[0])
+    if dim == 0:
+        return None
+    accumulator = [0.0] * dim
+    count = 0
+    for vector in vectors:
+        if len(vector) != dim:
+            continue
+        for i, value in enumerate(vector):
+            accumulator[i] += value
+        count += 1
+    if count == 0:
+        return None
+    return [value / count for value in accumulator]
+
+
+async def _recompute_group_embedding(db: AsyncSession, group: Group) -> None:
+    try:
+        user_ids = await _get_group_member_ids(db, group.id)
+        notion_ids = await _get_notion_member_ids(db, group.id)
+        vectors = await _collect_group_member_embeddings(db, user_ids, notion_ids)
+        average = _average_vectors(vectors)
+        timestamp = datetime.now(timezone.utc)
+        values = {
+            "embedding": average,
+            "embedding_updated_at": timestamp,
+        }
+        await db.execute(update(Group).where(Group.id == group.id).values(**values))
+        await db.commit()
+    except Exception as exc:
+        logging.getLogger("uvicorn.error").warning(
+            "Failed to recompute embedding for group_id=%s: %s", group.id, exc
+        )
 
 
 def _build_subgroup_name(parent: Group, index: int) -> str:
@@ -1049,6 +1118,7 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
         await db.rollback()
         raise HTTPException(status_code=409, detail="Group already exists")
     await db.refresh(group)
+    await _recompute_group_embedding(db, group)
     return _group_response(group, [creator.id])
 
 @app.get("/api/groups", response_model=List[GroupResponse], tags=["groups"])
@@ -1096,6 +1166,99 @@ async def get_user_groups(user_id: str, db: AsyncSession = Depends(get_db)):
         responses.append(_group_response(group, member_ids))
     return responses
 
+
+@app.get(
+    "/api/groups/search",
+    response_model=GroupSearchResponse,
+    tags=["groups"],
+)
+async def search_groups(
+    current_user_id: str | None = Query(None),
+    limit: int = Query(40, ge=1, le=200),
+    db: AsyncSession = Depends(get_db),
+):
+    """추천 순으로 그룹을 가져오되 사용자가 속한 그룹은 제외"""
+    user_uuid: uuid.UUID | None = None
+    user_embedding: list[float] | None = None
+    if current_user_id:
+        try:
+            user = await _get_user_by_id(db, current_user_id)
+            user_uuid = uuid.UUID(current_user_id)
+            user_embedding = _to_float_vector(user.embedding)
+        except HTTPException:
+            user_uuid = None
+            user_embedding = None
+
+    group_result = await db.execute(select(Group).where(Group.is_subgroup == False))  # noqa: E712
+    groups = group_result.scalars().all()
+    group_ids = [group.id for group in groups]
+
+    exclude_group_ids: set[uuid.UUID] = set()
+    if user_uuid:
+        member_result = await db.execute(
+            select(GroupMember.group_id).where(GroupMember.user_id == user_uuid)
+        )
+        exclude_group_ids = {row[0] for row in member_result.all()}
+
+    member_counts: dict[uuid.UUID, int] = {}
+    if group_ids:
+        user_counts = await db.execute(
+            select(GroupMember.group_id, func.count())
+            .where(GroupMember.group_id.in_(group_ids))
+            .group_by(GroupMember.group_id)
+        )
+        member_counts.update({row[0]: row[1] for row in user_counts.all()})
+
+        notion_counts = await db.execute(
+            select(NotionGroupMember.group_id, func.count())
+            .where(NotionGroupMember.group_id.in_(group_ids))
+            .group_by(NotionGroupMember.group_id)
+        )
+        for group_id, count in notion_counts.all():
+            member_counts[group_id] = member_counts.get(group_id, 0) + count
+
+    items: list[GroupSearchItem] = []
+    for group in groups:
+        if group.id in exclude_group_ids:
+            continue
+        profile = group.group_profile or {}
+        if not bool(profile.get("is_public", True)):
+            continue
+
+        if group.embedding is None and group.embedding_updated_at is None:
+            await _recompute_group_embedding(db, group)
+            await db.refresh(group)
+
+        group_vector = _to_float_vector(group.embedding if group.embedding else None)
+        match_score = _cosine_similarity(user_embedding, group_vector)
+
+        raw_tags = profile.get("tags") or profile.get("interests") or []
+        tags = [str(tag) for tag in raw_tags] if isinstance(raw_tags, list) else []
+        region = profile.get("region") or ""
+        image_url = _normalize_upload_url(profile.get("image_url")) or ""
+        icon_type = profile.get("icon_type") or ""
+        member_count = member_counts.get(group.id, 0)
+
+        items.append(
+            GroupSearchItem(
+                id=str(group.id),
+                name=group.name,
+                description=group.description,
+                memberCount=member_count,
+                tags=tags,
+                region=region,
+                imageUrl=image_url,
+                iconType=icon_type,
+                isPublic=bool(profile.get("is_public", True)),
+                matchScore=match_score,
+            )
+        )
+
+    items.sort(key=lambda item: item.matchScore, reverse=True)
+    if limit and len(items) > limit:
+        items = items[:limit]
+    return GroupSearchResponse(items=items)
+
 @app.post("/api/groups/{group_id}/members", response_model=GroupResponse, tags=["groups"])
 async def add_group_member(
     group_id: str,
@@ -1118,6 +1281,7 @@ async def add_group_member(
     if not existing:
         db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
         await db.commit()
+        await _recompute_group_embedding(db, group)
     member_ids = await _get_all_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
 
@@ -1236,6 +1400,7 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
         )
     )
     await db.commit()
+    await _recompute_group_embedding(db, group)
     logging.getLogger("uvicorn.error").info(
         "Remove group member completed user_id=%s group_id=%s",
         user.id,

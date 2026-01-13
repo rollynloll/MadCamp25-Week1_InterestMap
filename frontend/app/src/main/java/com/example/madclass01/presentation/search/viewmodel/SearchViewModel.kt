@@ -33,8 +33,15 @@ class SearchViewModel @Inject constructor(
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
     
     private var searchJob: Job? = null
-    
+    private var currentUserId: String? = null
+
     init {
+        searchGroups()
+    }
+
+    fun setUserId(userId: String?) {
+        if (currentUserId == userId) return
+        currentUserId = userId
         searchGroups()
     }
     
@@ -60,7 +67,11 @@ class SearchViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = "")
             
             try {
-                val results = searchGroupsUseCase(_uiState.value.searchQuery, _uiState.value.filters)
+                val results = searchGroupsUseCase(
+                    currentUserId,
+                    _uiState.value.searchQuery,
+                    _uiState.value.filters
+                )
                 _uiState.value = _uiState.value.copy(
                     searchResults = results,
                     isLoading = false,

@@ -442,6 +442,19 @@ class BackendRepository @Inject constructor(
             ApiResult.Error(e.message ?: "Network error")
         }
     }
+
+    suspend fun searchGroups(currentUserId: String?): ApiResult<List<GroupSearchItem>> = withContext(Dispatchers.IO) {
+        try {
+            val response = apiService.searchGroups(currentUserId)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!.items)
+            } else {
+                ApiResult.Error("Failed to search groups", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
     
     suspend fun addGroupMember(
         groupId: String,

@@ -102,6 +102,13 @@ fun SearchResultCard(
                     }
                 }
                 
+                Text(
+                    text = "${group.matchPercentage}% 유사",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFFF9945)
+                )
+                
                 // Description
                 if (group.description.isNotBlank()) {
                     Text(

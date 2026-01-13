@@ -2,7 +2,6 @@ package com.example.madclass01.presentation.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,6 +40,7 @@ import com.example.madclass01.presentation.search.viewmodel.SearchViewModel
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
 @Composable
 fun SearchScreen(
+    userId: String? = null,
     viewModel: SearchViewModel = hiltViewModel(),
     onGroupClick: (String) -> Unit
 ) {
@@ -52,10 +52,6 @@ fun SearchScreen(
         onRefresh = { viewModel.searchGroups() }
     )
 
-    LaunchedEffect(Unit) {
-        viewModel.searchGroups()
-    }
-    
     // 에러 메시지 표시
     LaunchedEffect(uiState.errorMessage) {
         if (uiState.errorMessage.isNotEmpty()) {
@@ -65,6 +61,10 @@ fun SearchScreen(
             )
             viewModel.clearErrorMessage()
         }
+    }
+    
+    LaunchedEffect(userId) {
+        viewModel.setUserId(userId)
     }
     
     // Gradient Brush
