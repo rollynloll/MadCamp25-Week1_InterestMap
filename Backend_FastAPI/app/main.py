@@ -752,6 +752,41 @@ async def update_user(user_id: str, request: UserUpdateRequest, db: AsyncSession
 
 # ==================== Photo APIs ====================
 
+@app.post("/api/users/{user_id}/profile-image", response_model=UserResponse, tags=["users"])
+async def upload_user_profile_image(
+    request: Request,
+    user_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """프로필 사진 전용 업로드 (갤러리/UserPhoto에 추가하지 않음)"""
+    user = await _get_user_by_id(db, user_id)
+
+    # 1. 파일 저장
+    safe_name = Path(file.filename or "profile.jpg").name
+    photo_uuid = uuid.uuid4()
+    user_dir = UPLOAD_ROOT / user_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    
+    disk_path = user_dir / f"profile_{photo_uuid}_{safe_name}"
+    
+    with disk_path.open("wb") as buffer:
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            buffer.write(chunk)
+            
+    # 2. URL 생성 및 DB 업데이트
+    file_path = f"/uploads/{user_id}/{disk_path.name}"
+    full_url = _build_file_url(request, file_path)
+    
+    user.profile_image_url = full_url
+    
+    await db.commit()
+    await db.refresh(user)
+    return _cache_user(user)
+
 @app.post("/api/photos", response_model=PhotoUploadResponse, tags=["photos"])
 async def upload_photo(
     request: Request,

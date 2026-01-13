@@ -206,6 +206,13 @@ interface ApiService {
         @Part file: okhttp3.MultipartBody.Part
     ): Response<PhotoResponse>
 
+    @Multipart
+    @POST("/api/users/{userId}/profile-image")
+    suspend fun uploadProfileImage(
+        @Path("userId") userId: String,
+        @Part file: okhttp3.MultipartBody.Part
+    ): Response<UserResponse>
+
     /**
      * 다중 사진 업로드 (배치)
      * POST /api/photos/batch

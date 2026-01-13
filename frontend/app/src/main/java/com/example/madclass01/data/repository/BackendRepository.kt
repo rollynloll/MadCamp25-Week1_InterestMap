@@ -23,9 +23,14 @@ sealed class ApiResult<out T> {
 
 @Singleton
 class BackendRepository @Inject constructor(
-    private val apiService: ApiService
+    private val apiService: ApiService,
+    private val tokenManager: com.example.madclass01.core.TokenManager
 ) {
     private val gson = Gson()
+
+    // ... (rest of methods until deletePhoto)
+
+
 
     /**
      * 카카오 SDK access token을 백엔드에 전달해 우리 JWT(access_token)를 발급받는다.
@@ -241,6 +246,25 @@ class BackendRepository @Inject constructor(
         }
     }
 
+    suspend fun uploadOnlyProfileImage(
+        userId: String,
+        file: File
+    ): ApiResult<UserResponse> = withContext(Dispatchers.IO) {
+        try {
+            val requestBody = file.asRequestBody("image/*".toMediaTypeOrNull())
+            val multipartBody = MultipartBody.Part.createFormData("file", file.name, requestBody)
+
+            val response = apiService.uploadProfileImage(userId, multipartBody)
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to upload profile image", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+
     /**
      * 다중 사진 업로드 (리사이징 + WebP 압축)
      */
@@ -335,6 +359,20 @@ class BackendRepository @Inject constructor(
                 ApiResult.Success(response.body()!!)
             } else {
                 ApiResult.Error("Failed to get user photos", response.code())
+            }
+        } catch (e: Exception) {
+            ApiResult.Error(e.message ?: "Network error")
+        }
+    }
+
+    suspend fun deletePhoto(photoId: String): ApiResult<OkResponse> = withContext(Dispatchers.IO) {
+        val token = tokenManager.getToken() ?: return@withContext ApiResult.Error("Not logged in")
+        try {
+            val response = apiService.deletePhoto(photoId, "Bearer $token")
+            if (response.isSuccessful && response.body() != null) {
+                ApiResult.Success(response.body()!!)
+            } else {
+                ApiResult.Error("Failed to delete photo", response.code())
             }
         } catch (e: Exception) {
             ApiResult.Error(e.message ?: "Network error")

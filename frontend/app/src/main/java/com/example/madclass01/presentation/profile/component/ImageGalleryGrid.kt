@@ -34,13 +34,10 @@ fun ImageGalleryGrid(
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(max = 500.dp) // Safety cap, usually controlled by parent scroll
-            .height((((images.size + 1 + 2) / 3) * 110).dp), // Estimate height: (items + 1 button) / 3 cols * rowHeight
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        userScrollEnabled = false // Usually nested in a scrollable column
+        contentPadding = PaddingValues(2.dp) // Add slight padding to avoid clipping shadows
     ) {
         // Add Button
         item {
@@ -61,7 +58,8 @@ fun ImageGalleryGrid(
                     drawRoundRect(
                         color = Color(0xFFE0E0E0),
                         size = size,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                        style = stroke
                     )
                 }
                 
@@ -89,9 +87,7 @@ fun ImageThumbnail(
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier.aspectRatio(1f)
-    ) {
+    Box(modifier = modifier.aspectRatio(1f)) {
         AsyncImage(
             model = imageUri,
             contentDescription = "Gallery Image",
@@ -102,23 +98,28 @@ fun ImageThumbnail(
             contentScale = ContentScale.Crop
         )
         
-        // Remove Button
-        Surface(
+        // Remove Button with larger hit area
+        Box(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(6.dp)
-                .size(22.dp)
-                .clickable { onRemove() },
-            shape = CircleShape,
-            color = Color.Black.copy(alpha = 0.6f),
-            contentColor = Color.White
+                .size(32.dp) // Increased touch target
+                .clickable { onRemove() }
+                .padding(4.dp), // Visual padding
+            contentAlignment = Alignment.TopEnd
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Remove",
-                    modifier = Modifier.size(14.dp)
-                )
+            Surface(
+                modifier = Modifier.size(20.dp),
+                shape = CircleShape,
+                color = Color.Black.copy(alpha = 0.6f),
+                contentColor = Color.White
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Remove",
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
             }
         }
     }

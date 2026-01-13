@@ -220,13 +220,36 @@ fun ProfileEditScreen(
                                 val finalRegion = region.trim().ifBlank { null }
                                 val finalBio = bio.trim()
 
+                                val keptImageUrls = mutableListOf<String>()
+                                val newImageFiles = mutableListOf<File>()
+                                
+                                images.forEach { uriString ->
+                                    if (uriString.startsWith("http")) {
+                                        keptImageUrls.add(uriString)
+                                    } else {
+                                        // Assume it's a local URI (content:// or file://)
+                                        try {
+                                            val uri = Uri.parse(uriString)
+                                            val file = uriToFile(context, uri)
+                                            if (file != null) {
+                                                newImageFiles.add(file)
+                                            }
+                                        } catch (e: Exception) {
+                                            // ignore
+                                        }
+                                    }
+                                }
+
                                 viewModel.updateProfile(
                                     userId = userId,
                                     nickname = trimmed,
+                                    profileImageUrl = profileImage, // Pass current profile image
                                     age = parsedAge,
                                     region = finalRegion,
                                     bio = finalBio,
-                                    tags = selectedTags.toList()
+                                    tags = selectedTags.toList(),
+                                    keptImageUrls = keptImageUrls,
+                                    newImageFiles = newImageFiles
                                 )
                             },
                             enabled = !uiState.isLoading,
@@ -488,11 +511,34 @@ fun ProfileEditScreen(
                             color = Color(0xFF333333),
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
+    // 갤러리 사진 추가를 위한 이미지 피커 (다중 선택)
+    val galleryImagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        uris.forEach { uri ->
+            val file = uriToFile(context, uri)
+            if (file != null) {
+                // TODO: Upload mechanism for gallery images if needed imediately, 
+                // or just add local URI to display and upload on Save.
+                // Currently assuming we just add to list and ViewModel handles upload/sync on Save/Update.
+                // But wait, the current `images` list is String (URL or URI).
+                // If it's a new local file, we should keep it as URI string.
+                images.add(uri.toString())
+            }
+        }
+    }
+
                         ImageGalleryGrid(
                              images = images.map { ImageItem(uri = it) },
-                             onRemoveImage = {},
-                             onAddImage = {},
-                             modifier = Modifier.fillMaxWidth()
+                             onRemoveImage = { uriToRemove -> 
+                                 images.remove(uriToRemove)
+                             },
+                             onAddImage = { 
+                                 galleryImagePicker.launch("image/*")
+                             },
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .heightIn(max = 280.dp)
                         )
                     }
                 }
