@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +31,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -40,10 +44,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,17 +67,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.example.madclass01.domain.model.Group
 import com.example.madclass01.domain.model.UserEmbedding
 import com.example.madclass01.presentation.group.viewmodel.ClusterGroup
 import com.example.madclass01.presentation.group.viewmodel.GroupClusterViewModel
 import kotlin.math.abs
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun GroupClusterListScreen(
     groupId: String,
     currentUserId: String,
     onBackPress: () -> Unit = {},
+    onClusterGroupSaved: (String) -> Unit = {},
     viewModel: GroupClusterViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -93,6 +99,7 @@ fun GroupClusterListScreen(
         viewModel.load(groupId, currentUserId)
     }
 
+    val parentGroup = uiState.group
     if (selectedClusterForDetail != null) {
         val cluster = selectedClusterForDetail!!
         val color = clusterColors.getOrNull(cluster.id) ?: Color.Gray
@@ -103,9 +110,21 @@ fun GroupClusterListScreen(
             initialName = customName,
             color = color,
             currentUserId = currentUserId,
+            isMine = cluster.members.any { it.userId == currentUserId },
+            isSavingCluster = uiState.isSavingCluster,
+            parentGroup = parentGroup,
             onDismiss = { selectedClusterForDetail = null },
             onSaveName = { newName ->
                 viewModel.updateClusterName(cluster.id, newName)
+                selectedClusterForDetail = null
+            },
+            onSaveClusterAsGroup = { newName, description, iconType ->
+                viewModel.saveClusterAsGroup(cluster, newName, description, iconType, currentUserId) { result ->
+                    if (result.isSuccess) {
+                        onClusterGroupSaved(result.getOrThrow())
+                        selectedClusterForDetail = null
+                    }
+                }
             }
         )
     }
@@ -335,17 +354,27 @@ fun FacePile(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ClusterDetailDialog(
     cluster: ClusterGroup,
     initialName: String,
     color: Color,
     currentUserId: String,
+    parentGroup: Group?,
+    isMine: Boolean,
+    isSavingCluster: Boolean,
     onDismiss: () -> Unit,
-    onSaveName: (String) -> Unit
+    onSaveName: (String) -> Unit,
+    onSaveClusterAsGroup: (String, String?, String?) -> Unit
 ) {
     var editingName by remember { mutableStateOf(initialName) }
+    var editingDescription by remember {
+        mutableStateOf(parentGroup?.description.takeIf { !it.isNullOrBlank() } ?: "")
+    }
+    var selectedIcon by remember { mutableStateOf(parentGroup?.iconType ?: "users") }
+    val region = parentGroup?.region ?: "전체"
+    val iconOptions = listOf("users", "coffee", "camera", "mountain", "music", "book", "sports", "food")
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -394,6 +423,72 @@ fun ClusterDetailDialog(
                         Icon(Icons.Default.Edit, contentDescription = null, tint = Color.Gray)
                     }
                 )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "설명",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = editingDescription,
+                    onValueChange = { editingDescription = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = color,
+                        unfocusedBorderColor = Color.LightGray
+                    ),
+                    placeholder = { Text("그룹 설명을 입력해보세요") }
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "지역",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                OutlinedTextField(
+                    value = region,
+                    onValueChange = {},
+                    enabled = false,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        disabledBorderColor = Color.LightGray,
+                        disabledTextColor = Color(0xFF333333)
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "아이콘",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.Gray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    iconOptions.forEach { icon ->
+                        AssistChip(
+                            onClick = { selectedIcon = icon },
+                            label = { Text(icon) },
+                            colors = AssistChipDefaults.assistChipColors(
+                                containerColor = if (selectedIcon == icon) color else Color(0xFFF0F0F0),
+                                labelColor = if (selectedIcon == icon) Color.White else Color.Black
+                            )
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -450,16 +545,34 @@ fun ClusterDetailDialog(
                 // Action Button
                 Button(
                     onClick = {
-                        onSaveName(editingName)
-                        onDismiss()
+                        if (isMine && !isSavingCluster) {
+                            onSaveClusterAsGroup(editingName, editingDescription, selectedIcon)
+                        } else if (!isMine) {
+                            onSaveName(editingName)
+                            onDismiss()
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = color),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isMine) Color(0xFF47A3FF) else color
+                    ),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("저장하기", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        if (isMine && isSavingCluster) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Text(
+                            if (isMine) "내 그룹 만들기" else "저장하기",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
         }

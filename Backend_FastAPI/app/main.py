@@ -442,6 +442,46 @@ async def _recompute_group_embedding(db: AsyncSession, group: Group) -> None:
         )
 
 
+async def _count_group_members(db: AsyncSession, group_id: uuid.UUID) -> tuple[int, int]:
+    result = await db.execute(
+        select(func.count())
+        .select_from(GroupMember)
+        .where(GroupMember.group_id == group_id)
+    )
+    user_count = result.scalar() or 0
+    notion_result = await db.execute(
+        select(func.count())
+        .select_from(NotionGroupMember)
+        .where(NotionGroupMember.group_id == group_id)
+    )
+    notion_count = notion_result.scalar() or 0
+    return user_count, notion_count
+
+
+async def _has_subgroups(db: AsyncSession, group_id: uuid.UUID) -> bool:
+    result = await db.execute(
+        select(func.count())
+        .select_from(Group)
+        .where(Group.parent_group_id == group_id)
+    )
+    return (result.scalar() or 0) > 0
+
+
+async def _delete_group_if_empty(db: AsyncSession, group: Group) -> bool:
+    user_count, notion_count = await _count_group_members(db, group.id)
+    if user_count + notion_count > 0:
+        return False
+    if await _has_subgroups(db, group.id):
+        return False
+
+    await db.execute(delete(GroupMessage).where(GroupMessage.group_id == group.id))
+    await db.execute(delete(GroupMember).where(GroupMember.group_id == group.id))
+    await db.execute(delete(NotionGroupMember).where(NotionGroupMember.group_id == group.id))
+    await db.execute(delete(Group).where(Group.id == group.id))
+    await db.commit()
+    return True
+
+
 def _build_subgroup_name(parent: Group, index: int) -> str:
     short_id = str(parent.id).split("-")[0]
     return f"{parent.name} · 소그룹 {index + 1} ({short_id})"
@@ -1104,19 +1144,15 @@ async def create_group(request: GroupCreateRequest, db: AsyncSession = Depends(g
         group_profile=group_profile,
     )
     db.add(group)
-    try:
-        await db.flush()
-        db.add(
-            GroupMember(
-                group_id=group.id,
-                user_id=creator.id,
-                role="owner",
-            )
+    await db.flush()
+    db.add(
+        GroupMember(
+            group_id=group.id,
+            user_id=creator.id,
+            role="owner",
         )
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise HTTPException(status_code=409, detail="Group already exists")
+    )
+    await db.commit()
     await db.refresh(group)
     await _recompute_group_embedding(db, group)
     return _group_response(group, [creator.id])
@@ -1267,21 +1303,49 @@ async def add_group_member(
 ):
     """그룹에 멤버 추가"""
     group = await _get_group_by_id(db, group_id)
-    user = await _get_user_by_id(db, request.user_id)
-    if _is_spectator_user(user):
+    user: User | None = None
+    notion_user: NotionUser | None = None
+
+    try:
+        user = await _get_user_by_id(db, request.user_id)
+    except HTTPException:
+        notion_user = await _get_notion_user_by_id(db, request.user_id)
+
+    if user and _is_spectator_user(user):
         member_ids = await _get_all_group_member_ids(db, group.id)
         return _group_response(group, member_ids)
-    result = await db.execute(
-        select(GroupMember).where(
-            GroupMember.group_id == group.id,
-            GroupMember.user_id == user.id,
+
+    if user:
+        result = await db.execute(
+            select(GroupMember).where(
+                GroupMember.group_id == group.id,
+                GroupMember.user_id == user.id,
+            )
         )
-    )
-    existing = result.scalar_one_or_none()
-    if not existing:
-        db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
-        await db.commit()
-        await _recompute_group_embedding(db, group)
+        existing = result.scalar_one_or_none()
+        if not existing:
+            db.add(GroupMember(group_id=group.id, user_id=user.id, role="member"))
+            await db.commit()
+            await _recompute_group_embedding(db, group)
+    elif notion_user:
+        result = await db.execute(
+            select(NotionGroupMember).where(
+                NotionGroupMember.group_id == group.id,
+                NotionGroupMember.notion_user_id == notion_user.id,
+            )
+        )
+        existing = result.scalar_one_or_none()
+        if not existing:
+            db.add(
+                NotionGroupMember(
+                    group_id=group.id,
+                    notion_user_id=notion_user.id,
+                    role="member",
+                )
+            )
+            await db.commit()
+            await _recompute_group_embedding(db, group)
+
     member_ids = await _get_all_group_member_ids(db, group.id)
     return _group_response(group, member_ids)
 
@@ -1400,6 +1464,15 @@ async def remove_group_member(group_id: str, user_id: str, db: AsyncSession = De
         )
     )
     await db.commit()
+    deleted = await _delete_group_if_empty(db, group)
+    if deleted:
+        logging.getLogger("uvicorn.error").info(
+            "Group deleted because user_id=%s left group_id=%s",
+            user.id,
+            group.id,
+        )
+        return {"message": "Member removed successfully"}
+
     await _recompute_group_embedding(db, group)
     logging.getLogger("uvicorn.error").info(
         "Remove group member completed user_id=%s group_id=%s",

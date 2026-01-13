@@ -403,16 +403,19 @@ fun AppNavigation(
                 }
             )
         }
-        is AppScreen.GroupClusterList -> {
-            val groupClusterList = currentScreen as AppScreen.GroupClusterList
-            com.example.madclass01.presentation.group.screen.GroupClusterListScreen(
-                groupId = groupClusterList.groupId,
-                currentUserId = userId ?: "mock_user",
-                onBackPress = {
-                    currentScreen = AppScreen.GroupCluster(groupClusterList.groupId)
-                }
-            )
-        }
+            is AppScreen.GroupClusterList -> {
+                val groupClusterList = currentScreen as AppScreen.GroupClusterList
+                com.example.madclass01.presentation.group.screen.GroupClusterListScreen(
+                    groupId = groupClusterList.groupId,
+                    currentUserId = userId ?: "mock_user",
+                    onBackPress = {
+                        currentScreen = AppScreen.GroupCluster(groupClusterList.groupId)
+                    },
+                    onClusterGroupSaved = { newGroupId ->
+                        currentScreen = AppScreen.GroupDetail(newGroupId)
+                    }
+                )
+            }
         AppScreen.Home -> {
             com.example.madclass01.presentation.main.MainScreen(
                 userId = userId,  // userId 전달

@@ -9,6 +9,7 @@ import com.example.madclass01.data.remote.dto.SubgroupClusterRequest
 import com.example.madclass01.data.remote.dto.SubgroupItemResponse
 import com.example.madclass01.data.repository.ApiResult
 import com.example.madclass01.data.repository.BackendRepository
+import com.example.madclass01.domain.usecase.CreateGroupUseCase
 import com.example.madclass01.domain.usecase.GetGroupDetailUseCase
 import com.example.madclass01.domain.usecase.GetRelationshipGraphUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,6 +34,7 @@ data class GroupClusterUiState(
     val subgroupRooms: Map<Int, SubgroupRoom> = emptyMap(),
     val enterRoom: SubgroupRoom? = null,
     val isCreatingRoom: Boolean = false,
+    val isSavingCluster: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String = "",
     val customClusterNames: Map<Int, String> = emptyMap() // Key: Cluster ID (Index), Value: Custom Name
@@ -49,6 +51,7 @@ data class SubgroupRoom(
 class GroupClusterViewModel @Inject constructor(
     private val getGroupDetailUseCase: GetGroupDetailUseCase,
     private val getRelationshipGraphUseCase: GetRelationshipGraphUseCase,
+    private val createGroupUseCase: CreateGroupUseCase,
     private val backendRepository: BackendRepository
 ) : ViewModel() {
 
@@ -89,6 +92,74 @@ class GroupClusterViewModel @Inject constructor(
                 clusters = clusters,
                 isLoading = false
             )
+        }
+    }
+
+    fun saveClusterAsGroup(
+        cluster: ClusterGroup,
+        name: String,
+        description: String?,
+        iconType: String?,
+        creatorId: String,
+        onComplete: (Result<String>) -> Unit
+    ) {
+        val parentGroup = _uiState.value.group
+        val tags = parentGroup?.tags?.map { it.name } ?: emptyList()
+        val region = parentGroup?.region?.takeIf { it.isNotBlank() }
+        val defaultIcon = parentGroup?.iconType ?: "users"
+        val imageUrl = parentGroup?.imageUrl?.takeIf { it.isNotBlank() }
+        val finalDescription = description?.takeIf { it.isNotBlank() }
+            ?: parentGroup?.description?.takeIf { it.isNotBlank() }
+            ?: "소그룹 ${cluster.id + 1}"
+        val isPublic = parentGroup?.isPublic ?: true
+
+        if (name.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                errorMessage = "그룹 이름을 입력해주세요"
+            )
+            onComplete(Result.failure(IllegalArgumentException("그룹 이름이 필요합니다")))
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                isSavingCluster = true,
+                errorMessage = ""
+            )
+            val result = createGroupUseCase(
+                name = name,
+                description = finalDescription,
+                iconType = iconType ?: defaultIcon,
+                tags = tags,
+                region = region,
+                imageUrl = imageUrl,
+                isPublic = isPublic,
+                userId = creatorId
+            )
+
+        result.onSuccess { group ->
+            cluster.members.map { it.userId }
+                .distinct()
+                .filter { it.isNotBlank() && it != creatorId }
+                .forEach { memberId ->
+                    when (backendRepository.addGroupMember(group.id, memberId)) {
+                        is ApiResult.Error -> {
+                            // best effort; ignore for now
+                        }
+                        else -> Unit
+                    }
+                }
+            _uiState.value = _uiState.value.copy(isSavingCluster = false)
+            onComplete(Result.success(group.id))
+        }
+
+            result.onFailure { throwable ->
+                _uiState.value = _uiState.value.copy(
+                    isSavingCluster = false,
+                    errorMessage = throwable.message ?: "그룹 저장에 실패했습니다"
+                )
+                onComplete(Result.failure(throwable))
+            }
         }
     }
 

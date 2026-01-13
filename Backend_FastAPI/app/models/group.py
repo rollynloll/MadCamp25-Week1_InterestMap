@@ -1,6 +1,7 @@
 """
+DB: groups
 - id (UUID, PK)
-- name (VARCHAR(80), NOT NULL, UNIQUE)
+- name (VARCHAR(80), NOT NULL)
 - description (VARCHAR(255), NULL)
 - created_by (UUID, FK -> users.id, NULL)   # seed group이면 NULL도 가능
 - group_profile (JSONB, NOT NULL, default={})  # 그룹 취향/성격 데이터
@@ -32,7 +33,7 @@ class Group(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
-    name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
     description: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     created_by: Mapped[uuid.UUID | None] = mapped_column(
