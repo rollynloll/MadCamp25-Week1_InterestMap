@@ -1,36 +1,42 @@
 package com.example.madclass01.presentation.group.screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,14 +44,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,13 +74,19 @@ fun GroupClusterScreen(
     var selectedClusterId by remember { mutableStateOf<Int?>(null) }
     val clusterCount = uiState.clusterCount
 
-    LaunchedEffect(uiState.enterRoom) {
-        val room = uiState.enterRoom
-        if (room != null) {
-            onEnterSubgroup(room.id, room.name, room.memberCount)
-            viewModel.resetEnterRoom()
-        }
-    }
+    // Consistent Color Palette
+    val clusterColors = listOf(
+        Color(0xFFFF9F45), // Orange
+        Color(0xFF2CB1BC), // Teal
+        Color(0xFF4C6EF5), // Blue
+        Color(0xFF9B59B6), // Purple
+        Color(0xFF27AE60), // Green
+        Color(0xFFE67E22)  // Dark Orange
+    )
+
+    // Primary Theme Colors
+    val primaryColor = Color(0xFFB85A16)
+    val primaryContainer = Color(0xFFFFE4D0)
 
     LaunchedEffect(groupId, currentUserId) {
         viewModel.load(groupId, currentUserId)
@@ -91,302 +103,336 @@ fun GroupClusterScreen(
                 title = {
                     Text(
                         text = uiState.group?.name ?: "소그룹 나누기",
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackPress) {
                         Icon(imageVector = Icons.Default.ArrowBack, contentDescription = "뒤로가기")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.White
+                )
             )
         },
-        bottomBar = {
-            Surface(
-                tonalElevation = 4.dp,
-                shadowElevation = 4.dp,
-                color = Color.White
-            ) {
-                Button(
-                    onClick = {
-                        activeClusterId?.let { viewModel.enterSubgroupRoom(groupId, it) }
-                    },
-                    enabled = showSubgroupButton && activeClusterId != null && !uiState.isCreatingRoom,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B7A49)),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    Text(
-                        text = if (uiState.isCreatingRoom) "방 준비 중..." else "소그룹 채팅 시작하기",
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                }
-            }
-        }
+        containerColor = Color.White
     ) { paddingValues ->
         val bottomPadding = 16.dp
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .padding(horizontal = 20.dp) // Increased padding for cleaner look
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = bottomPadding + 64.dp)
-                    .background(Color.White)
-                    .verticalScroll(scrollState)
-                    .padding(horizontal = 16.dp)
-            ) {
-                when {
-                    uiState.isLoading -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary,
-                                strokeWidth = 3.dp
-                            )
-                        }
-                    }
-                    uiState.errorMessage.isNotEmpty() -> {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = uiState.errorMessage,
-                                color = MaterialTheme.colorScheme.error,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
-                    else -> {
-                        Text(
-                            text = "취향지도 기반 3개 소그룹",
+            when {
+                uiState.isLoading -> {
+                    LoadingView(primaryColor)
+                }
+                uiState.errorMessage.isNotEmpty() -> {
+                    ErrorView(uiState.errorMessage)
+                }
+                else -> {
+                    // Header Section
+                    Text(
+                        text = "취향지도 기반 ${clusterCount}개 소그룹",
+                        style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 12.dp)
-                        )
+                            fontSize = 20.sp
+                        ),
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                    )
+                    Text(
+                        text = "취향이 비슷한 멤버끼리 뭉쳐보세요.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(bottom = 20.dp)
+                    )
 
                     if (uiState.relationshipGraph != null) {
-                        val clusterColors = listOf(
-                                Color(0xFFFF9F45),
-                                Color(0xFF2CB1BC),
-                                Color(0xFF4C6EF5),
-                                Color(0xFF9B59B6),
-                                Color(0xFF27AE60),
-                                Color(0xFFE67E22)
-                            )
-                            val memberColorMap = uiState.clusters.flatMap { cluster ->
-                                val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
+                        val memberColorMap = remember(uiState.clusters) {
+                            uiState.clusters.flatMap { cluster ->
+                                val color = clusterColors.getOrNull(cluster.id) ?: Color.Gray
                                 cluster.members.map { it.userId to color }
                             }.toMap()
-                            val memberClusterMap = uiState.clusters.flatMap { cluster ->
+                        }
+                        val memberClusterMap = remember(uiState.clusters) {
+                            uiState.clusters.flatMap { cluster ->
                                 cluster.members.map { it.userId to cluster.id }
                             }.toMap()
+                        }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "소그룹 수: $clusterCount",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                    color = Color(0xFFB85A16)
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.updateClusterCount((clusterCount - 1).coerceAtLeast(2))
-                                            selectedClusterId = null
-                                        },
-                                        enabled = clusterCount > 2,
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text(
-                                            text = "-",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = Color(0xFFB85A16)
-                                        )
-                                    }
-                                    Button(
-                                        onClick = {
-                                            viewModel.updateClusterCount((clusterCount + 1).coerceAtMost(6))
-                                            selectedClusterId = null
-                                        },
-                                        enabled = clusterCount < 6,
-                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE4D0)),
-                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                        modifier = Modifier.height(32.dp)
-                                    ) {
-                                        Text(
-                                            text = "+",
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp,
-                                            color = Color(0xFFB85A16)
-                                        )
-                                    }
-                                }
-                            }
+                        // 1. Control Panel (Cluster Count)
+                        ClusterControlRow(
+                            clusterCount = clusterCount,
+                            onDecrease = {
+                                viewModel.updateClusterCount((clusterCount - 1).coerceAtLeast(2))
+                                selectedClusterId = null
+                            },
+                            onIncrease = {
+                                viewModel.updateClusterCount((clusterCount + 1).coerceAtMost(6))
+                                selectedClusterId = null
+                            },
+                            primaryColor = primaryColor,
+                            containerColor = primaryContainer
+                        )
 
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 2. Filter Chips
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(bottom = 12.dp)
                                 .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(
+                            val isAllSelected = selectedClusterId == null
+                            FilterChip(
+                                selected = isAllSelected,
                                 onClick = { selectedClusterId = null },
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (selectedClusterId == null) Color(0xFFB85A16) else Color(0xFFFFE4D0),
-                                        contentColor = if (selectedClusterId == null) Color.White else Color(0xFFB85A16)
+                                label = { Text("전체 보기") },
+                                enabled = true,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = primaryContainer,
+                                    selectedLabelColor = primaryColor,
+                                    containerColor = Color.Transparent,
+                                    labelColor = Color.Gray
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    enabled = true,
+                                    selected = isAllSelected,
+                                    borderColor = if (isAllSelected) primaryColor else Color.LightGray,
+                                    selectedBorderColor = primaryColor,
+                                    borderWidth = 1.dp
+                                ),
+                                shape = RoundedCornerShape(20.dp)
+                            )
+
+                            uiState.clusters.forEach { cluster ->
+                                val isSelected = selectedClusterId == cluster.id
+                                val color = clusterColors.getOrNull(cluster.id) ?: Color.Gray
+                                
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = {
+                                        selectedClusterId = if (isSelected) null else cluster.id
+                                    },
+                                    label = { Text("그룹 ${cluster.id + 1}") },
+                                    enabled = true,
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = color.copy(alpha = 0.2f),
+                                        selectedLabelColor = color, // Use cluster color specifically
+                                        containerColor = Color.Transparent,
+                                        labelColor = Color.Gray
                                     ),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                    modifier = Modifier.height(36.dp)
-                                ) {
-                                    Text(
-                                        text = "전체 보기",
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                uiState.clusters.forEach { cluster ->
-                                    val isSelected = selectedClusterId == cluster.id
-                                    val color = clusterColors.getOrNull(cluster.id) ?: Color(0xFF9CA3AF)
-                                    Button(
-                                        onClick = {
-                                            selectedClusterId = if (isSelected) null else cluster.id
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (isSelected) color else Color(0xFFFFE4D0),
-                                            contentColor = if (isSelected) Color.White else Color(0xFFB85A16)
-                                        ),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                        modifier = Modifier.height(36.dp)
-                                    ) {
-                                        Text(
-                                            text = "그룹 ${cluster.id + 1}",
-                                            fontWeight = FontWeight.SemiBold,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
+                                    border = FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = isSelected,
+                                        borderColor = if (isSelected) color else Color.LightGray,
+                                        selectedBorderColor = color,
+                                        borderWidth = 1.dp
+                                    ),
+                                    shape = RoundedCornerShape(20.dp)
+                                )
                             }
+                        }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(460.dp)
-                                    .background(Color(0xFFFAFBFC))
-                            ) {
-                                ZoomableGraphContainer(modifier = Modifier.fillMaxSize()) { scale ->
-                                    val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
-                                    RelationshipGraphComponent(
-                                        relationshipGraph = uiState.relationshipGraph!!,
-                                        nodeScale = nodeScale,
-                                        nodeColorProvider = { userId ->
-                                            val clusterId = memberClusterMap[userId]
-                                            when {
-                                                selectedClusterId == null -> memberColorMap[userId]
-                                                clusterId == selectedClusterId -> memberColorMap[userId]
-                                                else -> Color(0xFFE5E7EB)
-                                            }
-                                        },
-                                        nodeZIndexProvider = { userId ->
-                                            val clusterId = memberClusterMap[userId]
-                                            if (selectedClusterId != null && clusterId == selectedClusterId) 1f else 0f
-                                        },
-                                        onNodeClick = {},
-                                        onNodeLongClick = {}
-                                    )
-                                }
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // 3. Graph Container
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f) // Fill remaining space but leave room for button
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(Color(0xFFF8F9FA)) // Softer background
+                                .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(24.dp))
+                        ) {
+                            ZoomableGraphContainer(modifier = Modifier.fillMaxSize()) { scale ->
+                                val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
+                                RelationshipGraphComponent(
+                                    relationshipGraph = uiState.relationshipGraph!!,
+                                    nodeScale = nodeScale,
+                                    nodeColorProvider = { userId ->
+                                        val clusterId = memberClusterMap[userId]
+                                        if (selectedClusterId == null) {
+                                            memberColorMap[userId] ?: Color.Gray
+                                        } else if (clusterId == selectedClusterId) {
+                                            memberColorMap[userId] ?: Color.Gray
+                                        } else {
+                                            Color(0xFFE0E0E0) // De-emphasized color
+                                        }
+                                    },
+                                    nodeZIndexProvider = { userId ->
+                                        val clusterId = memberClusterMap[userId]
+                                        if (selectedClusterId != null && clusterId == selectedClusterId) 1f else 0f
+                                    },
+                                    onNodeClick = {},
+                                    onNodeLongClick = {}
+                                )
                             }
-
-                        } else {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // Interaction Hint
                             Text(
-                                text = "그래프 데이터를 불러오지 못했어요.",
-                                color = Color(0xFF777777),
-                                fontSize = 13.sp
+                                text = "💡 핀치하여 확대/축소",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.Gray,
+                                modifier = Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .padding(16.dp)
                             )
                         }
+
+                    } else {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(300.dp)
+                                .background(Color(0xFFF5F5F5), RoundedCornerShape(16.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "(데이터 없음)",
+                                color = Color.Gray,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 4. Bottom Action Card
                     Card(
                         onClick = onViewGroups,
                         modifier = Modifier
                             .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4D0)),
-                            shape = RoundedCornerShape(16.dp)
+                            .padding(bottom = 24.dp)
+                            .height(56.dp), // Fixed comfortable height
+                        colors = CardDefaults.cardColors(
+                            containerColor = primaryContainer
+                        ),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "소그룹 보기",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    color = Color(0xFFB85A16)
+                            Text(
+                                text = "소그룹별 멤버 확인하기",
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = primaryColor
                                 )
-                                Text(
-                                    text = "멤버 리스트 확인",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFB85A16)
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Card(
-                            onClick = onViewGroups,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFE4D0)),
-                            shape = RoundedCornerShape(16.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 14.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "소그룹 보기",
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 15.sp,
-                                    color = Color(0xFFB85A16)
-                                )
-                                Text(
-                                    text = "멤버 리스트 확인",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFFB85A16)
-                                )
-                            }
+                            )
                         }
                     }
                 }
             }
-
+        }
     }
 }
+
+@Composable
+private fun ClusterControlRow(
+    clusterCount: Int,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit,
+    primaryColor: Color,
+    containerColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column {
+            Text(
+                text = "소그룹 개수 설정",
+                style = MaterialTheme.typography.labelLarge,
+                color = Color.Gray
+            )
+        }
+        
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            IconButton(
+                onClick = onDecrease,
+                enabled = clusterCount > 2,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = containerColor,
+                    contentColor = primaryColor,
+                    disabledContainerColor = Color(0xFFF5F5F5),
+                    disabledContentColor = Color.LightGray
+                ),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Remove,
+                    contentDescription = "Decrease",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Text(
+                text = "$clusterCount",
+                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                modifier = Modifier.width(20.dp).align(Alignment.CenterVertically),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            IconButton(
+                onClick = onIncrease,
+                enabled = clusterCount < 6,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = containerColor,
+                    contentColor = primaryColor,
+                    disabledContainerColor = Color(0xFFF5F5F5),
+                    disabledContentColor = Color.LightGray
+                ),
+                modifier = Modifier.size(36.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Increase",
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingView(color: Color) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        CircularProgressIndicator(
+            color = color,
+            strokeWidth = 3.dp
+        )
+    }
+}
+
+@Composable
+private fun ErrorView(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
 }
 
 @Composable
