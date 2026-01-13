@@ -271,73 +271,24 @@ fun ZoomableImage(
                     }
                 }
             )
-            // Custom 2-finger zoom gesture - does NOT consume 1-finger events
+            // Use standard detectTransformGestures for smoother pinch-to-zoom
             .pointerInput(Unit) {
-                awaitEachGesture {
-                    // Wait for first finger down
-                    val firstDown = awaitFirstDown(requireUnconsumed = false)
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val newScale = (scale * zoom).coerceIn(1f, 5f)
                     
-                    // Wait to see if a second finger comes down
-                    var secondPointer: androidx.compose.ui.input.pointer.PointerId? = null
-                    var event = awaitPointerEvent()
-                    
-                    // Check if we have 2+ fingers within a small window
-                    while (event.changes.size < 2) {
-                        val change = event.changes.firstOrNull { it.id != firstDown.id && it.pressed }
-                        if (change != null) {
-                            secondPointer = change.id
-                            break
-                        }
+                    if (newScale > 1f) {
+                        val newOffset = offset + pan
+                        val maxX = (size.width * (newScale - 1)) / 2f
+                        val maxY = (size.height * (newScale - 1)) / 2f
                         
-                        // If the first finger is released before second touches, exit
-                        if (event.changes.none { it.id == firstDown.id && it.pressed }) {
-                            return@awaitEachGesture // Let other handlers process this
-                        }
-                        
-                        // If movement exceeds threshold with 1 finger, it's a swipe - let pager handle it
-                        val dragDistance = (event.changes.first().position - firstDown.position).getDistance()
-                        if (dragDistance > 20f) {
-                            return@awaitEachGesture // Exit without consuming - allow pager swipe
-                        }
-                        
-                        event = awaitPointerEvent()
-                    }
-                    
-                    // We have 2+ fingers - now handle pinch zoom
-                    if (event.changes.size >= 2) {
-                        var previousCentroid = event.calculateCentroid()
-                        var previousSpan = calculateSpan(event)
-                        
-                        do {
-                            event = awaitPointerEvent()
-                            val currentCentroid = event.calculateCentroid()
-                            val currentSpan = calculateSpan(event)
-                            
-                            if (previousSpan > 0f && currentSpan > 0f) {
-                                val zoomChange = currentSpan / previousSpan
-                                val newScale = (scale * zoomChange).coerceIn(1f, 5f)
-                                scale = newScale
-                                
-                                if (newScale > 1.01f) {
-                                    val panChange = currentCentroid - previousCentroid
-                                    val maxX = (size.width * (newScale - 1)) / 2f
-                                    val maxY = (size.height * (newScale - 1)) / 2f
-                                    val newOffset = offset + panChange
-                                    offset = Offset(
-                                        x = newOffset.x.coerceIn(-maxX, maxX),
-                                        y = newOffset.y.coerceIn(-maxY, maxY)
-                                    )
-                                } else {
-                                    offset = Offset.Zero
-                                }
-                            }
-                            
-                            previousCentroid = currentCentroid
-                            previousSpan = currentSpan
-                            
-                            // Consume events to prevent other handlers
-                            event.changes.forEach { it.consume() }
-                        } while (event.changes.any { it.pressed })
+                        scale = newScale
+                        offset = Offset(
+                            x = newOffset.x.coerceIn(-maxX, maxX),
+                            y = newOffset.y.coerceIn(-maxY, maxY)
+                        )
+                    } else {
+                        scale = 1f
+                        offset = Offset.Zero
                     }
                 }
             }
@@ -348,17 +299,9 @@ fun ZoomableImage(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .fillMaxSize()
-                .systemBarsPadding() // Ensure image fits within safe area (excludes status/nav bars)
+                .systemBarsPadding() 
         )
     }
-}
-
-private fun calculateSpan(event: androidx.compose.ui.input.pointer.PointerEvent): Float {
-    val pointers = event.changes.filter { it.pressed }
-    if (pointers.size < 2) return 0f
-    val dx = pointers[0].position.x - pointers[1].position.x
-    val dy = pointers[0].position.y - pointers[1].position.y
-    return kotlin.math.sqrt(dx * dx + dy * dy)
 }
 
 private fun shareImage(context: Context, imageUrl: String) {
