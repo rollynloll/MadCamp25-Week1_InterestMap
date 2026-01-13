@@ -95,16 +95,11 @@ fun GroupDetailScreen(
         floatingActionButton = {
             // 로딩 중이 아니고 에러가 없거나(혹은 목업 모드일 때) FAB 표시
             if (!uiState.isLoading && (!hasError || isMockMode) && !uiState.isSpectator) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    GradientExtendedFloatingActionButton(
-                        onClick = onClusterClick,
-                        text = "2차 가기",
-                        icon = Icons.Default.Person
-                    )
-
+                    // 그룹 채팅 (위)
                     GradientExtendedFloatingActionButton(
                         onClick = {
                             if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
@@ -113,8 +108,17 @@ fun GroupDetailScreen(
                                 viewModel.startGroupChat(groupId)
                             }
                         },
-                        text = if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) "1:1 채팅하기" else "그룹 채팅방 입장",
-                        icon = Icons.AutoMirrored.Filled.Chat
+                        text = if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) "1:1 채팅" else "그룹 채팅",
+                        icon = Icons.AutoMirrored.Filled.Chat,
+                        isLarge = false
+                    )
+
+                    // 2차 가기 (아래, 더 크게)
+                    GradientExtendedFloatingActionButton(
+                        onClick = onClusterClick,
+                        text = "2차 가기",
+                        icon = Icons.Default.Person,
+                        isLarge = true
                     )
                 }
             }
@@ -326,14 +330,20 @@ fun ErrorView(
 fun GradientExtendedFloatingActionButton(
     onClick: () -> Unit,
     text: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isLarge: Boolean = false
 ) {
+    val horizontalPadding = if (isLarge) 18.dp else 14.dp
+    val verticalPadding = if (isLarge) 12.dp else 10.dp
+    val iconSize = if (isLarge) 20.dp else 18.dp
+    val fontSize = if (isLarge) 14.sp else 13.sp
+    
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.Transparent,
-        shadowElevation = 8.dp,
-        modifier = Modifier.padding(bottom = 16.dp)
+        shadowElevation = 6.dp,
+        modifier = Modifier.padding(bottom = 4.dp)
     ) {
         Row(
             modifier = Modifier
@@ -342,21 +352,21 @@ fun GradientExtendedFloatingActionButton(
                         colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
                     )
                 )
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = horizontalPadding, vertical = verticalPadding),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(iconSize)
             )
             Text(
                 text = text,
                 color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+                fontSize = fontSize,
+                fontWeight = FontWeight.SemiBold
             )
         }
     }

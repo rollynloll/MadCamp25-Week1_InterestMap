@@ -61,6 +61,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -367,22 +368,26 @@ fun ProfileContent(
 
                 // Bio
                 if (!bio.isNullOrBlank()) {
+                    var bioLayoutResult by remember { mutableStateOf<androidx.compose.ui.text.TextLayoutResult?>(null) }
+                    val needsMore = bioLayoutResult?.hasVisualOverflow == true
+                    
                     Text(
                         text = bio,
                         fontSize = 13.sp,
                         color = Color.White.copy(alpha = 0.95f),
                         textAlign = TextAlign.Center,
-                        maxLines = 2, // Reduced lines
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        onTextLayout = { result -> bioLayoutResult = result },
                         modifier = Modifier
                             .fillMaxWidth(0.8f)
                             .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                             .padding(vertical = 6.dp, horizontal = 16.dp)
                     )
-                    val needsMore = bio.lines().size > 2 || bio.length > 120
                     if (needsMore) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "자세히 보기",
+                            text = "더보기",
                             color = Color.White.copy(alpha = 0.8f),
                             fontSize = 11.sp,
                             modifier = Modifier
@@ -392,24 +397,8 @@ fun ProfileContent(
                         )
                     }
                 }
-                if (showBioDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showBioDialog = false },
-                        title = { Text(text = "자기소개", fontWeight = FontWeight.Bold) },
-                        text = {
-                            Text(
-                                text = bio ?: "",
-                                fontSize = 14.sp,
-                                color = Color.Black
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showBioDialog = false }) {
-                                Text(text = "닫기")
-                            }
-                        },
-                        modifier = Modifier.padding(16.dp)
-                    )
+                if (showBioDialog && !bio.isNullOrBlank()) {
+                    BioDetailDialog(bio = bio, onDismiss = { showBioDialog = false })
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -605,6 +594,53 @@ fun AllTagsDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Close", color = Color(0xFF333333), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun BioDetailDialog(
+    bio: String,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "자기소개",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF9945)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = bio,
+                    fontSize = 14.sp,
+                    color = Color(0xFF333333),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                androidx.compose.material3.TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("닫기", color = Color(0xFF333333), fontWeight = FontWeight.SemiBold)
                 }
             }
         }
