@@ -21,12 +21,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -34,7 +35,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -95,7 +95,6 @@ fun GroupClusterScreen(
     val defaultClusterId = uiState.clusters.firstOrNull()?.id
     val activeClusterId = selectedClusterId ?: defaultClusterId
     val showSubgroupButton = uiState.relationshipGraph != null
-    val scrollState = rememberScrollState()
 
     Scaffold(
         topBar = {
@@ -116,14 +115,25 @@ fun GroupClusterScreen(
                 )
             )
         },
-        containerColor = Color.White
+        containerColor = Color.White,
+        floatingActionButton = {
+            if (!uiState.isLoading && uiState.errorMessage.isEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = onViewGroups,
+                    containerColor = primaryColor,
+                    contentColor = Color.White,
+                    icon = { Icon(Icons.Default.Group, contentDescription = null) },
+                    text = { Text(text = "멤버 확인하기", fontWeight = FontWeight.Bold) }
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center
     ) { paddingValues ->
-        val bottomPadding = 16.dp
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 20.dp) // Increased padding for cleaner look
+                .padding(horizontal = 20.dp)
         ) {
             when {
                 uiState.isLoading -> {
@@ -243,7 +253,8 @@ fun GroupClusterScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f) // Fill remaining space but leave room for button
+                                .weight(1f) // Occupy remaining space
+                                .padding(bottom = 80.dp) // Space for FAB
                                 .clip(RoundedCornerShape(24.dp))
                                 .background(Color(0xFFF8F9FA)) // Softer background
                                 .border(1.dp, Color(0xFFEEEEEE), RoundedCornerShape(24.dp))
@@ -299,35 +310,6 @@ fun GroupClusterScreen(
                             )
                         }
                         Spacer(modifier = Modifier.weight(1f))
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 4. Bottom Action Card
-                    Card(
-                        onClick = onViewGroups,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 24.dp)
-                            .height(56.dp), // Fixed comfortable height
-                        colors = CardDefaults.cardColors(
-                            containerColor = primaryContainer
-                        ),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = "소그룹별 멤버 확인하기",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = primaryColor
-                                )
-                            )
-                        }
                     }
                 }
             }
