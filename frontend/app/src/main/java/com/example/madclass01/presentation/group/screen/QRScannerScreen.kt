@@ -51,6 +51,9 @@ fun QRScannerScreen(
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     
+    // Handle system back press
+    androidx.activity.compose.BackHandler(onBack = onBackPress)
+    
     var hasCameraPermission by remember { mutableStateOf(false) }
     var scannedUrl by remember { mutableStateOf<String?>(null) }
     

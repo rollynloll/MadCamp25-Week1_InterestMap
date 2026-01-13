@@ -49,6 +49,9 @@ fun QRInviteScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // Handle system back press
+    androidx.activity.compose.BackHandler(onBack = onBackPress)
 
     var showCopyToast by remember { mutableStateOf(false) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }

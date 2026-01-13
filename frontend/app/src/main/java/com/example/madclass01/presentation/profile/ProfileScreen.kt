@@ -97,6 +97,16 @@ fun ProfileScreen(
     // State for Full Screen Image Viewer
     var selectedImageIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Handle system back press
+    // If viewing an image OR if onBack is provided (e.g. from GroupDetail), intercept back press
+    androidx.activity.compose.BackHandler(enabled = selectedImageIndex != null || onBack != null) {
+        if (selectedImageIndex != null) {
+            selectedImageIndex = null
+        } else {
+            onBack?.invoke()
+        }
+    }
+
     LaunchedEffect(userId) {
         if (userId != null) {
             viewModel.loadProfile(userId)
@@ -200,21 +210,20 @@ fun ProfileContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Top Bar with Edit Button
-                Row(
+                // Combined Header Section (Back Button, Profile Image, Edit Button)
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 16.dp, vertical = 10.dp) // Reduced padding
                 ) {
-                    // Back Button
+                    // Back Button (Top Aligned)
                     if (onBack != null) {
                         IconButton(
                             onClick = onBack,
                             modifier = Modifier
                                 .size(36.dp)
                                 .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                                .align(Alignment.TopStart)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ChevronLeft,
@@ -222,58 +231,56 @@ fun ProfileContent(
                                 tint = Color.White
                             )
                         }
-                    } else {
-                        Spacer(modifier = Modifier.size(36.dp))
                     }
 
-                    // Edit Button
+                    // Profile Image (Centered, Larger)
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(140.dp) // Increased size
+                            .border(3.dp, Color.White, CircleShape)
+                            .padding(3.dp)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .align(Alignment.Center)
+                    ) {
+                        if (images.isNotEmpty()) {
+                            AsyncImage(
+                                model = images.first(),
+                                contentDescription = "Profile Picture",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                text = nickname?.take(2) ?: "MY",
+                                fontSize = 48.sp, // Increased font size for larger circle
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFF9945)
+                            )
+                        }
+                    }
+
+                    // Edit Button (Top Right Aligned)
                     if (onEditClick != null) {
                         IconButton(
                             onClick = onEditClick,
                             modifier = Modifier
-                                .size(36.dp)
+                                .size(32.dp)
                                 .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                                .align(Alignment.TopEnd)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit Profile",
                                 tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
-                    } else {
-                        Spacer(modifier = Modifier.size(36.dp))
                     }
                 }
 
-                // Profile Image with Border (Smaller)
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(100.dp) // Reduced from 120.dp
-                        .border(3.dp, Color.White, CircleShape)
-                        .padding(3.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                ) {
-                    if (images.isNotEmpty()) {
-                        AsyncImage(
-                            model = images.first(),
-                            contentDescription = "Profile Picture",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        Text(
-                            text = nickname?.take(2) ?: "MY",
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFFF9945)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(4.dp)) // Reduced spacing to name
 
                 // Name and Gender
                 Row(
@@ -440,7 +447,7 @@ fun ProfileContent(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "My Gallery",
+                    text = "Mood & Interest",
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF333333)

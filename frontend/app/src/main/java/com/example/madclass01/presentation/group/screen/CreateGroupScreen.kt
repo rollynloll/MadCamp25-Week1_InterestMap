@@ -3,6 +3,7 @@
 package com.example.madclass01.presentation.group.screen
 
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -53,6 +54,9 @@ fun CreateGroupScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Handle system back press
+    BackHandler(onBack = (if (!uiState.isLoading) onBackPress else { }) as () -> Unit)
     
     var tagInputValue by remember { mutableStateOf("") }
     var regionExpanded by remember { mutableStateOf(false) }

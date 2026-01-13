@@ -38,39 +38,72 @@ class ProfileEditViewModel @Inject constructor(
     fun updateProfile(
         userId: String,
         nickname: String,
+        profileImageUrl: String?,
         age: Int?,
         region: String?,
         bio: String,
-        tags: List<String>
+        tags: List<String>,
+        keptImageUrls: List<String>,
+        newImageFiles: List<File>
     ) {
         viewModelScope.launch {
-            android.util.Log.d("ProfileEditViewModel", "저장눌림")
+            android.util.Log.d("ProfileEditViewModel", "저장 시작: Kept=${keptImageUrls.size}, New=${newImageFiles.size}")
             _uiState.value = _uiState.value.copy(isLoading = true, error = null, isSuccess = false)
 
-            val profileData = mapOf(
-                "age" to (age ?: ""),
-                "region" to (region ?: ""),
-                "bio" to bio,
-                "interests" to tags
-            )
-
-            // 텍스트 정보만 업데이트 (profileImageUrl은 null로 보내면 기존 값 유지되도록 처리)
-            val updateResult = backendRepository.updateUser(
-                userId = userId,
-                nickname = nickname,
-                profileData = profileData
-            )
-            
-            android.util.Log.d("ProfileEditViewModel", "Update result: $updateResult")
-
-            when (updateResult) {
-                is ApiResult.Success -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+            try {
+                // 1. Delete Removed Photos
+                val serverPhotosResult = backendRepository.getUserPhotos(userId)
+                if (serverPhotosResult is ApiResult.Success) {
+                    val serverPhotos = serverPhotosResult.data
+                    val keptSet = keptImageUrls.toSet()
+                    
+                    val photosToDelete = serverPhotos.filter { photo ->
+                        val resolvedUrl = UrlResolver.resolve(photo.fileUrl.ifBlank { photo.filePath })
+                        resolvedUrl !in keptSet
+                    }
+                    
+                    photosToDelete.forEach { photo ->
+                        android.util.Log.d("ProfileEditViewModel", "Deleting photo: ${photo.id}")
+                        backendRepository.deletePhoto(photo.id.toString()) 
+                    }
                 }
-                is ApiResult.Error -> {
-                    _uiState.value = _uiState.value.copy(isLoading = false, error = updateResult.message)
+
+                // 2. Upload New Photos
+                if (newImageFiles.isNotEmpty()) {
+                    newImageFiles.forEach { file ->
+                         android.util.Log.d("ProfileEditViewModel", "Uploading file: ${file.name}")
+                         backendRepository.uploadPhoto(userId, file)
+                    }
                 }
-                else -> {}
+
+                // 3. Update Text Profile & Profile Image
+                val profileData = mapOf(
+                    "age" to (age ?: ""),
+                    "region" to (region ?: ""),
+                    "bio" to bio,
+                    "interests" to tags
+                )
+
+                val updateResult = backendRepository.updateUser(
+                    userId = userId,
+                    nickname = nickname,
+                    profileImageUrl = profileImageUrl, // Explicitly pass profile image URL
+                    profileData = profileData
+                )
+                
+                android.util.Log.d("ProfileEditViewModel", "Update result: $updateResult")
+
+                when (updateResult) {
+                    is ApiResult.Success -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+                    }
+                    is ApiResult.Error -> {
+                        _uiState.value = _uiState.value.copy(isLoading = false, error = updateResult.message)
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                 _uiState.value = _uiState.value.copy(isLoading = false, error = e.message ?: "Unknown error")
             }
         }
     }
@@ -89,37 +122,19 @@ class ProfileEditViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isUploadingImage = true, error = null)
             
-            val uploadResult = backendRepository.uploadPhoto(userId, imageFile)
+            // Use the new dedicated endpoint that avoids creating UserPhoto entries
+            val uploadResult = backendRepository.uploadOnlyProfileImage(userId, imageFile)
             
             when (uploadResult) {
                 is ApiResult.Success -> {
-                    val photoUrl = uploadResult.data.fileUrl
+                    val photoUrl = uploadResult.data.profileImageUrl ?: ""
                     val resolvedPhotoUrl = UrlResolver.resolve(photoUrl)
                     android.util.Log.d("ProfileEditViewModel", "Profile image uploaded: $photoUrl")
                     
-                    // URL을 프로필 이미지로 업데이트
-                    val updateResult = backendRepository.updateUser(
-                        userId = userId,
-                        nickname = null,  // 닉네임은 변경하지 않음
-                        profileImageUrl = photoUrl,
-                        profileData = null
+                    _uiState.value = _uiState.value.copy(
+                        isUploadingImage = false,
+                        uploadedProfileImageUrl = resolvedPhotoUrl
                     )
-                    
-                    when (updateResult) {
-                        is ApiResult.Success -> {
-                            _uiState.value = _uiState.value.copy(
-                                isUploadingImage = false,
-                                uploadedProfileImageUrl = resolvedPhotoUrl
-                            )
-                        }
-                        is ApiResult.Error -> {
-                            _uiState.value = _uiState.value.copy(
-                                isUploadingImage = false,
-                                error = updateResult.message
-                            )
-                        }
-                        else -> {}
-                    }
                 }
                 is ApiResult.Error -> {
                     _uiState.value = _uiState.value.copy(

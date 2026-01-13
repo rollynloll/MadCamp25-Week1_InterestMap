@@ -14,6 +14,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -26,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.presentation.group.component.GroupCard
 import com.example.madclass01.presentation.group.viewmodel.GroupListViewModel
+import java.lang.System.currentTimeMillis
 
 @Composable
 fun GroupListScreen(
@@ -46,6 +49,21 @@ fun GroupListScreen(
 
     LaunchedEffect(refreshTrigger) {
         viewModel.loadMyGroups()
+    }
+    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var backPressedTime by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+
+    // Double back to exit logic
+    androidx.activity.compose.BackHandler {
+        val currentTime = currentTimeMillis()
+        if (currentTime - backPressedTime <= 2000) {
+            // Exit app
+            (context as? android.app.Activity)?.finish()
+        } else {
+            backPressedTime = currentTime
+            android.widget.Toast.makeText(context, "'뒤로' 버튼을 한번 더 누르면 종료됩니다.", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
     
     // Gradient Brush
