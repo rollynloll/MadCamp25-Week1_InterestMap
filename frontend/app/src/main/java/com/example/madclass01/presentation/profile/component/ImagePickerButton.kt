@@ -12,8 +12,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Canvas
 
 @Composable
 fun ImagePickerButton(
@@ -23,23 +27,29 @@ fun ImagePickerButton(
     Box(
         modifier = modifier
             .size(100.dp)
-            .background(
-                color = Color.White,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .border(
-                width = 2.dp,
-                color = Color(0xFFFF9945),
-                shape = RoundedCornerShape(12.dp)
-            )
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFF9F9F9))
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
+        // Optional: Draw a dashed border for a "placeholder" feel
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val stroke = Stroke(
+                width = 2.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+            )
+            drawRoundRect(
+                color = Color(0xFFE0E0E0),
+                size = size,
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+            )
+        }
+
         Icon(
             imageVector = Icons.Default.Add,
             contentDescription = "이미지 추가",
             tint = Color(0xFFFF9945),
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(32.dp)
         )
     }
 }

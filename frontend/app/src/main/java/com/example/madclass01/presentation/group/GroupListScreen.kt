@@ -16,6 +16,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -41,39 +43,16 @@ fun GroupListScreen(
         }
     }
     
+    // Gradient Brush
+    val headerBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFF9945),
+            Color(0xFFFFB775)
+        )
+    )
+
     Scaffold(
-        containerColor = Color.White,
-        topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "내 그룹",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1A1A1A)
-                )
-                
-                IconButton(
-                    onClick = onQRScanClick,
-                    modifier = Modifier
-                        .size(44.dp)
-                        .background(Color(0xFFF8F8F8), CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "QR 스캔",
-                        tint = Color(0xFFFF9945),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-        },
+        containerColor = Color(0xFFF9F9F9),
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onCreateGroupClick,
@@ -93,88 +72,158 @@ fun GroupListScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .padding(bottom = paddingValues.calculateBottomPadding())
         ) {
-            when {
-                uiState.isLoading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = Color(0xFFFF9945),
-                            strokeWidth = 3.dp
-                        )
-                    }
-                }
-                
-                uiState.errorMessage.isNotEmpty() -> {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // --- Gradient Header ---
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(elevation = 4.dp, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                        .background(headerBrush, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                        .statusBarsPadding()
+                        .padding(bottom = 24.dp, top = 8.dp)
+                ) {
                     Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        modifier = Modifier.padding(horizontal = 24.dp)
                     ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "내 그룹",
+                                fontSize = 28.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+
+                            // QR Scan Button inside Header
+                            IconButton(
+                                onClick = onQRScanClick,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.QrCodeScanner,
+                                    contentDescription = "QR 스캔",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                        
                         Text(
-                            text = "⚠️",
-                            fontSize = 48.sp
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = uiState.errorMessage,
-                            color = Color(0xFF666666),
-                            textAlign = TextAlign.Center,
-                            fontSize = 15.sp
-                        )
-                    }
-                }
-                
-                uiState.myGroups.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp)
-                            .padding(bottom = 100.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "👋",
-                            fontSize = 64.sp
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = "참여 중인 그룹이 없어요",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1A1A1A)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "새로운 그룹을 만들거나\nQR코드를 스캔해 참여해보세요!",
+                            text = "함께하는 즐거움, 취향을 공유하세요!",
                             fontSize = 15.sp,
-                            color = Color(0xFF999999),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 22.sp
+                            color = Color.White.copy(alpha = 0.9f)
                         )
                     }
                 }
                 
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(bottom = 100.dp)
-                    ) {
-                        items(uiState.myGroups) { group ->
-                            GroupCard(
-                                group = group,
-                                onClick = { onGroupClick(group.id) }
-                            )
-                            Divider(
-                                color = Color(0xFFF5F5F5),
-                                thickness = 1.dp
-                            )
+                // --- Content List ---
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    when {
+                        uiState.isLoading -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFFF9945),
+                                    strokeWidth = 3.dp
+                                )
+                            }
+                        }
+                        
+                        uiState.errorMessage.isNotEmpty() -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "⚠️",
+                                    fontSize = 48.sp
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = uiState.errorMessage,
+                                    color = Color(0xFF666666),
+                                    textAlign = TextAlign.Center,
+                                    fontSize = 15.sp
+                                )
+                            }
+                        }
+                        
+                        uiState.myGroups.isEmpty() -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                // Empty State Illustration Placeholder
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .background(Color(0xFFEEEEEE), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("👋", fontSize = 50.sp)
+                                }
+                                
+                                Spacer(modifier = Modifier.height(24.dp))
+                                
+                                Text(
+                                    text = "참여 중인 그룹이 없어요",
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF333333)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "새로운 그룹을 만들거나\nQR코드를 스캔해 참여해보세요!",
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF999999),
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 22.sp
+                                )
+                            }
+                        }
+                        
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                items(uiState.myGroups) { group ->
+                                    // Use ElevatedCard for each group item
+                                    ElevatedCard(
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), // Using subtle elevation via shadow modifier usually, or just default
+                                        modifier = Modifier.shadow(2.dp, RoundedCornerShape(16.dp))
+                                    ) {
+                                        GroupCard(
+                                            group = group,
+                                            onClick = { onGroupClick(group.id) }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

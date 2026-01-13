@@ -14,9 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,9 +41,17 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
-    val kakaoYellow = Color(0xFFFEE500)
-    val omoOrange = Color(0xFFFF8A3D)
     
+    // Gradient Configuration
+    val gradientBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFF9945), // Original Orange
+            Color(0xFFFFB775)  // Lighter Orange
+        )
+    )
+    
+    val kakaoYellow = Color(0xFFFEE500)
+
     // 로그인 성공 시 처리
     LaunchedEffect(uiState.isLoginSuccess) {
         if (uiState.isLoginSuccess && uiState.userId != null) {
@@ -92,18 +103,12 @@ fun LoginScreen(
     
     // 카카오 로그인 실행 함수
     fun startKakaoLogin() {
-        // 카카오톡 설치/로그인 가능 여부 확인
         val talkAvailable = UserApiClient.instance.isKakaoTalkLoginAvailable(context)
-        Log.d(
-            "KakaoLogin",
-            "startKakaoLogin: isKakaoTalkLoginAvailable=$talkAvailable, activity=${activity != null}"
-        )
+        Log.d("KakaoLogin", "startKakaoLogin: isKakaoTalkLoginAvailable=$talkAvailable")
 
         if (talkAvailable) {
-            // 카카오톡으로 로그인 (Activity context 필요)
             val host = activity
             if (host == null) {
-                Log.w("KakaoLogin", "카카오톡 로그인을 위한 Activity 컨텍스트를 가져올 수 없어 웹 로그인으로 대체합니다")
                 UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
                 return
             }
@@ -111,20 +116,15 @@ fun LoginScreen(
             UserApiClient.instance.loginWithKakaoTalk(host) { token, error ->
                 if (error != null) {
                     Log.e("KakaoLogin", "카카오톡 로그인 실패", error)
-                    
-                    // 사용자가 카카오톡 로그인을 취소한 경우
                     if (error is ClientError && error.reason == ClientErrorCause.Cancelled) {
                         return@loginWithKakaoTalk
                     }
-                    
-                    // 카카오톡 로그인 실패 시 카카오 계정으로 로그인 시도
                     UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
                 } else if (token != null) {
                     kakaoCallback(token, null)
                 }
             }
         } else {
-            // 카카오톡 미설치: 카카오 계정으로 로그인
             UserApiClient.instance.loginWithKakaoAccount(context, callback = kakaoCallback)
         }
     }
@@ -133,96 +133,118 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .systemBarsPadding()
-            .background(omoOrange)
+            .background(gradientBrush) // Apply Gradient
     ) {
-        // 상단 로고/타이틀
+        // --- Top Branding Section ---
         Column(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 120.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxWidth()
+                .padding(top = 100.dp, bottom = 240.dp), // Leave space for bottom sheet
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
+            // Animated Logo Container (Idea)
             Box(
-                modifier = Modifier.size(170.dp),
+                modifier = Modifier.size(180.dp),
                 contentAlignment = Alignment.Center
             ) {
-                // Background shadow layer
+                // Outer glow/shadow
                 Box(
                     modifier = Modifier
-                        .size(150.dp)
+                        .size(160.dp)
                         .shadow(
-                            elevation = 16.dp,
+                            elevation = 24.dp,
                             shape = CircleShape,
-                            spotColor = Color.Black,
-                            ambientColor = Color.Black
+                            spotColor = Color.Black.copy(alpha = 0.4f),
+                            ambientColor = Color.Black.copy(alpha = 0.4f)
                         )
                 )
 
                 Image(
-                    painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
+                    painter = painterResource(R.drawable.omo),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(150.dp)
+                        .size(160.dp)
                         .clip(CircleShape)
-                        .border(2.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                        .background(Color.Transparent, CircleShape)
+                        .border(4.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                        .background(Color.White) // Fallback background if image is transparent
                 )
             }
-            Spacer(Modifier.height(24.dp))
+            
+            Spacer(Modifier.height(32.dp))
+            
             Text(
-                text = LocalContext.current.getString(R.string.login_title),
+                text = stringResource(R.string.login_title),
                 color = Color.White,
-                fontSize = 44.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = LocalContext.current.getString(R.string.login_subtitle1),
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = LocalContext.current.getString(R.string.login_subtitle2),
-                color = Color.White,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = LocalContext.current.getString(R.string.login_caption),
-                color = Color(0xFFFEF6E8),
-                fontSize = 16.sp,
-                lineHeight = 22.sp,
+                fontSize = 40.sp,
+                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.displayMedium,
                 textAlign = TextAlign.Center
+            )
+            
+            Spacer(Modifier.height(16.dp))
+            
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = stringResource(R.string.login_subtitle1),
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = stringResource(R.string.login_subtitle2),
+                    color = Color.White.copy(alpha = 0.95f),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            
+            Spacer(Modifier.height(24.dp))
+            
+            Text(
+                text = stringResource(R.string.login_caption),
+                color = Color(0xFFFFF3E0),
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(horizontal = 40.dp)
             )
         }
 
-        // 하단 컨테이너 + 카카오 버튼
+        // --- Bottom Action Sheet ---
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(220.dp),
+                // Responsive height control could be added if needed, but fixed for now
+                .wrapContentHeight(),
             color = Color.White,
-            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+            shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+            shadowElevation = 16.dp
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                    .fillMaxWidth()
+                    .padding(start = 24.dp, end = 24.dp, top = 32.dp, bottom = 40.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Kakao Login Button
                 Button(
-                    onClick = {
-                        // 실제 카카오톡 로그인 실행
-                        startKakaoLogin()
-                    },
+                    onClick = { startKakaoLogin() },
                     enabled = !uiState.isLoading,
-                    colors = ButtonDefaults.buttonColors(containerColor = kakaoYellow),
-                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = kakaoYellow,
+                        disabledContainerColor = kakaoYellow.copy(alpha = 0.5f)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
@@ -230,62 +252,72 @@ fun LoginScreen(
                     if (uiState.isLoading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color.Black
+                            color = Color.Black,
+                            strokeWidth = 2.dp
                         )
                     } else {
-                        Icon(
-                            painter = androidx.compose.ui.res.painterResource(R.drawable.omo),
+                        // Assuming kakao symbol is not available as vector, reusing app icon or text only
+                        // For a real app, use the official Kakao symbol
+                         Icon(
+                            painter = painterResource(R.drawable.omo), // Placeholder or Kakao Icon
                             contentDescription = null,
-                            tint = Color.Unspecified
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(12.dp))
                         Text(
-                            text = LocalContext.current.getString(R.string.kakao_login_button),
-                            color = Color.Black,
-                            fontSize = 18.sp,
+                            text = stringResource(R.string.kakao_login_button),
+                            color = Color(0xFF191919), // Kakao Black
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
 
-                // 테스트 로그인 버튼 (임시)
+                // Test Login Button
                 OutlinedButton(
                     onClick = {
-                        // 임시: 서버 연동 없이 프론트에서 바로 로그인
                         viewModel.loginOffline(
                             userId = "local_test_${System.currentTimeMillis()}",
                             nickname = "테스트유저"
                         )
                     },
                     enabled = !uiState.isLoading,
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = Color(0xFF666666)
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(52.dp)
                 ) {
                     Text(
-                        text = "테스트로 로그인",
-                        color = Color(0xFF111827),
-                        fontSize = 16.sp,
+                        text = "테스트 계정으로 시작하기",
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
                 
-                // 에러 메시지 표시
                 if (uiState.loginErrorMessage.isNotEmpty()) {
                     Text(
                         text = uiState.loginErrorMessage,
                         color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
 
+                Spacer(modifier = Modifier.height(8.dp))
+                
                 Text(
-                    text = LocalContext.current.getString(R.string.login_terms),
-                    color = Color(0xFFB0B0B0),
+                    text = stringResource(R.string.login_terms),
+                    color = Color(0xFF999999),
                     fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    textAlign = TextAlign.Center
+                    lineHeight = 18.sp,
+                    textAlign = TextAlign.Center,
+                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
         }

@@ -1,23 +1,25 @@
 package com.example.madclass01.presentation.profile.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -34,25 +36,40 @@ fun ImageGalleryGrid(
         columns = GridCells.Fixed(3),
         modifier = modifier
             .fillMaxWidth()
-            .height((((images.size + 1) / 3 + 1) * 130).dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+            .heightIn(max = 500.dp) // Safety cap, usually controlled by parent scroll
+            .height((((images.size + 1 + 2) / 3) * 110).dp), // Estimate height: (items + 1 button) / 3 cols * rowHeight
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        userScrollEnabled = false // Usually nested in a scrollable column
     ) {
-        // 추가 버튼
+        // Add Button
         item {
             Box(
                 modifier = Modifier
                     .aspectRatio(1f)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFE8E8E8))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFF9F9F9))
                     .clickable { onAddImage() },
                 contentAlignment = Alignment.Center
             ) {
+                 // Dashed border drawing to match ImagePickerButton
+                androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                    val stroke = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    )
+                    drawRoundRect(
+                        color = Color(0xFFE0E0E0),
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                    )
+                }
+                
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "사진 추가",
-                    tint = Color(0xFF999999),
-                    modifier = Modifier.size(32.dp)
+                    tint = Color(0xFFFF9945),
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
@@ -77,33 +94,32 @@ fun ImageThumbnail(
     ) {
         AsyncImage(
             model = imageUri,
-            contentDescription = "갤러리 이미지",
+            contentDescription = "Gallery Image",
             modifier = Modifier
                 .fillMaxSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFE8E8E8)),
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xFFEEEEEE)),
             contentScale = ContentScale.Crop
         )
         
-        // 작은 삭제 버튼
-        Box(
+        // Remove Button
+        Surface(
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(4.dp)
-                .size(18.dp)
-                .background(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(50)
-                )
+                .padding(6.dp)
+                .size(22.dp)
                 .clickable { onRemove() },
-            contentAlignment = Alignment.Center
+            shape = CircleShape,
+            color = Color.Black.copy(alpha = 0.6f),
+            contentColor = Color.White
         ) {
-            Icon(
-                imageVector = Icons.Default.Close,
-                contentDescription = "이미지 삭제",
-                tint = Color.White,
-                modifier = Modifier.size(12.dp)
-            )
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Remove",
+                    modifier = Modifier.size(14.dp)
+                )
+            }
         }
     }
 }

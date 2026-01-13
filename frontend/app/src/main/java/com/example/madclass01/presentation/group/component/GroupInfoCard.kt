@@ -3,6 +3,8 @@ package com.example.madclass01.presentation.group.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -19,73 +21,54 @@ fun GroupInfoCard(
     memberCount: Int = 24,
     modifier: Modifier = Modifier
 ) {
-    Surface(
+    ElevatedCard(
         modifier = modifier
-            .fillMaxWidth(0.838f)  // 326/390
-            .height(151.dp),
-        color = Color(0xFFF9FAFB),
-        shape = RoundedCornerShape(16.dp)
+            .fillMaxWidth(0.85f),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
+                .fillMaxWidth()
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Group Icon
+            // Group Icon Placeholder
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(64.dp)
                     .background(
-                        color = Color(0xFF10B981),  // 초대는 초록색
-                        shape = RoundedCornerShape(12.dp)
+                        color = Color(0xFFFF9945), // Brand Orange
+                        shape = RoundedCornerShape(16.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = when (group.id) {
-                        else -> "👥"
-                    },
-                    fontSize = 28.sp
+                    text = "👥", // Fallback or group.icon
+                    fontSize = 32.sp
                 )
             }
             
-            // Group Info
+            // Text Info
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = group.name,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF111827)
+                    color = Color(0xFF1A1A1A)
                 )
                 Text(
                     text = "${memberCount}명의 멤버",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color(0xFF6B7280)
+                    color = Color(0xFF666666)
                 )
             }
         }
-    }
-}
-
-// Surface 컴포저블을 위한 import 추가
-@Composable
-fun Surface(
-    modifier: Modifier = Modifier,
-    color: Color = Color.White,
-    shape: androidx.compose.ui.graphics.Shape = RoundedCornerShape(0.dp),
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(color = color, shape = shape),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        content()
     }
 }

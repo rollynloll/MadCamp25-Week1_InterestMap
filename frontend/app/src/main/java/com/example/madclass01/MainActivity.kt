@@ -18,6 +18,7 @@ import com.example.madclass01.presentation.profile.screen.ProfileSetupScreen
 import com.example.madclass01.presentation.profile.screen.LoadingScreen
 import com.example.madclass01.presentation.profile.screen.ProfileEditScreen
 import com.example.madclass01.presentation.profile.screen.TagSelectionScreen
+import com.example.madclass01.presentation.profile.ProfileScreen
 import com.example.madclass01.presentation.test.ApiTestScreen
 import com.example.madclass01.presentation.chat.ChatScreen
 import com.example.madclass01.presentation.group.screen.CreateGroupScreen
@@ -281,6 +282,20 @@ fun AppNavigation(
                 }
             )
         }
+        is AppScreen.UserProfile -> {
+            val userProfile = currentScreen as AppScreen.UserProfile
+            ProfileScreen(
+                userId = userProfile.userId,
+                onBack = {
+                    if (userProfile.fromGroupId != null) {
+                        currentScreen = AppScreen.GroupDetail(userProfile.fromGroupId)
+                    } else {
+                        currentScreen = AppScreen.Home
+                    }
+                },
+                onEditClick = null
+            )
+        }
         is AppScreen.GroupDetail -> {
             val groupDetail = currentScreen as AppScreen.GroupDetail
             GroupDetailScreen(
@@ -292,6 +307,9 @@ fun AppNavigation(
                 },
                 onQRCodeClick = { group ->
                     currentScreen = AppScreen.QRInvite(group.id, group.name, group.memberCount)
+                },
+                onProfileClick = { targetUserId ->
+                    currentScreen = AppScreen.UserProfile(targetUserId, fromGroupId = groupDetail.groupId)
                 },
                 onChatRoomCreated = { chatRoomId, groupName, memberCount ->
                     currentScreen = AppScreen.Chat(chatRoomId, groupName, memberCount)
@@ -399,6 +417,7 @@ sealed class AppScreen {
     object Loading : AppScreen()
     object TagSelection : AppScreen()
     data class GroupDetail(val groupId: String) : AppScreen()
+    data class UserProfile(val userId: String, val fromGroupId: String? = null) : AppScreen()
     object CreateGroup : AppScreen()
     data class Chat(val chatRoomId: String, val chatRoomName: String = "채팅", val memberCount: Int = 0) : AppScreen()
     object QRScanner : AppScreen()

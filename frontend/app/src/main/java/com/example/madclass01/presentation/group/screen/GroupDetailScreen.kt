@@ -1,69 +1,42 @@
 package com.example.madclass01.presentation.group.screen
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlin.math.pow
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
-import com.example.madclass01.presentation.group.component.ChatButtonComponent
-import com.example.madclass01.presentation.group.component.GroupChatButtonComponent
+import com.example.madclass01.R
 import com.example.madclass01.presentation.group.component.GroupDetailHeaderComponent
 import com.example.madclass01.presentation.group.component.RelationshipGraphComponent
 import com.example.madclass01.presentation.group.viewmodel.GroupDetailViewModel
-import com.example.madclass01.R
+import kotlin.math.pow
 
 @Composable
 fun GroupDetailScreen(
@@ -71,6 +44,7 @@ fun GroupDetailScreen(
     currentUserId: String,
     onBackPress: () -> Unit = {},
     onQRCodeClick: (com.example.madclass01.domain.model.Group) -> Unit = {},
+    onProfileClick: (String) -> Unit = {},
     onChatRoomCreated: (chatRoomId: String, groupName: String, memberCount: Int) -> Unit = { _, _, _ -> },
     viewModel: GroupDetailViewModel = hiltViewModel()
 ) {
@@ -95,251 +69,120 @@ fun GroupDetailScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
-            .background(Color.White)
-    ) {
-        if (uiState.isLoading) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                CircularProgressIndicator(color = Color(0xFF667EEA))
-                Text(
-                    text = "그룹 정보를 불러오는 중...",
-                    modifier = Modifier.padding(top = 16.dp),
-                    color = Color.Gray,
-                    fontSize = 14.sp
-                )
-            }
-        } else if (uiState.errorMessage.isNotEmpty()) {
-            BackHandler(enabled = true) {
-                onBackPress()
-            }
+    val isMockMode = uiState.errorMessage == "mock_mode"
+    val hasError = uiState.errorMessage.isNotEmpty() && !isMockMode
+    
+    // 에러 발생 시 뒤로가기 핸들링
+    if (hasError) {
+        BackHandler(onBack = onBackPress)
+    }
 
-            val isMockMode = uiState.errorMessage == "mock_mode"
-            // 테스트 사용자는 에러 다이얼로그 안 띄움, 실제 사용자는 무조건 띄움
-            var showErrorDialog by remember(uiState.errorMessage, uiState.isTestUser) { 
-                mutableStateOf(!uiState.isTestUser && !isMockMode) 
-            }
-
-            val fallbackGroupName = if (groupId.contains("molip", ignoreCase = true)) {
-                "몰입캠프 분반4"
-            } else {
-                "그룹 상세"
-            }
-            val fallbackMemberCount = if (groupId.contains("molip", ignoreCase = true)) 21 else 0
-
-            Scaffold(
-                floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = {
+    Scaffold(
+        containerColor = Color.White,
+        floatingActionButton = {
+            // 로딩 중이 아니고 에러가 없거나(혹은 목업 모드일 때) FAB 표시
+            if (!uiState.isLoading && (!hasError || isMockMode)) {
+                GradientExtendedFloatingActionButton(
+                    onClick = {
+                        if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
+                            viewModel.startChatWithSelectedUser(currentUserId)
+                        } else {
                             viewModel.startGroupChat(groupId)
-                        },
-                        modifier = Modifier
-                            .padding(bottom = 16.dp, end = 16.dp),
-                        containerColor = Color.Transparent,
-                        contentColor = Color.White
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 335.dp, height = 56.dp)
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
-                                    ),
-                                    shape = RoundedCornerShape(28.dp)
-                                )
-                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.Absolute.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.Chat,
-                                    contentDescription = "채팅",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    text = "채팅",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
                         }
-                    }
-                },
-                containerColor = Color.Transparent
-            ) { paddingValues ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
-                    GroupDetailHeaderComponent(
-                        groupName = fallbackGroupName,
-                        memberCount = fallbackMemberCount,
-                        activityStatus = if (isMockMode) "테스트 모드 (목업 데이터)" else "목업 데이터",
-                        groupIcon = "👥",
-                        profileImageUrl = null,
-                        onBackClick = onBackPress,
-                        onQRCodeClick = {
-                            // 목업 모드에서는 더미 그룹 전달
-                            val dummyGroup = com.example.madclass01.domain.model.Group(
-                                id = groupId,
-                                name = fallbackGroupName,
-                                description = "",
-                                memberCount = fallbackMemberCount
-                            )
-                            onQRCodeClick(dummyGroup)
-                        }
-                    )
-
-                    ZoomableGraphContainer(
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .align(Alignment.CenterHorizontally)
-                    ) { scale ->
-                        val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
-                        MockRelationshipGraphCanvas(
-                            currentUserName = "나",
-                            currentUserImageModel = "https://picsum.photos/seed/me_star/200/200",
-                            nodeScale = nodeScale
-                        )
-                    }
-                }
-            }
-
-            if (showErrorDialog) {
-                AlertDialog(
-                    onDismissRequest = onBackPress,
-                    title = {
-                        Text(
-                            text = "오류 발생",
-                            fontWeight = FontWeight.Bold
-                        )
                     },
-                    text = {
-                        Text(text = uiState.errorMessage)
-                    },
-                    confirmButton = {
-                        Button(onClick = onBackPress) {
-                            Text(text = "확인")
-                        }
-                    }
+                    text = if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) "1:1 채팅하기" else "그룹 채팅방 입장",
+                    icon = Icons.AutoMirrored.Filled.Chat
                 )
             }
-        } else if (uiState.group != null && uiState.relationshipGraph != null) {
-            // 정상 상태
-            Scaffold(
-                floatingActionButton = {
-                    FloatingActionButton(
-                        onClick = {
-                            if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
-                                viewModel.startChatWithSelectedUser(currentUserId)
-                            } else {
-                                viewModel.startGroupChat(groupId)
-                            }
-                        },
-                        modifier = Modifier
-                            .padding(bottom = 16.dp, end = 16.dp),
-                        containerColor = Color.Transparent,
-                        contentColor = Color.White
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 335.dp, height = 56.dp)
-                                .background(
-                                    brush = Brush.linearGradient(
-                                        colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
-                                    ),
-                                    shape = RoundedCornerShape(28.dp)
-                                )
-                                .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Outlined.Chat,
-                                    contentDescription = "채팅",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
-                                Text(
-                                    text = "채팅",
-                                    fontSize = 18.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-                    }
-                },
-                containerColor = Color.Transparent
-            ) { paddingValues ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                ) {
+        },
+        floatingActionButtonPosition = FabPosition.End
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (uiState.isLoading) {
+                LoadingView()
+            } else if (hasError) {
+                ErrorView(
+                    errorMessage = uiState.errorMessage,
+                    onRetry = { viewModel.initializeWithGroup(groupId, currentUserId) },
+                    onBack = onBackPress
+                )
+            } else {
+                // 정상 콘텐츠 (또는 목업 모드)
+                val groupName = uiState.group?.name ?: if (isMockMode) "몰입캠프 분반4" else "그룹 상세"
+                val memberCount = uiState.group?.memberCount ?: if (isMockMode) 21 else 0
+                val activityStatus = if (isMockMode) "테스트 모드" else "오늘 활동"
+                val groupIcon = uiState.group?.iconType?.ifBlank { "👥" } ?: "👥"
+                val profileImageUrl = uiState.group?.imageUrl
+
+                Column(modifier = Modifier.fillMaxSize()) {
                     // 헤더
                     GroupDetailHeaderComponent(
-                        groupName = uiState.group!!.name,
-                        memberCount = uiState.group!!.memberCount,
-                        activityStatus = "오늘 활동",
-                        groupIcon = uiState.group!!.iconType.ifBlank { "👥" },
-                        profileImageUrl = uiState.group!!.imageUrl,
+                        groupName = groupName,
+                        memberCount = memberCount,
+                        activityStatus = activityStatus,
+                        groupIcon = groupIcon,
+                        profileImageUrl = profileImageUrl,
                         onBackClick = onBackPress,
-                        onQRCodeClick = { onQRCodeClick(uiState.group!!) }
-                    )
-
-                    // 관계 그래프
-                    ZoomableGraphContainer { scale ->
-                        val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
-                        RelationshipGraphComponent(
-                            relationshipGraph = uiState.relationshipGraph!!,
-                            selectedUserId = uiState.selectedUserId,
-                            nodeScale = nodeScale,
-                            onNodeClick = { userId ->
-                                viewModel.selectUser(userId)
-                            },
-                            onNodeLongClick = { userId ->
-                                viewModel.selectUser(userId)
-                            }
-                        )
-                    }
-                }
-            }
-
-            // 선택된 사용자 프로필 표시
-            if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId) {
-                val selectedUser = uiState.relationshipGraph!!.embeddings[uiState.selectedUserId]
-                val selectedNode = uiState.relationshipGraph!!.otherUserNodes.find { it.userId == uiState.selectedUserId }
-                if (selectedUser != null && selectedNode != null) {
-                    SelectedUserProfileBottomSheet(
-                        userName = selectedUser.userName,
-                        profileImageUrl = selectedUser.profileImageUrl,
-                        similarity = selectedNode.similarityScore,
-                        onChatClick = {
-                            viewModel.startChatWithSelectedUser(currentUserId)
-                        },
-                        onDismiss = {
-                            viewModel.deselectUser()
+                        onQRCodeClick = {
+                            val targetGroup = uiState.group ?: com.example.madclass01.domain.model.Group(
+                                id = groupId,
+                                name = groupName,
+                                description = "",
+                                memberCount = memberCount
+                            )
+                            onQRCodeClick(targetGroup)
                         }
                     )
+
+                    // 그래프 영역 (남은 공간 채우기)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(Color(0xFFFAFBFC)) // 그래프 배경색
+                    ) {
+                        ZoomableGraphContainer(
+                            modifier = Modifier.fillMaxSize()
+                        ) { scale ->
+                            val nodeScale = (1f / scale.pow(1.3f)).coerceIn(0.2f, 2f)
+                            
+                            if (isMockMode || uiState.relationshipGraph == null) {
+                                MockRelationshipGraphCanvas(
+                                    currentUserName = "나",
+                                    currentUserImageModel = "https://picsum.photos/seed/me_star/200/200",
+                                    nodeScale = nodeScale
+                                )
+                            } else {
+                                RelationshipGraphComponent(
+                                    relationshipGraph = uiState.relationshipGraph!!,
+                                    selectedUserId = uiState.selectedUserId,
+                                    nodeScale = nodeScale,
+                                    onNodeClick = { userId -> viewModel.selectUser(userId) },
+                                    onNodeLongClick = { userId -> viewModel.selectUser(userId) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 선택된 사용자 바텀 시트
+                if (uiState.selectedUserId != null && uiState.selectedUserId != currentUserId && uiState.relationshipGraph != null) {
+                    val selectedUser = uiState.relationshipGraph!!.embeddings[uiState.selectedUserId]
+                    val selectedNode = uiState.relationshipGraph!!.otherUserNodes.find { it.userId == uiState.selectedUserId }
+                    
+                    if (selectedUser != null && selectedNode != null) {
+                        SelectedUserProfileBottomSheet(
+                            userName = selectedUser.userName,
+                            profileImageUrl = selectedUser.profileImageUrl,
+                            similarity = selectedNode.similarityScore,
+                            onProfileClick = { onProfileClick(uiState.selectedUserId!!) },
+                            onDismiss = { viewModel.deselectUser() }
+                        )
+                    }
                 }
             }
         }
@@ -347,96 +190,106 @@ fun GroupDetailScreen(
 }
 
 @Composable
-private fun MockRelationshipGraphCanvas(
-    currentUserName: String,
-    currentUserImageModel: Any? = null,
-    nodeScale: Float = 1f
-) {
-    // CSS 스펙에 맞춘 예시 목업 배치 (390x520 캔버스, absolute 배치)
-    val avatar1 = "https://picsum.photos/seed/node1/200/200"
-    val avatar2 = "https://picsum.photos/seed/node2/200/200"
-    val avatar3 = "https://picsum.photos/seed/node3/200/200"
-    val avatar4 = "https://picsum.photos/seed/node4/200/200"
-    val avatar5 = "https://picsum.photos/seed/node5/200/200"
-
-    Box(
-        modifier = Modifier
-            .size(width = 390.dp, height = 520.dp)
-            .background(Color(0xFFFAFBFC)),
-        contentAlignment = Alignment.TopStart
+fun LoadingView() {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Center Node (Me)
-        StarNode(
-            modifier = Modifier.offset(x = 159.dp, y = 224.dp),
-            name = currentUserName,
-            imageModel = currentUserImageModel,
-            nodeScale = nodeScale
+        CircularProgressIndicator(
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(48.dp)
         )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "그룹 정보를 불러오는 중...",
+            color = Color.Gray,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
 
-        // Node 1
-        PlanetNode(
-            modifier = Modifier.offset(x = 129.dp, y = 182.dp),
-            size = 56.dp,
-            backgroundColor = Color(0xFF10B981),
-            borderWidth = 3.dp,
-            elevation = 12.dp,
-            name = "김OO",
-            textColor = Color.White,
-            imageModel = avatar1,
-            nodeScale = nodeScale
+@Composable
+fun ErrorView(
+    errorMessage: String,
+    onRetry: () -> Unit,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = "Error",
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(64.dp)
         )
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(
+            text = "오류가 발생했습니다",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = errorMessage,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.Gray,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(vertical = 8.dp)
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedButton(onClick = onBack) {
+                Text("뒤로 가기")
+            }
+            Button(onClick = onRetry) {
+                Text("다시 시도")
+            }
+        }
+    }
+}
 
-        // Node 2
-        PlanetNode(
-            modifier = Modifier.offset(x = 204.dp, y = 182.dp),
-            size = 56.dp,
-            backgroundColor = Color(0xFF10B981),
-            borderWidth = 3.dp,
-            elevation = 12.dp,
-            name = "이OO",
-            textColor = Color.White,
-            imageModel = avatar2,
-            nodeScale = nodeScale
-        )
-
-        // Node 3
-        PlanetNode(
-            modifier = Modifier.offset(x = 230.dp, y = 381.dp),
-            size = 48.dp,
-            backgroundColor = Color(0xFFF59E0B),
-            borderWidth = 2.dp,
-            elevation = 10.dp,
-            name = "박OO",
-            textColor = Color.White,
-            imageModel = avatar3,
-            nodeScale = nodeScale
-        )
-
-        // Node 4
-        PlanetNode(
-            modifier = Modifier.offset(x = 93.dp, y = 381.dp),
-            size = 48.dp,
-            backgroundColor = Color(0xFFF59E0B),
-            borderWidth = 2.dp,
-            elevation = 10.dp,
-            name = "최OO",
-            textColor = Color.White,
-            imageModel = avatar4,
-            nodeScale = nodeScale
-        )
-
-        // Node 5
-        PlanetNode(
-            modifier = Modifier.offset(x = 313.dp, y = 469.dp),
-            size = 40.dp,
-            backgroundColor = Color(0xFFE5E7EB),
-            borderWidth = 2.dp,
-            elevation = 8.dp,
-            name = "정OO",
-            textColor = Color(0xFF6B7280),
-            imageModel = avatar5,
-            nodeScale = nodeScale
-        )
+@Composable
+fun GradientExtendedFloatingActionButton(
+    onClick: () -> Unit,
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(28.dp),
+        color = Color.Transparent,
+        shadowElevation = 8.dp,
+        modifier = Modifier.padding(bottom = 16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .background(
+                    brush = Brush.linearGradient(
+                        colors = listOf(Color(0xFF667EEA), Color(0xFF764BA2))
+                    )
+                )
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            Text(
+                text = text,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
@@ -445,7 +298,7 @@ private fun ZoomableGraphContainer(
     modifier: Modifier = Modifier,
     content: @Composable (Float) -> Unit
 ) {
-    var scale by remember { mutableStateOf(1f) }
+    var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
 
     val transformState = rememberTransformableState { zoomChange, panChange, _ ->
@@ -455,9 +308,9 @@ private fun ZoomableGraphContainer(
 
     Box(
         modifier = modifier
-            .size(width = 390.dp, height = 520.dp)
             .clipToBounds()
-            .transformable(transformState)
+            .transformable(transformState),
+        contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
@@ -471,6 +324,100 @@ private fun ZoomableGraphContainer(
         ) {
             content(scale)
         }
+    }
+}
+
+@Composable
+private fun MockRelationshipGraphCanvas(
+    currentUserName: String,
+    currentUserImageModel: Any? = null,
+    nodeScale: Float = 1f
+) {
+    // 캔버스 크기를 정의 (좌표계 기준)
+    val canvasWidth = 390.dp
+    val canvasHeight = 520.dp
+
+    Box(
+        modifier = Modifier
+            .size(canvasWidth, canvasHeight),
+        contentAlignment = Alignment.TopStart
+    ) {
+        // Center Node (Me)
+        StarNode(
+            modifier = Modifier.align(Alignment.Center),
+            name = currentUserName,
+            imageModel = currentUserImageModel,
+            nodeScale = nodeScale
+        )
+
+        // 주변 노드들 (절대 좌표 대신 상대적 위치나 정해진 오프셋 사용)
+        // 여기서는 기존 오프셋을 유지하되, 캔버스 중앙을 기준으로 배치하는 것이 좋겠지만
+        // 간단히 기존 오프셋을 유지합니다.
+        
+        // Node 1
+        PlanetNode(
+            modifier = Modifier.offset(x = 129.dp, y = 182.dp),
+            size = 56.dp,
+            backgroundColor = Color(0xFF10B981),
+            borderWidth = 3.dp,
+            elevation = 12.dp,
+            name = "김OO",
+            textColor = Color.White,
+            imageModel = "https://picsum.photos/seed/node1/200/200",
+            nodeScale = nodeScale
+        )
+
+        // Node 2
+        PlanetNode(
+            modifier = Modifier.offset(x = 204.dp, y = 182.dp),
+            size = 56.dp,
+            backgroundColor = Color(0xFF10B981),
+            borderWidth = 3.dp,
+            elevation = 12.dp,
+            name = "이OO",
+            textColor = Color.White,
+            imageModel = "https://picsum.photos/seed/node2/200/200",
+            nodeScale = nodeScale
+        )
+
+        // Node 3
+        PlanetNode(
+            modifier = Modifier.offset(x = 230.dp, y = 381.dp),
+            size = 48.dp,
+            backgroundColor = Color(0xFFF59E0B),
+            borderWidth = 2.dp,
+            elevation = 10.dp,
+            name = "박OO",
+            textColor = Color.White,
+            imageModel = "https://picsum.photos/seed/node3/200/200",
+            nodeScale = nodeScale
+        )
+
+        // Node 4
+        PlanetNode(
+            modifier = Modifier.offset(x = 93.dp, y = 381.dp),
+            size = 48.dp,
+            backgroundColor = Color(0xFFF59E0B),
+            borderWidth = 2.dp,
+            elevation = 10.dp,
+            name = "최OO",
+            textColor = Color.White,
+            imageModel = "https://picsum.photos/seed/node4/200/200",
+            nodeScale = nodeScale
+        )
+
+        // Node 5
+        PlanetNode(
+            modifier = Modifier.offset(x = 313.dp, y = 469.dp),
+            size = 40.dp,
+            backgroundColor = Color(0xFFE5E7EB),
+            borderWidth = 2.dp,
+            elevation = 8.dp,
+            name = "정OO",
+            textColor = Color(0xFF6B7280),
+            imageModel = "https://picsum.photos/seed/node5/200/200",
+            nodeScale = nodeScale
+        )
     }
 }
 
@@ -567,153 +514,126 @@ private fun PlanetNode(
     }
 }
 
-/**
- * 선택된 사용자 프로필 시트(모달)
- * - 사용자 정보 표시
- * - 채팅 버튼
- * - 유사도 표시
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SelectedUserProfileBottomSheet(
     userName: String,
     profileImageUrl: String? = null,
     similarity: Float = 0.5f,
-    onChatClick: () -> Unit = {},
+    onProfileClick: () -> Unit = {},
     onDismiss: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = Color.White,
-        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-        dragHandle = null,
-        tonalElevation = 0.dp
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(24.dp),
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // 헤더 (닫기 버튼)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "닫기",
-                        tint = Color(0xFF595959)
-                    )
-                }
-            }
-
             // 프로필 이미지
             Box(
                 modifier = Modifier
-                    .size(120.dp)
-                    .shadow(elevation = 12.dp, shape = CircleShape, clip = false)
-                    .background(Color(0xFFF5F5F5), CircleShape)
-                    .border(4.dp, Color.White, CircleShape),
+                    .size(100.dp)
+                    .shadow(elevation = 4.dp, shape = CircleShape)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF5F5F5)),
                 contentAlignment = Alignment.Center
             ) {
                 AsyncImage(
                     model = profileImageUrl,
                     contentDescription = "프로필 사진",
-                    modifier = Modifier
-                        .size(112.dp)
-                        .clip(CircleShape),
+                    modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             }
 
+            Spacer(modifier = Modifier.height(16.dp))
+
             // 이름
             Text(
                 text = userName,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1A1A1A),
-                modifier = Modifier.padding(top = 16.dp)
+                style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                color = Color(0xFF1A1A1A)
             )
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // 유사도 표시
             Surface(
-                modifier = Modifier
-                    .padding(top = 12.dp)
-                    .fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFFAFBFC)
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = Color(0xFFF3F4F6) // Neutral background
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
+                    modifier = Modifier.padding(20.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
                         Text(
                             text = "취향 유사도",
-                            fontSize = 14.sp,
-                            color = Color(0xFF8C8C8C)
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF6B7280)
                         )
                         Text(
                             text = "${(similarity * 100).toInt()}% 일치",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = when {
-                                similarity >= 0.7 -> Color(0xFF10B981)
-                                similarity >= 0.5 -> Color(0xFF10B981)
-                                similarity >= 0.3 -> Color(0xFFF59E0B)
-                                else -> Color(0xFF8C8C8C)
-                            },
-                            modifier = Modifier.padding(top = 4.dp)
+                                similarity >= 0.7f -> Color(0xFF10B981) // Green
+                                similarity >= 0.5f -> Color(0xFF3B82F6) // Blue
+                                else -> Color(0xFFF59E0B) // Amber
+                            }
                         )
                     }
 
                     Text(
                         text = when {
-                            similarity >= 0.7 -> "매우 유사"
-                            similarity >= 0.5 -> "유사"
-                            similarity >= 0.3 -> "보통"
-                            else -> "다름"
+                            similarity >= 0.7f -> "🔥 천생연분"
+                            similarity >= 0.5f -> "✨ 비슷해요"
+                            else -> "🤝 알아가요"
                         },
-                        fontSize = 14.sp,
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF595959)
+                        color = Color(0xFF374151)
                     )
                 }
             }
 
-            // 채팅 버튼
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 프로필 보기 버튼
             Button(
                 onClick = {
-                    onChatClick()
+                    onProfileClick()
                     onDismiss()
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 24.dp)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                    .height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFFFF9945)
-                )
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
+                Icon(
+                    imageVector = Icons.Default.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "$userName 와 채팅하기",
+                    text = "프로필 보기",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                    fontWeight = FontWeight.Bold
                 )
             }
-
-            // 하단 여백
-            androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }

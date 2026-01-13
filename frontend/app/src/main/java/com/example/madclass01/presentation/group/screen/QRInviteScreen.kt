@@ -8,24 +8,27 @@ import android.content.Intent
 import android.graphics.Bitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.madclass01.domain.model.Group
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
-import com.example.madclass01.presentation.group.component.CopyLinkButton
 import com.example.madclass01.presentation.group.component.GroupInfoCard
 import com.example.madclass01.presentation.group.component.QRCodeContainer
 import com.example.madclass01.presentation.group.viewmodel.QRInviteViewModel
@@ -47,35 +50,27 @@ fun QRInviteScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    remember(userId) { Unit }
     var showCopyToast by remember { mutableStateOf(false) }
     var qrBitmap by remember { mutableStateOf<Bitmap?>(null) }
     
+    // Deep Link URL 생성
+    val deepLinkUrl = "https://madcamp.app/invite/${group.id}"
+
     LaunchedEffect(Unit) {
         viewModel.initializeWithGroup(group)
     }
-    
-    // 초대 링크 자동 복사
-    LaunchedEffect(uiState.inviteLink?.inviteUrl) {
-        if (uiState.inviteLink?.inviteUrl != null) {
-            copyToClipboard(context, uiState.inviteLink!!.inviteUrl)
-            viewModel.copyInviteLink()
+
+    // QR 코드 생성 (항상 Deep Link URL 기반)
+    LaunchedEffect(key1 = deepLinkUrl) {
+         scope.launch {
+            qrBitmap = QRCodeGenerator.generateQRCode(
+                text = deepLinkUrl,
+                width = 512,
+                height = 512
+            )
         }
     }
-    
-    // QR 코드 생성
-    LaunchedEffect(key1 = uiState.inviteLink?.inviteUrl, key2 = Unit) {
-        if (uiState.inviteLink?.inviteUrl != null) {
-            scope.launch {
-                qrBitmap = QRCodeGenerator.generateQRCode(
-                    text = uiState.inviteLink!!.inviteUrl,
-                    width = 512,
-                    height = 512
-                )
-            }
-        }
-    }
-    
+
     LaunchedEffect(uiState.copySuccess) {
         if (uiState.copySuccess) {
             showCopyToast = true
@@ -84,7 +79,7 @@ fun QRInviteScreen(
             viewModel.resetCopySuccess()
         }
     }
-    
+
     LaunchedEffect(uiState.joinSuccess) {
         if (uiState.joinSuccess) {
             onJoinSuccess()
@@ -92,118 +87,189 @@ fun QRInviteScreen(
         }
     }
     
+    // Defines a modern gradient for the header
+    val headerBrush = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFF9945), // Original Orange
+            Color(0xFFFFB775)  // Lighter Orange
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(Color(0xFFF9F9F9))
+            .statusBarsPadding()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header
-            Row(
+            // --- Header Section ---
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(60.dp)
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .shadow(elevation = 4.dp, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                    .background(headerBrush, shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
+                    .padding(bottom = 24.dp, top = 8.dp)
             ) {
-                // Back Button
-                IconButton(
-                    onClick = onBackPress
+                Column(
+                    modifier = Modifier.padding(horizontal = 20.dp)
                 ) {
-                    Text(text = "←", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                }
-                
-                // Title
-                Text(
-                    text = "그룹 초대",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF111827)
-                )
-                
-                // Share Button
-                IconButton(onClick = {
-                    val inviteUrl = uiState.inviteLink?.inviteUrl ?: return@IconButton
-                    shareMore(context, inviteUrl)
-                }) {
-                    Icon(imageVector = Icons.Default.Share, contentDescription = "Share")
+                    // Top Bar
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onBackPress,
+                            modifier = Modifier.offset(x = (-12).dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.weight(1f))
+                        
+                        // Share Button in Header
+                        IconButton(
+                            onClick = {
+                                shareMore(context, deepLinkUrl, group.name)
+                            },
+                             modifier = Modifier
+                                .background(Color.White.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = Color.White,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "그룹 초대하기",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "친구들과 함께 즐거운 시간을 보내세요! \uD83D\uDC8C",
+                        fontSize = 16.sp,
+                        color = Color.White.copy(alpha = 0.9f)
+                    )
                 }
             }
             
-            HorizontalDivider(
-                color = Color(0xFFE5E7EB),
-                thickness = 1.dp
-            )
+            Spacer(modifier = Modifier.height(24.dp))
             
-            // Content
+            // --- Main Content ---
             Column(
-                modifier = Modifier
+                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(32.dp)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                // Group Info Card
-                GroupInfoCard(
-                    group = group,
-                    memberCount = memberCount
-                )
-                
-                // QR Code Container
-                QRCodeContainer(
-                    qrCodeBitmap = qrBitmap,
-                    inviteUrl = uiState.inviteLink?.inviteUrl ?: "",
-                    expiryTime = uiState.expiryTime
-                )
-                
-                // Copy Link Button
-                CopyLinkButton(
-                    onClick = {
-                        val inviteUrl = uiState.inviteLink?.inviteUrl
-                        if (inviteUrl != null) {
-                            copyToClipboard(context, inviteUrl)
-                            viewModel.copyInviteLink()
-                        }
-                    }
-                )
-                
-                // Loading Indicator
-                if (uiState.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = Color(0xFF667EEA),
-                        strokeWidth = 2.dp
-                    )
-                }
-                
-                // Error Message
-                if (uiState.errorMessage.isNotEmpty()) {
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth(0.838f)
-                            .padding(vertical = 8.dp),
-                        color = Color(0xFFFEE2E2),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                // 1. Group Info
+                ElevatedCard(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                     Column(modifier = Modifier.padding(24.dp)) {
                         Text(
-                            text = uiState.errorMessage,
-                            fontSize = 14.sp,
-                            color = Color(0xFFDC2626),
-                            modifier = Modifier.padding(12.dp)
+                            text = group.name,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF333333),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "현재 멤버 ${memberCount}명",
+                            fontSize = 15.sp,
+                            color = Color.Gray,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(32.dp))
+                // 2. QR Code
+                ElevatedCard(
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.elevatedCardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        QRCodeContainer(
+                            qrCodeBitmap = qrBitmap,
+                            inviteUrl = deepLinkUrl,
+                            expiryTime = uiState.expiryTime
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = "QR코드를 스캔하여 입장하세요",
+                            fontSize = 14.sp,
+                            color = Color(0xFF999999)
+                        )
+                    }
+                }
+                
+                // 3. Link Action
+                Button(
+                    onClick = {
+                        copyToClipboard(context, deepLinkUrl)
+                        showCopyToast = true
+                        scope.launch {
+                             delay(2000)
+                             showCopyToast = false
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF9945)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "초대 링크 복사하기",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(40.dp))
             }
         }
-        
+
         // Copy Toast
         if (showCopyToast) {
             Surface(
@@ -211,13 +277,13 @@ fun QRInviteScreen(
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 32.dp),
                 color = Color.Black.copy(alpha = 0.8f),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(50)
             ) {
                 Text(
-                    text = "✓ 초대 링크 복사됨",
+                    text = "링크가 클립보드에 복사되었습니다.",
                     color = Color.White,
                     fontSize = 14.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
                 )
             }
         }
@@ -232,59 +298,12 @@ private fun copyToClipboard(context: Context, text: String) {
     clipboard.setPrimaryClip(clip)
 }
 
-private fun shareToKakao(context: Context, groupName: String, inviteUrl: String) {
-    // 카카오톡 공유 구현 (카카오 SDK 필요)
-    try {
-        val message = "「$groupName」 그룹에 초대합니다!\n\n$inviteUrl"
-        val intent = Intent().apply {
-            action = Intent.ACTION_SEND
-            putExtra(Intent.EXTRA_TEXT, message)
-            type = "text/plain"
-        }
-        context.startActivity(Intent.createChooser(intent, "카카오톡으로 공유"))
-    } catch (e: Exception) {
-        e.printStackTrace()
-    }
-}
-
-private fun shareToInstagram(context: Context, inviteUrl: String) {
-    // 인스타그램 공유 (Direct Message로)
-    try {
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, "그룹 초대 링크: $inviteUrl")
-            setPackage("com.instagram.android")
-        }
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        // 기본 공유로 폴백
-        shareMore(context, inviteUrl)
-    }
-}
-
-private fun shareMore(context: Context, inviteUrl: String) {
-    // Android 기본 공유 메뉴
-    val message = "그룹에 초대합니다!\n\n$inviteUrl"
+private fun shareMore(context: Context, inviteUrl: String, groupName: String) {
+    val message = "「$groupName」 그룹에 초대합니다!\n링크를 클릭하여 바로 참여하세요 \uD83D\uDC47\n\n$inviteUrl"
     val intent = Intent().apply {
         action = Intent.ACTION_SEND
         putExtra(Intent.EXTRA_TEXT, message)
         type = "text/plain"
     }
-    context.startActivity(Intent.createChooser(intent, "공유"))
-}
-
-// Surface Composable for simpler implementation
-@Composable
-fun Surface(
-    modifier: Modifier = Modifier,
-    color: Color = Color.White,
-    shape: Shape = RoundedCornerShape(0.dp),
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .background(color = color, shape = shape)
-    ) {
-        content()
-    }
+    context.startActivity(Intent.createChooser(intent, "그룹 초대하기"))
 }

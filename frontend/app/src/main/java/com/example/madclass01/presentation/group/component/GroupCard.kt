@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -31,49 +33,47 @@ fun GroupCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White)
             .clickable { onClick() }
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(16.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            // 그룹 아이콘
+            // Group Icon
             Box(
                 modifier = Modifier
                     .size(64.dp)
                     .background(
-                        color = Color(0xFF333333),
-                        shape = RoundedCornerShape(12.dp)
+                        color = Color(0xFFF5F5F5),
+                        shape = RoundedCornerShape(16.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 if (group.imageUrl.isNotBlank()) {
                     AsyncImage(
                         model = group.imageUrl,
-                        contentDescription = "그룹 프로필",
+                        contentDescription = "Group Profile",
                         modifier = Modifier
                             .fillMaxSize()
-                            .clip(RoundedCornerShape(12.dp)),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Crop
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
                     )
                 } else {
                     Text(
                         text = groupIconEmoji(group.iconType),
-                        fontSize = 28.sp
+                        fontSize = 32.sp
                     )
                 }
             }
             
-            // 그룹 정보
+            // Group Info
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight(),
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                // 그룹명 및 멤버수
+                // Header: Name and Member Count
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -83,27 +83,53 @@ fun GroupCard(
                         text = group.name,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1A1A1A)
+                        color = Color(0xFF333333),
+                        maxLines = 1,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
                     
                     Text(
                         text = "${group.memberCount}명",
-                        fontSize = 12.sp,
+                        fontSize = 13.sp,
                         color = Color(0xFF999999)
                     )
                 }
                 
-                // 그룹 소개
+                // Description
                 if (group.description.isNotBlank()) {
                     Text(
                         text = group.description,
                         fontSize = 13.sp,
                         color = Color(0xFF666666),
-                        maxLines = 1
+                        maxLines = 1,
+                        lineHeight = 18.sp
                     )
                 }
                 
-                // 태그 (가로 스크롤)
+                // Region & Tags Row
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                     if (group.region.isNotBlank()) {
+                        Icon(
+                            imageVector = Icons.Default.LocationOn,
+                            contentDescription = null,
+                            tint = Color(0xFFFF9945),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text(
+                            text = group.region,
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                }
+
+                 // Tags
                 if (group.tags.isNotEmpty()) {
                     Row(
                         modifier = Modifier
@@ -114,30 +140,20 @@ fun GroupCard(
                         group.tags.forEach { tag ->
                             TagChip(
                                 label = tag.name,
-                                isSelected = false,
-                                onToggle = {},
-                                modifier = Modifier
+                                isSelected = false
                             )
                         }
                     }
                 }
-                
-                // 지역 정보
-                if (group.region.isNotBlank()) {
-                    Text(
-                        text = "📍 ${group.region}",
-                        fontSize = 12.sp,
-                        color = Color(0xFF999999)
-                    )
-                }
             }
             
-            // 화살표
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = "상세보기",
+                contentDescription = null,
                 tint = Color(0xFFDDDDDD),
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier
+                    .size(20.dp)
+                    .align(Alignment.CenterVertically)
             )
         }
     }
