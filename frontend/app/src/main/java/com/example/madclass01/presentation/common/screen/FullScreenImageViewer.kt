@@ -18,6 +18,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -271,25 +273,47 @@ fun ZoomableImage(
                     }
                 }
             )
-            // Use standard detectTransformGestures for smoother pinch-to-zoom
+            // Custom pinch-to-zoom that only activates with 2+ fingers
             .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val newScale = (scale * zoom).coerceIn(1f, 5f)
+                awaitEachGesture {
+                    // Wait for first pointer down
+                    awaitFirstDown(requireUnconsumed = false)
                     
-                    if (newScale > 1f) {
-                        val newOffset = offset + pan
-                        val maxX = (size.width * (newScale - 1)) / 2f
-                        val maxY = (size.height * (newScale - 1)) / 2f
+                    do {
+                        val event = awaitPointerEvent()
+                        val pointerCount = event.changes.count { it.pressed }
                         
-                        scale = newScale
-                        offset = Offset(
-                            x = newOffset.x.coerceIn(-maxX, maxX),
-                            y = newOffset.y.coerceIn(-maxY, maxY)
-                        )
-                    } else {
-                        scale = 1f
-                        offset = Offset.Zero
-                    }
+                        // Only process gestures when 2+ fingers OR when already zoomed
+                        if (pointerCount >= 2 || isZoomed) {
+                            val zoomChange = event.calculateZoom()
+                            val panChange = event.calculatePan()
+                            
+                            // Apply zoom
+                            if (zoomChange != 1f || (isZoomed && pointerCount >= 1)) {
+                                val newScale = (scale * zoomChange).coerceIn(1f, 5f)
+                                
+                                if (newScale > 1f) {
+                                    val newOffset = offset + panChange
+                                    val maxX = (size.width * (newScale - 1)) / 2f
+                                    val maxY = (size.height * (newScale - 1)) / 2f
+                                    
+                                    scale = newScale
+                                    offset = Offset(
+                                        x = newOffset.x.coerceIn(-maxX, maxX),
+                                        y = newOffset.y.coerceIn(-maxY, maxY)
+                                    )
+                                    
+                                    // Consume events only when zoomed/zooming
+                                    event.changes.forEach { it.consume() }
+                                } else {
+                                    scale = 1f
+                                    offset = Offset.Zero
+                                }
+                            }
+                        }
+                        // If only 1 finger and not zoomed, DON'T consume - let HorizontalPager handle it
+                        
+                    } while (event.changes.any { it.pressed })
                 }
             }
     ) {
