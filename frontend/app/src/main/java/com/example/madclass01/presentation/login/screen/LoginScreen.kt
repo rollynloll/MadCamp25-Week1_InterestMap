@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +44,9 @@ fun LoginScreen(
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
+    
+    // Secret Login State
+    var secretClickCount by remember { mutableIntStateOf(0) }
     
     // Gradient Configuration
     val gradientBrush = Brush.verticalGradient(
@@ -153,7 +157,18 @@ fun LoginScreen(
             ) {
                 // Animated Logo Container (Idea)
                 Box(
-                    modifier = Modifier.size(180.dp),
+                    modifier = Modifier
+                        .size(180.dp)
+                        .clickable {
+                            secretClickCount++
+                            if (secretClickCount >= 3) {
+                                viewModel.loginOffline(
+                                    userId = "local_test_${System.currentTimeMillis()}",
+                                    nickname = "테스트유저"
+                                )
+                                secretClickCount = 0
+                            }
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     // Outer glow/shadow
@@ -279,31 +294,7 @@ fun LoginScreen(
                         }
                     }
 
-                    // Test Login Button
-                    OutlinedButton(
-                        onClick = {
-                            viewModel.loginOffline(
-                                userId = "local_test_${System.currentTimeMillis()}",
-                                nickname = "테스트유저"
-                            )
-                        },
-                        enabled = !uiState.isLoading,
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFEEEEEE)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = Color(0xFF666666)
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                    ) {
-                        Text(
-                            text = "테스트 계정으로 시작하기",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+
                     
                     if (uiState.loginErrorMessage.isNotEmpty()) {
                         Text(
