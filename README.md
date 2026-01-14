@@ -212,6 +212,12 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | `POST` | `/api/photos/batch` | 다중 사진 업로드 & AI 분석 |
 | `POST` | `/api/generate-embedding` | 사용자 임베딩 생성 |
 
+## Video 
+
+
+https://github.com/user-attachments/assets/f6843c46-e267-441f-8b68-a809aae095d5
+
+
 
 ---
 <p align="center">
