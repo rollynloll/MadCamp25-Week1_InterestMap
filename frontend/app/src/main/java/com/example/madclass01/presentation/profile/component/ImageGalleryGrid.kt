@@ -3,9 +3,7 @@ package com.example.madclass01.presentation.profile.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,51 +30,68 @@ fun ImageGalleryGrid(
     onAddImage: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+    // Custom Grid implementation to work inside Scrollable Column
+    val columns = 3
+    // Create a list of all items including the "Add" button as the first item
+    val allItems = listOf<Any?>(Unit) + images
+
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(2.dp) // Add slight padding to avoid clipping shadows
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Add Button
-        item {
-            Box(
-                modifier = Modifier
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFFF9F9F9))
-                    .clickable { onAddImage() },
-                contentAlignment = Alignment.Center
+        // Chunk items into rows
+        allItems.chunked(columns).forEach { rowItems ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                 // Dashed border drawing to match ImagePickerButton
-                androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-                    val stroke = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                    )
-                    drawRoundRect(
-                        color = Color(0xFFE0E0E0),
-                        size = size,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
-                        style = stroke
-                    )
+                rowItems.forEach { item ->
+                    Box(modifier = Modifier.weight(1f)) {
+                        if (item == Unit) {
+                            // Add Button
+                            Box(
+                                modifier = Modifier
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(Color(0xFFF9F9F9))
+                                    .clickable { onAddImage() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Dashed border drawing to match ImagePickerButton
+                                androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+                                    val stroke = Stroke(
+                                        width = 2.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                                    )
+                                    drawRoundRect(
+                                        color = Color(0xFFE0E0E0),
+                                        size = size,
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()),
+                                        style = stroke
+                                    )
+                                }
+
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "사진 추가",
+                                    tint = Color(0xFFFF9945),
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                        } else if (item is ImageItem) {
+                            ImageThumbnail(
+                                imageUri = item.uri,
+                                onRemove = { onRemoveImage(item.uri) }
+                            )
+                        }
+                    }
                 }
                 
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "사진 추가",
-                    tint = Color(0xFFFF9945),
-                    modifier = Modifier.size(28.dp)
-                )
+                // Fill empty spaces if row is not full to maintain grid alignment
+                repeat(columns - rowItems.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
-        }
-
-        items(images) { imageItem ->
-            ImageThumbnail(
-                imageUri = imageItem.uri,
-                onRemove = { onRemoveImage(imageItem.uri) }
-            )
         }
     }
 }
